@@ -8,6 +8,7 @@
       </div>
       <div class="header-actions">
         <el-button 
+          v-if="isAdmin"
           type="primary" 
           icon="Plus" 
           @click="openCreateDialog"
@@ -119,6 +120,7 @@
                 详情
               </el-button>
               <el-button
+                v-if="isAdmin"
                 size="small"
                 type="warning"
                 icon="Edit"
@@ -127,6 +129,7 @@
                 编辑
               </el-button>
               <el-button
+                v-if="isAdmin"
                 size="small"
                 :type="row.is_active ? 'danger' : 'success'"
                 @click="handleToggleStatus(row)"
@@ -134,6 +137,7 @@
                 {{ row.is_active ? '禁用' : '启用' }}
               </el-button>
               <el-button
+                v-if="isAdmin"
                 size="small"
                 type="danger"
                 icon="Delete"
@@ -269,7 +273,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, reactive } from 'vue'
+import { ref, onMounted, reactive, computed } from 'vue'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { useVendorStore } from '@/stores/vendors'
 import type { Vendor, VendorCreateRequest, VendorUpdateRequest } from '@/api/vendors'
@@ -299,6 +303,14 @@ const form = reactive<VendorCreateRequest & { id?: number }>({
 })
 
 const formRef = ref<FormInstance>()
+
+// 用户权限检查
+const userInfo = computed(() => {
+  const userInfoStr = localStorage.getItem('user_info')
+  return userInfoStr ? JSON.parse(userInfoStr) : null
+})
+
+const isAdmin = computed(() => userInfo.value?.role === 'admin')
 
 // 表单验证规则
 const rules: FormRules = {

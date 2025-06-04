@@ -33,7 +33,7 @@ const router = createRouter({
       path: '/vendors',
       name: 'vendors',
       component: () => import('../views/VendorList.vue'),
-      meta: { requiresAuth: true }
+      meta: { requiresAuth: true, requiresAdmin: true }
     },
     {
       path: '/models',
@@ -53,12 +53,20 @@ const router = createRouter({
 // 路由守卫
 router.beforeEach((to, from, next) => {
   const token = localStorage.getItem('auth_token')
+  const userInfoStr = localStorage.getItem('user_info')
+  const userInfo = userInfoStr ? JSON.parse(userInfoStr) : null
+  
   const requiresAuth = to.meta.requiresAuth !== false
+  const requiresAdmin = to.meta.requiresAdmin === true
 
   if (requiresAuth && !token) {
     // 需要认证但没有token，跳转到登录页
     ElMessage.warning('请先登录')
     next('/login')
+  } else if (requiresAdmin && (!userInfo || userInfo.role !== 'admin')) {
+    // 需要管理员权限但不是管理员
+    ElMessage.error('需要管理员权限才能访问此页面')
+    next('/')
   } else if (to.path === '/login' && token) {
     // 已登录用户访问登录页，跳转到首页
     next('/')
