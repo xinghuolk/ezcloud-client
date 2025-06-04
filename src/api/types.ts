@@ -1,20 +1,23 @@
 // 通用响应结构
 export interface ApiResponse<T = any> {
-  code: number
+  success: boolean
   message: string
   data: T
-  timestamp: string
+  timestamp?: string
+}
+
+// 分页参数
+export interface PaginationParams {
+  page?: number
+  limit?: number
 }
 
 // 分页响应结构
-export interface PaginationResponse<T> {
-  items: T[]
-  pagination: {
+export interface PaginationResponse {
+  total: number
     page: number
     limit: number
-    total: number
-    pages: number
-  }
+  totalPages: number
 }
 
 // 用户相关类型

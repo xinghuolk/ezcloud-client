@@ -112,8 +112,12 @@
 import { ref, reactive } from 'vue'
 import { ElMessage } from 'element-plus'
 import { User, Lock } from '@element-plus/icons-vue'
+import { useRouter } from 'vue-router'
 import { authApi } from '@/api'
 import type { LoginParams, RegisterParams } from '@/api/types'
+
+// 路由
+const router = useRouter()
 
 // 表单引用
 const loginFormRef = ref()
@@ -190,12 +194,15 @@ const handleLogin = async () => {
     
     const response = await authApi.login(loginForm)
     
-    // 保存token
+    // 保存token和用户信息
     localStorage.setItem('auth_token', response.data.token)
+    localStorage.setItem('user_info', JSON.stringify(response.data.user))
     
     ElMessage.success('登录成功！')
     
-    // 这里可以跳转到主页面
+    // 跳转到主页面
+    await router.push('/')
+    
     console.log('登录成功，用户信息：', response.data.user)
     
   } catch (error) {

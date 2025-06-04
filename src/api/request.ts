@@ -3,7 +3,7 @@ import { ElMessage } from 'element-plus'
 
 // 创建axios实例
 const request = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
+  baseURL: import.meta.env.VITE_API_BASE_URL || '',
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
@@ -30,10 +30,22 @@ request.interceptors.response.use(
   (response: AxiosResponse) => {
     const { data } = response
     
-    // 统一处理响应格式
-    if (data.code !== undefined && data.code !== 200) {
+    // 统一处理响应格式，转换为前端期望的格式
+    if (data.code !== undefined) {
+      // 后端返回格式：{code, message, data}
+      // 转换为前端期望格式：{success, message, data}
+      const transformedData = {
+        success: data.code >= 200 && data.code < 300,
+        message: data.message,
+        data: data.data
+      }
+      
+      if (!transformedData.success) {
       ElMessage.error(data.message || '请求失败')
       return Promise.reject(new Error(data.message || '请求失败'))
+      }
+      
+      return transformedData
     }
     
     return data
