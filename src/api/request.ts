@@ -1,9 +1,10 @@
 import axios, { type AxiosResponse, type AxiosError, type InternalAxiosRequestConfig } from 'axios'
 import { ElMessage } from 'element-plus'
+import router from '@/router'
 
 // 创建axios实例
 const request = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || '',
+  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000',
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
@@ -21,6 +22,7 @@ request.interceptors.request.use(
     return config
   },
   (error: AxiosError) => {
+    console.error('Request error:', error)
     return Promise.reject(error)
   }
 )
@@ -30,52 +32,70 @@ request.interceptors.response.use(
   (response: AxiosResponse) => {
     const { data } = response
     
-    // 统一处理响应格式，转换为前端期望的格式
-    if (data.code !== undefined) {
-      // 后端返回格式：{code, message, data}
-      // 转换为前端期望格式：{success, message, data}
-      const transformedData = {
-        success: data.code >= 200 && data.code < 300,
-        message: data.message,
-        data: data.data
-      }
-      
-      if (!transformedData.success) {
-      ElMessage.error(data.message || '请求失败')
-      return Promise.reject(new Error(data.message || '请求失败'))
-      }
-      
-      return transformedData
+    // 处理blob响应（如文件下载）
+    if (response.config.responseType === 'blob') {
+      return data
     }
     
+    // 新的统一响应格式：{success, message, data}
+    if (typeof data === 'object' && data !== null) {
+      // 如果响应不成功，显示错误消息
+      if (data.success === false) {
+        ElMessage.error(data.message || 'Request failed')
+        return Promise.reject(new Error(data.message || 'Request failed'))
+      }
+      
+      // 响应成功，返回完整响应数据
+      return data
+    }
+    
+    // 如果响应格式不符合预期，直接返回
     return data
   },
   (error: AxiosError) => {
     // 处理HTTP错误状态码
     if (error.response) {
       const { status, data } = error.response
+      let errorMessage = 'Request failed'
+      
+      // 尝试从响应数据中获取错误消息
+      if (data && typeof data === 'object') {
+        errorMessage = (data as any).message || errorMessage
+      }
+      
       switch (status) {
         case 401:
-          ElMessage.error('未授权，请重新登录')
+          errorMessage = 'Unauthorized, please login again'
+          ElMessage.error(errorMessage)
+          // 清除本地存储的认证信息
           localStorage.removeItem('auth_token')
-          // 这里可以跳转到登录页面
+          localStorage.removeItem('user_info')
+          // 跳转到登录页面
+          router.push('/login')
           break
         case 403:
-          ElMessage.error('拒绝访问')
+          errorMessage = 'Access denied'
+          ElMessage.error(errorMessage)
           break
         case 404:
-          ElMessage.error('请求的资源不存在')
+          errorMessage = 'Resource not found'
+          ElMessage.error(errorMessage)
+          break
+        case 429:
+          errorMessage = 'Too many requests, please try again later'
+          ElMessage.error(errorMessage)
           break
         case 500:
-          ElMessage.error('服务器内部错误')
+          errorMessage = 'Internal server error'
+          ElMessage.error(errorMessage)
           break
         default:
-          ElMessage.error((data as any)?.message || '请求失败')
+          ElMessage.error(errorMessage)
       }
     } else if (error.request) {
-      ElMessage.error('网络错误，请检查网络连接')
+      ElMessage.error('Network error, please check your connection')
     } else {
-      ElMessage.error('请求配置错误')
+      ElMessage.error('Request configuration error')
     }
     
     return Promise.reject(error)

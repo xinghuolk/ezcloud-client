@@ -13,7 +13,8 @@ export interface PaginationParams {
 }
 
 // 分页响应结构
-export interface PaginationResponse {
+export interface PaginationResponse<T = any> {
+  items: T[]
   total: number
   page: number
   limit: number

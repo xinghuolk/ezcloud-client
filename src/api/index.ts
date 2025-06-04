@@ -42,6 +42,11 @@ export const authApi = {
   // Token刷新
   refreshToken: (): Promise<ApiResponse<{ token: string }>> => {
     return request.post('/api/v1/auth/refresh')
+  },
+
+  // 修改密码
+  changePassword: (params: { currentPassword: string; newPassword: string }): Promise<ApiResponse<void>> => {
+    return request.put('/api/v1/auth/password', params)
   }
 }
 

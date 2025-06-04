@@ -3,8 +3,8 @@
     <el-card class="login-card">
       <template #header>
         <div class="card-header">
-          <h2>EzCloud 设备管理平台</h2>
-          <p>用户登录</p>
+          <h2>EzCloud Device Management Platform</h2>
+          <p>User Login</p>
         </div>
       </template>
       
@@ -15,20 +15,20 @@
         label-width="80px"
         size="large"
       >
-        <el-form-item label="邮箱" prop="email">
+        <el-form-item label="Email" prop="email">
           <el-input
             v-model="loginForm.email"
             type="email"
-            placeholder="请输入邮箱"
+            placeholder="Please enter your email"
             :prefix-icon="User"
           />
         </el-form-item>
         
-        <el-form-item label="密码" prop="password">
+        <el-form-item label="Password" prop="password">
           <el-input
             v-model="loginForm.password"
             type="password"
-            placeholder="请输入密码"
+            placeholder="Please enter your password"
             :prefix-icon="Lock"
             show-password
           />
@@ -41,7 +41,7 @@
             @click="handleLogin"
             style="width: 100%"
           >
-            {{ loading ? '登录中...' : '登录' }}
+            {{ loading ? 'Logging in...' : 'Login' }}
           </el-button>
         </el-form-item>
         
@@ -51,46 +51,46 @@
             @click="showRegister = true"
             style="width: 100%"
           >
-            还没有账号？点击注册
+            Don't have an account? Register here
           </el-button>
         </el-form-item>
       </el-form>
     </el-card>
 
-    <!-- 注册对话框 -->
-    <el-dialog v-model="showRegister" title="用户注册" width="400px">
+    <!-- Register Dialog -->
+    <el-dialog v-model="showRegister" title="User Registration" width="400px">
       <el-form
         ref="registerFormRef"
         :model="registerForm"
         :rules="registerRules"
-        label-width="80px"
+        label-width="100px"
       >
-        <el-form-item label="用户名" prop="username">
-          <el-input v-model="registerForm.username" placeholder="请输入用户名" />
+        <el-form-item label="Username" prop="username">
+          <el-input v-model="registerForm.username" placeholder="Please enter username" />
         </el-form-item>
         
-        <el-form-item label="邮箱" prop="email">
-          <el-input v-model="registerForm.email" type="email" placeholder="请输入邮箱" />
+        <el-form-item label="Email" prop="email">
+          <el-input v-model="registerForm.email" type="email" placeholder="Please enter email address" />
         </el-form-item>
         
-        <el-form-item label="手机号" prop="phone">
-          <el-input v-model="registerForm.phone" placeholder="请输入手机号（可选）" />
+        <el-form-item label="Phone" prop="phone">
+          <el-input v-model="registerForm.phone" placeholder="Phone number (optional)" />
         </el-form-item>
         
-        <el-form-item label="密码" prop="password">
+        <el-form-item label="Password" prop="password">
           <el-input
             v-model="registerForm.password"
             type="password"
-            placeholder="请输入密码"
+            placeholder="Please enter password"
             show-password
           />
         </el-form-item>
         
-        <el-form-item label="确认密码" prop="confirmPassword">
+        <el-form-item label="Confirm" prop="confirmPassword">
           <el-input
             v-model="registerForm.confirmPassword"
             type="password"
-            placeholder="请确认密码"
+            placeholder="Please confirm password"
             show-password
           />
         </el-form-item>
@@ -98,9 +98,9 @@
       
       <template #footer>
         <span class="dialog-footer">
-          <el-button @click="showRegister = false">取消</el-button>
+          <el-button @click="showRegister = false">Cancel</el-button>
           <el-button type="primary" :loading="registerLoading" @click="handleRegister">
-            {{ registerLoading ? '注册中...' : '注册' }}
+            {{ registerLoading ? 'Registering...' : 'Register' }}
           </el-button>
         </span>
       </template>
@@ -114,27 +114,31 @@ import { ElMessage } from 'element-plus'
 import { User, Lock } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
 import { authApi } from '@/api'
+import { useUserStore } from '@/stores/user'
 import type { LoginParams, RegisterParams } from '@/api/types'
 
-// 路由
+// Router
 const router = useRouter()
 
-// 表单引用
+// Store
+const userStore = useUserStore()
+
+// Form refs
 const loginFormRef = ref()
 const registerFormRef = ref()
 
-// 状态
+// State
 const loading = ref(false)
 const registerLoading = ref(false)
 const showRegister = ref(false)
 
-// 登录表单
+// Login form
 const loginForm = reactive<LoginParams>({
   email: '',
   password: ''
 })
 
-// 注册表单
+// Register form
 const registerForm = reactive<RegisterParams & { confirmPassword: string }>({
   username: '',
   email: '',
@@ -143,38 +147,40 @@ const registerForm = reactive<RegisterParams & { confirmPassword: string }>({
   confirmPassword: ''
 })
 
-// 登录表单验证规则
+// Login form validation rules
 const loginRules = {
   email: [
-    { required: true, message: '请输入邮箱', trigger: 'blur' },
-    { type: 'email', message: '请输入正确的邮箱格式', trigger: 'blur' }
+    { required: true, message: 'Please enter your email', trigger: 'blur' },
+    { type: 'email', message: 'Please enter a valid email address', trigger: 'blur' }
   ],
   password: [
-    { required: true, message: '请输入密码', trigger: 'blur' },
-    { min: 6, message: '密码长度至少6位', trigger: 'blur' }
+    { required: true, message: 'Please enter your password', trigger: 'blur' },
+    { min: 6, message: 'Password must be at least 6 characters', trigger: 'blur' }
   ]
 }
 
-// 注册表单验证规则
+// Register form validation rules
 const registerRules = {
   username: [
-    { required: true, message: '请输入用户名', trigger: 'blur' },
-    { min: 3, max: 50, message: '用户名长度在3-50个字符', trigger: 'blur' }
+    { required: true, message: 'Please enter username', trigger: 'blur' },
+    { min: 3, max: 50, message: 'Username must be between 3-50 characters', trigger: 'blur' },
+    { pattern: /^[a-zA-Z0-9_]+$/, message: 'Username can only contain letters, numbers and underscores', trigger: 'blur' }
   ],
   email: [
-    { required: true, message: '请输入邮箱', trigger: 'blur' },
-    { type: 'email', message: '请输入正确的邮箱格式', trigger: 'blur' }
+    { required: true, message: 'Please enter email address', trigger: 'blur' },
+    { type: 'email', message: 'Please enter a valid email address', trigger: 'blur' }
   ],
   password: [
-    { required: true, message: '请输入密码', trigger: 'blur' },
-    { min: 6, message: '密码长度至少6位', trigger: 'blur' }
+    { required: true, message: 'Please enter password', trigger: 'blur' },
+    { min: 6, message: 'Password must be at least 6 characters', trigger: 'blur' },
+    { pattern: /^(?=.*[a-zA-Z])(?=.*\d)/, message: 'Password must contain at least one letter and one number', trigger: 'blur' }
   ],
   confirmPassword: [
-    { required: true, message: '请确认密码', trigger: 'blur' },
+    { required: true, message: 'Please confirm password', trigger: 'blur' },
     {
       validator: (rule: any, value: string, callback: Function) => {
         if (value !== registerForm.password) {
-          callback(new Error('两次输入密码不一致'))
+          callback(new Error('Password confirmation does not match'))
         } else {
           callback()
         }
@@ -184,7 +190,7 @@ const registerRules = {
   ]
 }
 
-// 处理登录
+// Handle login
 const handleLogin = async () => {
   if (!loginFormRef.value) return
   
@@ -194,25 +200,28 @@ const handleLogin = async () => {
     
     const response = await authApi.login(loginForm)
     
-    // 保存token和用户信息
-    localStorage.setItem('auth_token', response.data.token)
-    localStorage.setItem('user_info', JSON.stringify(response.data.user))
+    if (response.success) {
+      // Save authentication info to store and localStorage
+      userStore.setToken(response.data.token)
+      userStore.setUser(response.data.user)
+      
+      ElMessage.success('Login successful!')
+      
+      // Redirect to home page
+      await router.push('/')
+      
+      console.log('Login successful, user info:', response.data.user)
+    }
     
-    ElMessage.success('登录成功！')
-    
-    // 跳转到主页面
-    await router.push('/')
-    
-    console.log('登录成功，用户信息：', response.data.user)
-    
-  } catch (error) {
-    console.error('登录失败：', error)
+  } catch (error: any) {
+    console.error('Login failed:', error)
+    ElMessage.error(error.message || 'Login failed')
   } finally {
     loading.value = false
   }
 }
 
-// 处理注册
+// Handle register
 const handleRegister = async () => {
   if (!registerFormRef.value) return
   
@@ -223,20 +232,27 @@ const handleRegister = async () => {
     const { confirmPassword, ...registerData } = registerForm
     const response = await authApi.register(registerData)
     
-    ElMessage.success('注册成功！请使用新账号登录')
-    showRegister.value = false
+    if (response.success) {
+      ElMessage.success('Registration successful! Please login with your new account.')
+      showRegister.value = false
+      
+      // Clear register form
+      Object.assign(registerForm, {
+        username: '',
+        email: '',
+        phone: '',
+        password: '',
+        confirmPassword: ''
+      })
+      
+      // Auto-fill login form with new account info
+      loginForm.email = registerData.email
+      loginForm.password = ''
+    }
     
-    // 清空注册表单
-    Object.assign(registerForm, {
-      username: '',
-      email: '',
-      phone: '',
-      password: '',
-      confirmPassword: ''
-    })
-    
-  } catch (error) {
-    console.error('注册失败：', error)
+  } catch (error: any) {
+    console.error('Registration failed:', error)
+    ElMessage.error(error.message || 'Registration failed')
   } finally {
     registerLoading.value = false
   }
