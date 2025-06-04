@@ -84,7 +84,16 @@
         @sort-change="handleSortChange"
       >
         <el-table-column prop="id" label="ID" width="80" sortable="custom" />
-        <el-table-column prop="oemname" label="厂商名称" min-width="120" />
+        <el-table-column prop="oemname" label="厂商名称" min-width="120">
+          <template #default="{ row }">
+            <div>
+              <div>{{ row.oemname }}</div>
+              <div v-if="row.vendor" class="vendor-info">
+                <el-tag size="small" type="info">{{ row.vendor.name }}</el-tag>
+              </div>
+            </div>
+          </template>
+        </el-table-column>
         <el-table-column prop="stdname" label="标准型号名" min-width="150" />
         <el-table-column prop="devtype" label="设备类型" width="120">
           <template #default="{ row }">
@@ -149,8 +158,34 @@
         :rules="rules"
         label-width="120px"
       >
+        <el-form-item label="选择厂商" prop="vendor_id">
+          <el-select
+            v-model="form.vendor_id"
+            placeholder="请选择厂商"
+            style="width: 100%"
+            filterable
+            @change="onVendorChange"
+          >
+            <el-option
+              v-for="vendor in vendorStore.activeVendors"
+              :key="vendor.id"
+              :label="vendor.name"
+              :value="vendor.id"
+            />
+          </el-select>
+        </el-form-item>
         <el-form-item label="厂商名称" prop="oemname">
-          <el-input v-model="form.oemname" placeholder="请输入厂商名称，如：华为、小米" />
+          <el-input 
+            v-model="form.oemname" 
+            placeholder="厂商名称将自动填充"
+            :disabled="!!form.vendor_id"
+          />
+          <div class="form-help" v-if="form.vendor_id">
+            <el-text size="small" type="info">厂商名称已从选择的厂商自动填充</el-text>
+          </div>
+          <div class="form-help" v-else>
+            <el-text size="small" type="warning">建议选择厂商以保持数据一致性</el-text>
+          </div>
         </el-form-item>
         <el-form-item label="标准型号名" prop="stdname">
           <el-input v-model="form.stdname" placeholder="请输入标准型号名，如：HG8045Q、AX6000" />
@@ -199,6 +234,9 @@
       <div v-if="currentModel" class="model-detail">
         <el-descriptions :column="2" border>
           <el-descriptions-item label="ID">{{ currentModel.id }}</el-descriptions-item>
+          <el-descriptions-item label="关联厂商" v-if="currentModel.vendor">
+            <el-tag type="info">{{ currentModel.vendor.name }}</el-tag>
+          </el-descriptions-item>
           <el-descriptions-item label="厂商名称">{{ currentModel.oemname }}</el-descriptions-item>
           <el-descriptions-item label="标准型号名">{{ currentModel.stdname }}</el-descriptions-item>
           <el-descriptions-item label="设备类型">
@@ -234,11 +272,13 @@ import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance } from 'element-plus'
 import { Plus, Search, Refresh } from '@element-plus/icons-vue'
 import { useModelsStore } from '@/stores/models'
+import { useVendorStore } from '@/stores/vendors'
 import { DEVICE_TYPES, getDeviceTypeLabel, type DeviceModel, type ModelCreateParams } from '@/api/models'
 import { formatDateTime } from '@/utils/date'
 
 // Store
 const modelsStore = useModelsStore()
+const vendorStore = useVendorStore()
 
 // 响应式数据
 const searchForm = reactive({
@@ -249,6 +289,7 @@ const searchForm = reactive({
 })
 
 const form = reactive<ModelCreateParams>({
+  vendor_id: undefined,
   oemname: '',
   stdname: '',
   devtype: '',
@@ -269,6 +310,9 @@ const dialogTitle = computed(() => editingId.value ? '编辑型号' : '新增型
 
 // 表单验证规则
 const rules = {
+  vendor_id: [
+    { required: true, message: '请选择厂商', trigger: 'change' }
+  ],
   oemname: [
     { required: true, message: '请输入厂商名称', trigger: 'blur' },
     { max: 100, message: '厂商名称长度不能超过100字符', trigger: 'blur' }
@@ -299,16 +343,47 @@ const getDeviceTypeTagType = (type: string) => {
   return typeMap[type] || ''
 }
 
+// 厂商选择变化处理
+const onVendorChange = (vendorId: number) => {
+  const selectedVendor = vendorStore.vendors.find(v => v.id === vendorId)
+  if (selectedVendor) {
+    form.oemname = selectedVendor.name
+  }
+}
+
+// 重置表单
+const resetForm = () => {
+  Object.assign(form, {
+    vendor_id: undefined,
+    oemname: '',
+    stdname: '',
+    devtype: '',
+    description: '',
+    is_active: true
+  })
+  formRef.value?.clearValidate()
+}
+
 // 事件处理函数
-const handleAdd = () => {
+const handleAdd = async () => {
+  // 确保厂商数据已加载
+  if (vendorStore.vendors.length === 0) {
+    await vendorStore.fetchVendors({ is_active: true })
+  }
   editingId.value = null
   resetForm()
   dialogVisible.value = true
 }
 
-const handleEdit = (row: DeviceModel) => {
+const handleEdit = async (row: DeviceModel) => {
+  // 确保厂商数据已加载
+  if (vendorStore.vendors.length === 0) {
+    await vendorStore.fetchVendors({ is_active: true })
+  }
+  
   editingId.value = row.id
   Object.assign(form, {
+    vendor_id: row.vendor_id || undefined,
     oemname: row.oemname,
     stdname: row.stdname,
     devtype: row.devtype,
@@ -394,20 +469,12 @@ const viewSerials = (row: DeviceModel) => {
   ElMessage.info('序列号管理功能正在开发中')
 }
 
-const resetForm = () => {
-  Object.assign(form, {
-    oemname: '',
-    stdname: '',
-    devtype: '',
-    description: '',
-    is_active: true
-  })
-  formRef.value?.clearValidate()
-}
-
 // 生命周期
-onMounted(() => {
-  modelsStore.fetchModels()
+onMounted(async () => {
+  await Promise.all([
+    modelsStore.fetchModels(),
+    vendorStore.fetchVendors({ is_active: true })
+  ])
 })
 </script>
 
@@ -442,5 +509,13 @@ onMounted(() => {
 
 :deep(.el-descriptions__label) {
   font-weight: 600;
+}
+
+.vendor-info {
+  margin-top: 4px;
+}
+
+.form-help {
+  margin-top: 4px;
 }
 </style> 

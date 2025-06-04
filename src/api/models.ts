@@ -4,6 +4,7 @@ import type { ApiResponse, PaginationParams, PaginationResponse } from './types'
 // 设备型号相关类型定义
 export interface DeviceModel {
   id: number
+  vendor_id?: number
   oemname: string
   stdname: string
   devtype: string
@@ -15,6 +16,7 @@ export interface DeviceModel {
 }
 
 export interface ModelCreateParams {
+  vendor_id?: number
   oemname: string
   stdname: string
   devtype: string
