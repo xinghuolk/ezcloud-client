@@ -15,8 +15,8 @@ export interface PaginationParams {
 // 分页响应结构
 export interface PaginationResponse {
   total: number
-    page: number
-    limit: number
+  page: number
+  limit: number
   totalPages: number
 }
 

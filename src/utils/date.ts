@@ -4,30 +4,35 @@
 
 /**
  * 格式化日期时间
- * @param date 日期字符串或Date对象
- * @param format 格式化模板，默认为 'YYYY-MM-DD HH:mm:ss'
+ * @param date 日期字符串或日期对象
+ * @param format 格式类型
  * @returns 格式化后的日期字符串
  */
-export function formatDateTime(date: string | Date, format = 'YYYY-MM-DD HH:mm:ss'): string {
+export function formatDateTime(date: string | Date, format: 'datetime' | 'date' | 'time' = 'datetime'): string {
   if (!date) return ''
   
-  const d = new Date(date)
-  if (isNaN(d.getTime())) return ''
-
-  const year = d.getFullYear()
-  const month = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  const hours = String(d.getHours()).padStart(2, '0')
-  const minutes = String(d.getMinutes()).padStart(2, '0')
-  const seconds = String(d.getSeconds()).padStart(2, '0')
-
-  return format
-    .replace('YYYY', String(year))
-    .replace('MM', month)
-    .replace('DD', day)
-    .replace('HH', hours)
-    .replace('mm', minutes)
-    .replace('ss', seconds)
+  const dateObj = typeof date === 'string' ? new Date(date) : date
+  
+  if (isNaN(dateObj.getTime())) {
+    return ''
+  }
+  
+  const year = dateObj.getFullYear()
+  const month = String(dateObj.getMonth() + 1).padStart(2, '0')
+  const day = String(dateObj.getDate()).padStart(2, '0')
+  const hours = String(dateObj.getHours()).padStart(2, '0')
+  const minutes = String(dateObj.getMinutes()).padStart(2, '0')
+  const seconds = String(dateObj.getSeconds()).padStart(2, '0')
+  
+  switch (format) {
+    case 'date':
+      return `${year}-${month}-${day}`
+    case 'time':
+      return `${hours}:${minutes}:${seconds}`
+    case 'datetime':
+    default:
+      return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
+  }
 }
 
 /**
@@ -36,7 +41,7 @@ export function formatDateTime(date: string | Date, format = 'YYYY-MM-DD HH:mm:s
  * @returns 格式化后的日期字符串 (YYYY-MM-DD)
  */
 export function formatDate(date: string | Date): string {
-  return formatDateTime(date, 'YYYY-MM-DD')
+  return formatDateTime(date, 'date')
 }
 
 /**
@@ -45,7 +50,7 @@ export function formatDate(date: string | Date): string {
  * @returns 格式化后的时间字符串 (HH:mm:ss)
  */
 export function formatTime(date: string | Date): string {
-  return formatDateTime(date, 'HH:mm:ss')
+  return formatDateTime(date, 'time')
 }
 
 /**
@@ -108,4 +113,32 @@ export function isYesterday(date: string | Date): boolean {
   const yesterday = new Date()
   yesterday.setDate(yesterday.getDate() - 1)
   return d.toDateString() === yesterday.toDateString()
+}
+
+/**
+ * 格式化相对时间
+ * @param date 日期字符串或日期对象
+ * @returns 相对时间字符串
+ */
+export function formatRelativeTime(date: string | Date): string {
+  if (!date) return ''
+  
+  const dateObj = typeof date === 'string' ? new Date(date) : date
+  const now = new Date()
+  const diff = now.getTime() - dateObj.getTime()
+  
+  const seconds = Math.floor(diff / 1000)
+  const minutes = Math.floor(seconds / 60)
+  const hours = Math.floor(minutes / 60)
+  const days = Math.floor(hours / 24)
+  
+  if (days > 0) {
+    return `${days}天前`
+  } else if (hours > 0) {
+    return `${hours}小时前`
+  } else if (minutes > 0) {
+    return `${minutes}分钟前`
+  } else {
+    return '刚刚'
+  }
 } 
