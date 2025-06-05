@@ -100,7 +100,12 @@ export const serialsApi = {
     search?: string
   }): Promise<ApiResponse<{
     serials: SerialNumber[]
-    pagination: PaginationResponse
+    pagination: {
+      page: number
+      limit: number
+      total: number
+      totalPages: number
+    }
   }>> => {
     return request.get('/serials', { params })
   },
@@ -108,7 +113,12 @@ export const serialsApi = {
   // 获取批次列表
   getBatches: (params: PaginationParams): Promise<ApiResponse<{
     batches: BatchInfo[]
-    pagination: PaginationResponse
+    pagination: {
+      page: number
+      limit: number
+      total: number
+      totalPages: number
+    }
   }>> => {
     return request.get('/serials/batches', { params })
   },
@@ -117,7 +127,12 @@ export const serialsApi = {
   getBatchDetail: (batchId: string, params: PaginationParams): Promise<ApiResponse<{
     batch_id: string
     serials: SerialNumber[]
-    pagination: PaginationResponse
+    pagination: {
+      page: number
+      limit: number
+      total: number
+      totalPages: number
+    }
   }>> => {
     return request.get(`/serials/batches/${batchId}`, { params })
   },

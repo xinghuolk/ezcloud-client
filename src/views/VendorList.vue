@@ -425,15 +425,21 @@ const handleSubmit = async () => {
     
     submitting.value = true
     
-    const vendorData: VendorCreateRequest | VendorUpdateRequest = {
-      name: form.name.trim(),
-      description: form.description?.trim() || undefined,
-      is_active: form.is_active
-    }
-    
     if (editingId.value) {
+      // 更新厂商
+      const vendorData: VendorUpdateRequest = {
+        name: form.name.trim(),
+        description: form.description?.trim() || undefined,
+        is_active: form.is_active
+      }
       await vendorStore.updateVendor(editingId.value, vendorData)
     } else {
+      // 创建厂商
+      const vendorData: VendorCreateRequest = {
+        name: form.name.trim(),
+        description: form.description?.trim() || undefined,
+        is_active: form.is_active
+      }
       await vendorStore.createVendor(vendorData)
     }
     

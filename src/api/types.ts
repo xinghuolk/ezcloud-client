@@ -19,7 +19,7 @@ export interface PaginationResponse<T = any> {
     page: number
     limit: number
     total: number
-    pages: number
+    totalPages: number
   }
 }
 

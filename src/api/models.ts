@@ -13,6 +13,10 @@ export interface DeviceModel {
   serialNumberCount?: number
   created_at: string
   updated_at: string
+  vendor?: {
+    id: number
+    name: string
+  }
 }
 
 export interface ModelCreateParams {
@@ -37,7 +41,12 @@ export interface ModelListParams extends PaginationParams {
 
 export interface ModelListResponse {
   models: DeviceModel[]
-  pagination: PaginationResponse
+  pagination: {
+    page: number
+    limit: number
+    total: number
+    totalPages: number
+  }
 }
 
 export interface ModelStatsResponse {
