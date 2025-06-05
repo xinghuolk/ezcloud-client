@@ -122,7 +122,7 @@ export const serialApi = {
 // 设备管理API
 export const deviceApi = {
   // 获取设备列表
-  getDevices: (params?: DeviceQuery): Promise<ApiResponse<PaginationResponse<Device>>> => {
+  getDevices: (params?: DeviceQuery): Promise<ApiResponse<{ devices: Device[]; pagination: { page: number; limit: number; total: number; pages: number } }>> => {
     return request.get('/devices', { params })
   },
 

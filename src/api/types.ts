@@ -15,10 +15,12 @@ export interface PaginationParams {
 // 分页响应结构
 export interface PaginationResponse<T = any> {
   items: T[]
-  total: number
-  page: number
-  limit: number
-  totalPages: number
+  pagination: {
+    page: number
+    limit: number
+    total: number
+    pages: number
+  }
 }
 
 // 用户相关类型
@@ -110,10 +112,29 @@ export interface Device {
   created_at: string
   updated_at: string
   // 关联数据
-  oemname?: string
-  stdname?: string
-  devtype?: string
-  username?: string
+  deviceModel?: {
+    id: number
+    oemname: string
+    stdname: string
+    devtype: string
+    vendor?: {
+      id: number
+      name: string
+    }
+  }
+  user?: {
+    id: number
+    username: string
+    email: string
+  }
+  serialNumber?: {
+    id: number
+    batch_id: string
+    mac_start: string
+    mac_count: number
+    mac_interval: number
+    status: string
+  }
 }
 
 export interface DeviceBindParams {
@@ -123,7 +144,9 @@ export interface DeviceBindParams {
 export interface DeviceQuery {
   page?: number
   limit?: number
+  search?: string
   is_online?: boolean
+  is_activate?: boolean
   oemname?: string
   stdname?: string
   serial?: string

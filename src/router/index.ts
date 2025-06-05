@@ -37,6 +37,12 @@ const router = createRouter({
       meta: { requiresAuth: true }
     },
     {
+      path: '/devices/bind',
+      name: 'device-bind',
+      component: () => import('../views/DeviceBindView.vue'),
+      meta: { requiresAuth: true }
+    },
+    {
       path: '/vendors',
       name: 'vendors',
       component: () => import('../views/VendorList.vue'),
