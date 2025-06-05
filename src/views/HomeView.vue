@@ -1,264 +1,422 @@
 <template>
-  <div class="home-container">
-    <el-card class="welcome-card">
-      <template #header>
-        <div class="card-header">
-          <h2>欢迎使用 EzCloud 设备管理平台</h2>
-          <p>物联网设备管理的完整解决方案</p>
+  <div class="dashboard">
+    <!-- 页面标题 -->
+    <div class="page-header">
+      <h1>Dashboard</h1>
+      <p>Welcome back, {{ userStore.userInfo?.username }}!</p>
+    </div>
+
+    <!-- 统计卡片 -->
+    <div class="stats-grid">
+      <el-card class="stat-card">
+        <div class="stat-content">
+          <div class="stat-icon online">
+            <el-icon><Monitor /></el-icon>
+          </div>
+          <div class="stat-info">
+            <h3>{{ stats.onlineDevices }}</h3>
+            <p>Online Devices</p>
+          </div>
         </div>
-      </template>
-      
-      <div class="content">
-        <el-row :gutter="20">
-          <!-- 快速导航 -->
-          <el-col :span="24" :md="12" :lg="8">
-            <el-card shadow="hover" class="nav-card">
-              <div class="nav-item" @click="navigateTo('/models')">
-                <el-icon size="40" color="#409EFF">
-                  <Setting />
-                </el-icon>
-                <h3>设备型号管理</h3>
-                <p>管理设备型号信息，创建和维护不同厂商的设备型号</p>
-              </div>
-            </el-card>
-          </el-col>
-          
-          <el-col :span="24" :md="12" :lg="8">
-            <el-card shadow="hover" class="nav-card">
-              <div class="nav-item" @click="navigateTo('/serials')">
-                <el-icon size="40" color="#67C23A">
-                  <Document />
-                </el-icon>
-                <h3>序列号管理</h3>
-                <p>批量生成和管理设备序列号，支持MAC地址分配</p>
-              </div>
-            </el-card>
-          </el-col>
-          
-          <el-col :span="24" :md="12" :lg="8">
-            <el-card shadow="hover" class="nav-card">
-              <div class="nav-item" @click="navigateTo('/devices')">
-                <el-icon size="40" color="#E6A23C">
-                  <Monitor />
-                </el-icon>
-                <h3>设备管理</h3>
-                <p>查看和管理已绑定的设备，监控设备状态</p>
-              </div>
-            </el-card>
-          </el-col>
-        </el-row>
+      </el-card>
+
+      <el-card class="stat-card">
+        <div class="stat-content">
+          <div class="stat-icon total">
+            <el-icon><Grid /></el-icon>
+          </div>
+          <div class="stat-info">
+            <h3>{{ stats.totalDevices }}</h3>
+            <p>Total Devices</p>
+          </div>
+        </div>
+      </el-card>
+
+      <el-card class="stat-card">
+        <div class="stat-content">
+          <div class="stat-icon activated">
+            <el-icon><CircleCheck /></el-icon>
+          </div>
+          <div class="stat-info">
+            <h3>{{ stats.activatedDevices }}</h3>
+            <p>Activated Devices</p>
+          </div>
+        </div>
+      </el-card>
+
+      <el-card class="stat-card">
+        <div class="stat-content">
+          <div class="stat-icon models">
+            <el-icon><Box /></el-icon>
+          </div>
+          <div class="stat-info">
+            <h3>{{ stats.totalModels }}</h3>
+            <p>Device Models</p>
+          </div>
+        </div>
+      </el-card>
+    </div>
+
+    <!-- 快速操作 -->
+    <div class="quick-actions">
+      <el-card>
+        <template #header>
+          <h3>Quick Actions</h3>
+        </template>
         
-        <!-- 系统信息 -->
-        <el-row :gutter="20" style="margin-top: 30px;">
-          <el-col :span="24">
-            <el-card>
-              <template #header>
-                <h3>系统概览</h3>
-              </template>
-              <el-row :gutter="20">
-                <el-col :span="6">
-                  <div class="stat-item">
-                    <div class="stat-number">{{ stats.totalModels }}</div>
-                    <div class="stat-label">设备型号</div>
-                  </div>
-                </el-col>
-                <el-col :span="6">
-                  <div class="stat-item">
-                    <div class="stat-number">{{ stats.totalSerials }}</div>
-                    <div class="stat-label">序列号</div>
-                  </div>
-                </el-col>
-                <el-col :span="6">
-                  <div class="stat-item">
-                    <div class="stat-number">{{ stats.totalDevices }}</div>
-                    <div class="stat-label">设备总数</div>
-                  </div>
-                </el-col>
-                <el-col :span="6">
-                  <div class="stat-item">
-                    <div class="stat-number">{{ stats.onlineDevices }}</div>
-                    <div class="stat-label">在线设备</div>
-                  </div>
-                </el-col>
-              </el-row>
-            </el-card>
-          </el-col>
-        </el-row>
+        <div class="actions-grid">
+          <el-button 
+            type="primary" 
+            :icon="Link" 
+            size="large"
+            @click="$router.push('/devices/bind')"
+          >
+            Bind Device
+          </el-button>
+          
+          <el-button 
+            type="success" 
+            :icon="Monitor" 
+            size="large"
+            @click="$router.push('/devices')"
+          >
+            View Devices
+          </el-button>
+          
+          <el-button 
+            v-if="userStore.isAdmin"
+            type="warning" 
+            :icon="DocumentAdd" 
+            size="large"
+            @click="$router.push('/serials')"
+          >
+            Generate Serials
+          </el-button>
+          
+          <el-button 
+            v-if="userStore.isAdmin"
+            type="info" 
+            :icon="Setting" 
+            size="large"
+            @click="$router.push('/models')"
+          >
+            Manage Models
+          </el-button>
+        </div>
+      </el-card>
+    </div>
+
+    <!-- 最近设备 -->
+    <div class="recent-devices">
+      <el-card>
+        <template #header>
+          <div class="card-header">
+            <h3>Recent Devices</h3>
+            <el-button type="text" @click="$router.push('/devices')">
+              View All
+              <el-icon><ArrowRight /></el-icon>
+            </el-button>
+          </div>
+        </template>
         
-        <!-- 用户信息 -->
-        <el-row style="margin-top: 30px;">
-          <el-col :span="24">
-            <el-card>
-              <template #header>
-                <h3>用户信息</h3>
-              </template>
-              <el-descriptions :column="2" border v-if="userInfo">
-                <el-descriptions-item label="用户名">{{ userInfo.username }}</el-descriptions-item>
-                <el-descriptions-item label="邮箱">{{ userInfo.email }}</el-descriptions-item>
-                <el-descriptions-item label="角色">
-                  <el-tag :type="userInfo.role === 'admin' ? 'danger' : 'primary'">
-                    {{ userInfo.role === 'admin' ? '管理员' : '普通用户' }}
-                  </el-tag>
-                </el-descriptions-item>
-                <el-descriptions-item label="状态">
-                  <el-tag type="success">{{ userInfo.is_active ? '激活' : '禁用' }}</el-tag>
-                </el-descriptions-item>
-              </el-descriptions>
-            </el-card>
-          </el-col>
-        </el-row>
-      </div>
-    </el-card>
+        <el-table :data="recentDevices" style="width: 100%">
+          <el-table-column prop="serial" label="Serial Number" width="150" />
+          <el-table-column prop="name" label="Device Name" show-overflow-tooltip />
+          <el-table-column prop="deviceModel.oemname" label="Brand" width="120" />
+          <el-table-column prop="deviceModel.stdname" label="Model" width="120" />
+          <el-table-column label="Status" width="100">
+            <template #default="{ row }">
+              <el-tag :type="row.is_online ? 'success' : 'danger'" size="small">
+                {{ row.is_online ? 'Online' : 'Offline' }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="last_seen" label="Last Seen" width="160">
+            <template #default="{ row }">
+              {{ formatDateTime(row.last_seen) }}
+            </template>
+          </el-table-column>
+        </el-table>
+        
+        <div v-if="recentDevices.length === 0" class="empty-state">
+          <el-empty description="No devices found">
+            <el-button type="primary" @click="$router.push('/devices/bind')">
+              Bind Your First Device
+            </el-button>
+          </el-empty>
+        </div>
+      </el-card>
+    </div>
+
+    <!-- 系统状态（管理员可见） -->
+    <div v-if="userStore.isAdmin" class="system-status">
+      <el-card>
+        <template #header>
+          <h3>System Status</h3>
+        </template>
+        
+        <div class="system-info">
+          <el-descriptions :column="2" border>
+            <el-descriptions-item label="Total Users">
+              {{ systemInfo.totalUsers }}
+            </el-descriptions-item>
+            <el-descriptions-item label="Active Users">
+              {{ systemInfo.activeUsers }}
+            </el-descriptions-item>
+            <el-descriptions-item label="Today's Activations">
+              {{ systemInfo.todayActivations }}
+            </el-descriptions-item>
+            <el-descriptions-item label="Server Uptime">
+              {{ systemInfo.uptime }}
+            </el-descriptions-item>
+          </el-descriptions>
+        </div>
+      </el-card>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
-import { Setting, Document, Monitor } from '@element-plus/icons-vue'
+import { ref, onMounted, computed } from 'vue'
+import { 
+  Monitor, 
+  Grid, 
+  CircleCheck, 
+  Box, 
+  Link, 
+  DocumentAdd, 
+  Setting, 
+  ArrowRight 
+} from '@element-plus/icons-vue'
+import { useUserStore } from '@/stores/user'
+import { useDeviceStore } from '@/stores/devices'
+import { ElMessage } from 'element-plus'
+import type { Device } from '@/api/types'
 
-const router = useRouter()
-
-// 用户信息
-const userInfo = ref<any>(null)
+const userStore = useUserStore()
+const deviceStore = useDeviceStore()
 
 // 统计数据
-const stats = reactive({
-  totalModels: 0,
-  totalSerials: 0,
+const stats = ref({
   totalDevices: 0,
-  onlineDevices: 0
+  onlineDevices: 0,
+  activatedDevices: 0,
+  totalModels: 0
 })
 
-// 导航到指定页面
-const navigateTo = (path: string) => {
-  router.push(path)
+// 最近设备
+const recentDevices = ref<Device[]>([])
+
+// 系统信息
+const systemInfo = ref({
+  totalUsers: 0,
+  activeUsers: 0,
+  todayActivations: 0,
+  uptime: '0 days'
+})
+
+// 格式化日期时间
+const formatDateTime = (dateTime: string | null) => {
+  if (!dateTime) return 'Never'
+  return new Date(dateTime).toLocaleString()
 }
 
-// 获取用户信息
-const getUserInfo = () => {
-  const userInfoStr = localStorage.getItem('user_info')
-  if (userInfoStr) {
-    userInfo.value = JSON.parse(userInfoStr)
+// 加载数据
+const loadData = async () => {
+  try {
+    // 加载设备数据
+    await deviceStore.fetchDevices({ limit: 5 })
+    recentDevices.value = deviceStore.devices
+
+    // 计算统计数据
+    stats.value = {
+      totalDevices: deviceStore.deviceCount,
+      onlineDevices: deviceStore.onlineDevices.length,
+      activatedDevices: deviceStore.activatedDevices.length,
+      totalModels: 0 // 需要从模型store获取
+    }
+
+    // 如果是管理员，加载系统信息
+    if (userStore.isAdmin) {
+      // TODO: 调用系统统计API
+      systemInfo.value = {
+        totalUsers: 156,
+        activeUsers: 89,
+        todayActivations: 12,
+        uptime: '15 days'
+      }
+    }
+  } catch (error) {
+    console.error('Failed to load dashboard data:', error)
+    ElMessage.error('Failed to load dashboard data')
   }
 }
 
-// 获取统计数据
-const getStats = async () => {
-  // TODO: 调用实际的统计API
-  // 这里先使用模拟数据
-  stats.totalModels = 0
-  stats.totalSerials = 0
-  stats.totalDevices = 0
-  stats.onlineDevices = 0
-}
-
 onMounted(() => {
-  getUserInfo()
-  getStats()
+  loadData()
 })
 </script>
 
 <style scoped>
-.home-container {
-  padding: 20px;
-}
-
-.welcome-card {
+.dashboard {
   max-width: 1200px;
   margin: 0 auto;
 }
 
-.card-header {
-  text-align: center;
+.page-header {
+  margin-bottom: 30px;
 }
 
-.card-header h2 {
+.page-header h1 {
   margin: 0 0 8px 0;
   color: #303133;
+  font-size: 28px;
   font-weight: 600;
 }
 
-.card-header p {
+.page-header p {
   margin: 0;
-  color: #909399;
+  color: #606266;
   font-size: 16px;
 }
 
-.content {
-  padding: 20px 0;
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 20px;
+  margin-bottom: 30px;
 }
 
-.nav-card {
-  height: 180px;
-  margin-bottom: 20px;
-  cursor: pointer;
-  transition: all 0.3s ease;
+.stat-card {
+  border: none;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
 }
 
-.nav-card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
-}
-
-.nav-item {
-  text-align: center;
-  padding: 20px;
-  height: 100%;
+.stat-content {
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  gap: 15px;
+}
+
+.stat-icon {
+  width: 50px;
+  height: 50px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
   justify-content: center;
+  font-size: 24px;
+  color: white;
 }
 
-.nav-item h3 {
-  margin: 15px 0 10px 0;
+.stat-icon.online {
+  background: linear-gradient(135deg, #67C23A, #85CE61);
+}
+
+.stat-icon.total {
+  background: linear-gradient(135deg, #409EFF, #66B1FF);
+}
+
+.stat-icon.activated {
+  background: linear-gradient(135deg, #E6A23C, #EEB969);
+}
+
+.stat-icon.models {
+  background: linear-gradient(135deg, #909399, #B1B3B8);
+}
+
+.stat-info h3 {
+  margin: 0 0 5px 0;
   color: #303133;
-  font-size: 18px;
-}
-
-.nav-item p {
-  color: #606266;
-  font-size: 14px;
-  line-height: 1.5;
-  margin: 0;
-}
-
-.stat-item {
-  text-align: center;
-  padding: 20px;
-}
-
-.stat-number {
-  font-size: 36px;
-  font-weight: bold;
-  color: #409EFF;
-  margin-bottom: 8px;
-}
-
-.stat-label {
-  color: #606266;
-  font-size: 14px;
-}
-
-:deep(.el-descriptions__label) {
+  font-size: 24px;
   font-weight: 600;
 }
 
+.stat-info p {
+  margin: 0;
+  color: #606266;
+  font-size: 14px;
+}
+
+.quick-actions {
+  margin-bottom: 30px;
+}
+
+.actions-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 15px;
+}
+
+.actions-grid .el-button {
+  height: 60px;
+  font-size: 16px;
+}
+
+.recent-devices {
+  margin-bottom: 30px;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.card-header h3 {
+  margin: 0;
+  color: #303133;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 40px 0;
+}
+
+.system-status {
+  margin-bottom: 30px;
+}
+
+.system-info {
+  margin-top: 20px;
+}
+
+/* 响应式设计 */
 @media (max-width: 768px) {
-  .home-container {
-    padding: 10px;
+  .stats-grid {
+    grid-template-columns: 1fr;
   }
   
-  .nav-card {
-    height: auto;
+  .actions-grid {
+    grid-template-columns: 1fr;
   }
   
-  .nav-item {
-    padding: 15px;
+  .card-header {
+    flex-direction: column;
+    gap: 10px;
+    align-items: stretch;
   }
-  
-  .stat-number {
+}
+
+@media (max-width: 480px) {
+  .page-header h1 {
     font-size: 24px;
+  }
+  
+  .stat-content {
+    gap: 10px;
+  }
+  
+  .stat-icon {
+    width: 40px;
+    height: 40px;
+    font-size: 20px;
+  }
+  
+  .stat-info h3 {
+    font-size: 20px;
   }
 }
 </style>

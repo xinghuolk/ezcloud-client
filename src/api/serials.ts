@@ -89,7 +89,7 @@ export const serialsApi = {
     mac_count: number
     mac_interval: number
   }>> => {
-    return request.post('/api/v1/serials/generate', data)
+    return request.post('/serials/generate', data)
   },
 
   // 获取序列号列表
@@ -102,7 +102,7 @@ export const serialsApi = {
     serials: SerialNumber[]
     pagination: PaginationResponse
   }>> => {
-    return request.get('/api/v1/serials', { params })
+    return request.get('/serials', { params })
   },
 
   // 获取批次列表
@@ -110,7 +110,7 @@ export const serialsApi = {
     batches: BatchInfo[]
     pagination: PaginationResponse
   }>> => {
-    return request.get('/api/v1/serials/batches', { params })
+    return request.get('/serials/batches', { params })
   },
 
   // 获取批次详情
@@ -119,19 +119,19 @@ export const serialsApi = {
     serials: SerialNumber[]
     pagination: PaginationResponse
   }>> => {
-    return request.get(`/api/v1/serials/batches/${batchId}`, { params })
+    return request.get(`/serials/batches/${batchId}`, { params })
   },
 
   // 删除批次
   deleteBatch: (batchId: string): Promise<ApiResponse<{
     deleted_count: number
   }>> => {
-    return request.delete(`/api/v1/serials/batches/${batchId}`)
+    return request.delete(`/serials/batches/${batchId}`)
   },
 
   // 检查MAC地址冲突
   checkConflicts: (data: ConflictCheckRequest): Promise<ApiResponse<ConflictCheckResult>> => {
-    return request.post('/api/v1/serials/check-conflicts', data)
+    return request.post('/serials/check-conflicts', data)
   },
 
   // 导出Excel
@@ -140,7 +140,7 @@ export const serialsApi = {
     model_id?: number
     status?: string
   }): Promise<Blob> => {
-    return request.get('/api/v1/serials/export', {
+    return request.get('/serials/export', {
       params,
       responseType: 'blob'
     }) as Promise<Blob>

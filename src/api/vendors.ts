@@ -1,4 +1,4 @@
-import axios from 'axios'
+import request from './request'
 
 // 厂商接口定义
 export interface Vendor {
@@ -62,84 +62,53 @@ export interface ApiResponse<T = any> {
 
 // 厂商API服务类
 class VendorApiService {
-  private baseURL = '/api/v1/vendors'
+  private baseURL = '/vendors'
 
   /**
    * 获取厂商列表
    */
   async getVendors(params?: VendorListParams): Promise<VendorListResponse> {
-    const response = await axios.get<ApiResponse<VendorListResponse>>(this.baseURL, {
-      params
-    })
-    
-    if (!response.data.success) {
-      throw new Error(response.data.message || '获取厂商列表失败')
-    }
-    
-    return response.data.data!
+    const response = await request.get(this.baseURL, { params })
+    return response.data
   }
 
   /**
    * 获取厂商详情
    */
   async getVendor(id: number): Promise<VendorDetailResponse> {
-    const response = await axios.get<ApiResponse<VendorDetailResponse>>(`${this.baseURL}/${id}`)
-    
-    if (!response.data.success) {
-      throw new Error(response.data.message || '获取厂商详情失败')
-    }
-    
-    return response.data.data!
+    const response = await request.get(`${this.baseURL}/${id}`)
+    return response.data
   }
 
   /**
    * 创建厂商
    */
   async createVendor(vendor: VendorCreateRequest): Promise<Vendor> {
-    const response = await axios.post<ApiResponse<Vendor>>(this.baseURL, vendor)
-    
-    if (!response.data.success) {
-      throw new Error(response.data.message || '创建厂商失败')
-    }
-    
-    return response.data.data!
+    const response = await request.post(this.baseURL, vendor)
+    return response.data
   }
 
   /**
    * 更新厂商
    */
   async updateVendor(id: number, vendor: VendorUpdateRequest): Promise<Vendor> {
-    const response = await axios.put<ApiResponse<Vendor>>(`${this.baseURL}/${id}`, vendor)
-    
-    if (!response.data.success) {
-      throw new Error(response.data.message || '更新厂商失败')
-    }
-    
-    return response.data.data!
+    const response = await request.put(`${this.baseURL}/${id}`, vendor)
+    return response.data
   }
 
   /**
    * 删除厂商
    */
   async deleteVendor(id: number): Promise<void> {
-    const response = await axios.delete<ApiResponse>(`${this.baseURL}/${id}`)
-    
-    if (!response.data.success) {
-      throw new Error(response.data.message || '删除厂商失败')
-    }
+    await request.delete(`${this.baseURL}/${id}`)
   }
 
   /**
    * 切换厂商状态
    */
   async toggleVendorStatus(id: number): Promise<Vendor> {
-    const response = await axios.patch<ApiResponse<Vendor>>(`${this.baseURL}/${id}/toggle-status`)
-    
-    if (!response.data.success) {
-      throw new Error(response.data.message || '切换厂商状态失败')
-    }
-    
-    return response.data.data!
+    const response = await request.patch(`${this.baseURL}/${id}/toggle-status`)
+    return response.data
   }
 }
 

@@ -21,32 +21,32 @@ import type {
 export const authApi = {
   // 用户登录
   login: (params: LoginParams): Promise<ApiResponse<LoginResponse>> => {
-    return request.post('/api/v1/auth/login', params)
+    return request.post('/auth/login', params)
   },
 
   // 用户注册
   register: (params: RegisterParams): Promise<ApiResponse<User>> => {
-    return request.post('/api/v1/auth/register', params)
+    return request.post('/auth/register', params)
   },
 
   // 获取用户信息
   getProfile: (): Promise<ApiResponse<User>> => {
-    return request.get('/api/v1/auth/profile')
+    return request.get('/auth/profile')
   },
 
   // 更新用户信息
   updateProfile: (params: Partial<User>): Promise<ApiResponse<User>> => {
-    return request.put('/api/v1/auth/profile', params)
+    return request.put('/auth/profile', params)
   },
 
   // Token刷新
   refreshToken: (): Promise<ApiResponse<{ token: string }>> => {
-    return request.post('/api/v1/auth/refresh')
+    return request.post('/auth/refresh')
   },
 
   // 修改密码
   changePassword: (params: { currentPassword: string; newPassword: string }): Promise<ApiResponse<void>> => {
-    return request.put('/api/v1/auth/password', params)
+    return request.put('/auth/password', params)
   }
 }
 

@@ -54,32 +54,32 @@ export interface ModelStatsResponse {
 export const modelApi = {
   // 获取型号列表
   async getModels(params?: ModelListParams): Promise<ApiResponse<ModelListResponse>> {
-    return request.get('/api/v1/models', { params })
+    return request.get('/models', { params })
   },
 
   // 获取型号详情
   async getModel(id: number): Promise<ApiResponse<DeviceModel>> {
-    return request.get(`/api/v1/models/${id}`)
+    return request.get(`/models/${id}`)
   },
 
   // 创建型号
   async createModel(data: ModelCreateParams): Promise<ApiResponse<DeviceModel>> {
-    return request.post('/api/v1/models', data)
+    return request.post('/models', data)
   },
 
   // 更新型号
   async updateModel(id: number, data: ModelCreateParams): Promise<ApiResponse<DeviceModel>> {
-    return request.put(`/api/v1/models/${id}`, data)
+    return request.put(`/models/${id}`, data)
   },
 
   // 删除型号
   async deleteModel(id: number): Promise<ApiResponse<void>> {
-    return request.delete(`/api/v1/models/${id}`)
+    return request.delete(`/models/${id}`)
   },
 
   // 获取型号统计信息
   async getModelStats(id: number): Promise<ApiResponse<ModelStatsResponse>> {
-    return request.get(`/api/v1/models/${id}/stats`)
+    return request.get(`/models/${id}/stats`)
   }
 }
 
