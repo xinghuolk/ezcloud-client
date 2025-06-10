@@ -181,6 +181,16 @@
                 <el-text copyable>{{ row.serial }}</el-text>
               </template>
             </el-table-column>
+            <el-table-column label="OEM Name" min-width="120">
+              <template #default="{ row }">
+                {{ row.deviceModel?.oemname || '-' }}
+              </template>
+            </el-table-column>
+            <el-table-column label="Standard Model" min-width="150">
+              <template #default="{ row }">
+                {{ row.deviceModel?.stdname || '-' }}
+              </template>
+            </el-table-column>
             <el-table-column prop="mac_start" label="MAC Start" width="140">
               <template #default="{ row }">
                 <el-text copyable>{{ row.mac_start }}</el-text>

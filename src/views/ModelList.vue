@@ -3,10 +3,10 @@
     <el-card>
       <template #header>
         <div class="card-header">
-          <h3>设备型号管理</h3>
+          <h3>Device Model Management</h3>
           <el-button type="primary" @click="handleAdd">
             <el-icon><Plus /></el-icon>
-            新增型号
+            Add Model
           </el-button>
         </div>
       </template>
@@ -17,7 +17,7 @@
           <el-col :span="6">
             <el-input
               v-model="searchForm.search"
-              placeholder="搜索型号名称、厂商、描述"
+              placeholder="Search model name, vendor, description"
               clearable
               @clear="handleSearch"
               @keyup.enter="handleSearch"
@@ -30,7 +30,7 @@
           <el-col :span="4">
             <el-input
               v-model="searchForm.oemname"
-              placeholder="厂商名称"
+              placeholder="OEM Name"
               clearable
               @clear="handleSearch"
               @keyup.enter="handleSearch"
@@ -39,7 +39,7 @@
           <el-col :span="4">
             <el-select
               v-model="searchForm.devtype"
-              placeholder="设备类型"
+              placeholder="Device Type"
               clearable
               @change="handleSearch"
             >
@@ -54,22 +54,22 @@
           <el-col :span="4">
             <el-select
               v-model="searchForm.is_active"
-              placeholder="状态"
+              placeholder="Status"
               clearable
               @change="handleSearch"
             >
-              <el-option label="启用" :value="true" />
-              <el-option label="禁用" :value="false" />
+              <el-option label="Active" :value="true" />
+              <el-option label="Inactive" :value="false" />
             </el-select>
           </el-col>
           <el-col :span="6">
             <el-button type="primary" @click="handleSearch">
               <el-icon><Search /></el-icon>
-              搜索
+              Search
             </el-button>
             <el-button @click="handleReset">
               <el-icon><Refresh /></el-icon>
-              重置
+              Reset
             </el-button>
           </el-col>
         </el-row>
@@ -84,49 +84,50 @@
         @sort-change="handleSortChange"
       >
         <el-table-column prop="id" label="ID" width="80" sortable="custom" />
-        <el-table-column prop="oemname" label="厂商名称" min-width="120">
+        <el-table-column prop="vendor" label="Vendor Name" min-width="120">
           <template #default="{ row }">
-            <div>
-              <div>{{ row.oemname }}</div>
-              <div v-if="row.vendor" class="vendor-info">
-                <el-tag size="small" type="info">{{ row.vendor.name }}</el-tag>
-              </div>
+            <div v-if="row.vendor">
+              <el-tag size="small" type="info">{{ row.vendor.name }}</el-tag>
+            </div>
+            <div v-else>
+              <el-text type="info">-</el-text>
             </div>
           </template>
         </el-table-column>
-        <el-table-column prop="stdname" label="标准型号名" min-width="150" />
-        <el-table-column prop="devtype" label="设备类型" width="120">
+        <el-table-column prop="oemname" label="OEM Name" min-width="120" />
+        <el-table-column prop="stdname" label="Standard Model Name" min-width="150" />
+        <el-table-column prop="devtype" label="Device Type" width="120">
           <template #default="{ row }">
             <el-tag :type="getDeviceTypeTagType(row.devtype)">
               {{ getDeviceTypeLabel(row.devtype) }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="description" label="描述" min-width="200" show-overflow-tooltip />
-        <el-table-column prop="serialNumberCount" label="序列号数量" width="120" align="center">
+        <el-table-column prop="description" label="Description" min-width="200" show-overflow-tooltip />
+        <el-table-column prop="serialNumberCount" label="Serial Count" width="120" align="center">
           <template #default="{ row }">
             <el-link type="primary" @click="viewSerials(row)">
               {{ row.serialNumberCount || 0 }}
             </el-link>
           </template>
         </el-table-column>
-        <el-table-column prop="is_active" label="状态" width="100" align="center">
+        <el-table-column prop="is_active" label="Status" width="100" align="center">
           <template #default="{ row }">
             <el-tag :type="row.is_active ? 'success' : 'danger'">
-              {{ row.is_active ? '启用' : '禁用' }}
+              {{ row.is_active ? 'Active' : 'Inactive' }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="created_at" label="创建时间" width="180">
+        <el-table-column prop="created_at" label="Created At" width="180">
           <template #default="{ row }">
             {{ formatDateTime(row.created_at) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="180" fixed="right">
+        <el-table-column label="Actions" width="180" fixed="right">
           <template #default="{ row }">
-            <el-button size="small" @click="handleView(row)">详情</el-button>
-            <el-button size="small" type="primary" @click="handleEdit(row)">编辑</el-button>
-            <el-button size="small" type="danger" @click="handleDelete(row)">删除</el-button>
+            <el-button size="small" @click="handleView(row)">Details</el-button>
+            <el-button size="small" type="primary" @click="handleEdit(row)">Edit</el-button>
+            <el-button size="small" type="danger" @click="handleDelete(row)">Delete</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -158,13 +159,13 @@
         :rules="rules"
         label-width="120px"
       >
-        <el-form-item label="选择厂商" prop="vendor_id">
+        <el-form-item label="Select Vendor" prop="vendor_id">
           <el-select
             v-model="form.vendor_id"
-            placeholder="请选择厂商"
+            placeholder="Please select vendor"
             style="width: 100%"
             filterable
-            @change="onVendorChange"
+            clearable
           >
             <el-option
               v-for="vendor in vendorStore.activeVendors"
@@ -174,24 +175,17 @@
             />
           </el-select>
         </el-form-item>
-        <el-form-item label="厂商名称" prop="oemname">
+        <el-form-item label="OEM Name" prop="oemname">
           <el-input 
             v-model="form.oemname" 
-            placeholder="厂商名称将自动填充"
-            :disabled="!!form.vendor_id"
+            placeholder="Enter OEM name"
           />
-          <div class="form-help" v-if="form.vendor_id">
-            <el-text size="small" type="info">厂商名称已从选择的厂商自动填充</el-text>
-          </div>
-          <div class="form-help" v-else>
-            <el-text size="small" type="warning">建议选择厂商以保持数据一致性</el-text>
-          </div>
         </el-form-item>
-        <el-form-item label="标准型号名" prop="stdname">
-          <el-input v-model="form.stdname" placeholder="请输入标准型号名，如：HG8045Q、AX6000" />
+        <el-form-item label="Standard Model" prop="stdname">
+          <el-input v-model="form.stdname" placeholder="Enter standard model name, e.g.: HG8045Q, AX6000" />
         </el-form-item>
-        <el-form-item label="设备类型" prop="devtype">
-          <el-select v-model="form.devtype" placeholder="请选择设备类型" style="width: 100%">
+        <el-form-item label="Device Type" prop="devtype">
+          <el-select v-model="form.devtype" placeholder="Please select device type" style="width: 100%">
             <el-option
               v-for="item in DEVICE_TYPES"
               :key="item.value"
@@ -200,27 +194,27 @@
             />
           </el-select>
         </el-form-item>
-        <el-form-item label="描述" prop="description">
+        <el-form-item label="Description" prop="description">
           <el-input
             v-model="form.description"
             type="textarea"
             :rows="3"
-            placeholder="请输入型号描述信息"
+            placeholder="Enter model description"
             maxlength="1000"
             show-word-limit
           />
         </el-form-item>
-        <el-form-item label="状态" prop="is_active">
+        <el-form-item label="Status" prop="is_active">
           <el-radio-group v-model="form.is_active">
-            <el-radio :value="true">启用</el-radio>
-            <el-radio :value="false">禁用</el-radio>
+            <el-radio :value="true">Active</el-radio>
+            <el-radio :value="false">Inactive</el-radio>
           </el-radio-group>
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="dialogVisible = false">取消</el-button>
+        <el-button @click="dialogVisible = false">Cancel</el-button>
         <el-button type="primary" :loading="submitting" @click="handleSubmit">
-          {{ editingId ? '更新' : '创建' }}
+          {{ editingId ? 'Update' : 'Create' }}
         </el-button>
       </template>
     </el-dialog>
@@ -228,38 +222,41 @@
     <!-- 详情对话框 -->
     <el-dialog
       v-model="detailDialogVisible"
-      title="型号详情"
+      title="Model Details"
       width="800px"
     >
       <div v-if="currentModel" class="model-detail">
         <el-descriptions :column="2" border>
           <el-descriptions-item label="ID">{{ currentModel.id }}</el-descriptions-item>
-          <el-descriptions-item label="关联厂商" v-if="currentModel.vendor">
+          <el-descriptions-item label="Vendor Name" v-if="currentModel.vendor">
             <el-tag type="info">{{ currentModel.vendor.name }}</el-tag>
           </el-descriptions-item>
-          <el-descriptions-item label="厂商名称">{{ currentModel.oemname }}</el-descriptions-item>
-          <el-descriptions-item label="标准型号名">{{ currentModel.stdname }}</el-descriptions-item>
-          <el-descriptions-item label="设备类型">
+          <el-descriptions-item label="Vendor Name" v-else>
+            <el-text type="info">-</el-text>
+          </el-descriptions-item>
+          <el-descriptions-item label="OEM Name">{{ currentModel.oemname }}</el-descriptions-item>
+          <el-descriptions-item label="Standard Model">{{ currentModel.stdname }}</el-descriptions-item>
+          <el-descriptions-item label="Device Type">
             <el-tag :type="getDeviceTypeTagType(currentModel.devtype)">
               {{ getDeviceTypeLabel(currentModel.devtype) }}
             </el-tag>
           </el-descriptions-item>
-          <el-descriptions-item label="状态">
+          <el-descriptions-item label="Status">
             <el-tag :type="currentModel.is_active ? 'success' : 'danger'">
-              {{ currentModel.is_active ? '启用' : '禁用' }}
+              {{ currentModel.is_active ? 'Active' : 'Inactive' }}
             </el-tag>
           </el-descriptions-item>
-          <el-descriptions-item label="序列号数量">
+          <el-descriptions-item label="Serial Count">
             {{ currentModel.serialNumberCount || 0 }}
           </el-descriptions-item>
-          <el-descriptions-item label="创建时间" span="2">
+          <el-descriptions-item label="Created At" span="2">
             {{ formatDateTime(currentModel.created_at) }}
           </el-descriptions-item>
-          <el-descriptions-item label="更新时间" span="2">
+          <el-descriptions-item label="Updated At" span="2">
             {{ formatDateTime(currentModel.updated_at) }}
           </el-descriptions-item>
-          <el-descriptions-item label="描述" span="2">
-            {{ currentModel.description || '暂无描述' }}
+          <el-descriptions-item label="Description" span="2">
+            {{ currentModel.description || 'No description' }}
           </el-descriptions-item>
         </el-descriptions>
       </div>
@@ -306,30 +303,30 @@ const formRef = ref<FormInstance>()
 
 // 计算属性
 const { models, loading, pagination } = modelsStore
-const dialogTitle = computed(() => editingId.value ? '编辑型号' : '新增型号')
+const dialogTitle = computed(() => editingId.value ? 'Edit Model' : 'Add Model')
 
 // 表单验证规则
 const rules = {
   vendor_id: [
-    { required: true, message: '请选择厂商', trigger: 'change' }
+    { required: true, message: 'Please select a vendor', trigger: 'change' }
   ],
   oemname: [
-    { required: true, message: '请输入厂商名称', trigger: 'blur' },
-    { max: 100, message: '厂商名称长度不能超过100字符', trigger: 'blur' }
+    { required: true, message: 'Please enter OEM name', trigger: 'blur' },
+    { max: 100, message: 'OEM name cannot exceed 100 characters', trigger: 'blur' }
   ],
   stdname: [
-    { required: true, message: '请输入标准型号名', trigger: 'blur' },
-    { max: 100, message: '标准型号名长度不能超过100字符', trigger: 'blur' }
+    { required: true, message: 'Please enter standard model name', trigger: 'blur' },
+    { max: 100, message: 'Standard model name cannot exceed 100 characters', trigger: 'blur' }
   ],
   devtype: [
-    { required: true, message: '请选择设备类型', trigger: 'change' }
+    { required: true, message: 'Please select device type', trigger: 'change' }
   ],
   description: [
-    { max: 1000, message: '描述长度不能超过1000字符', trigger: 'blur' }
+    { max: 1000, message: 'Description cannot exceed 1000 characters', trigger: 'blur' }
   ]
 }
 
-// 获取设备类型标签样式
+// Get device type tag style
 const getDeviceTypeTagType = (type: string) => {
   const typeMap: Record<string, string> = {
     'router': 'primary',
@@ -343,7 +340,7 @@ const getDeviceTypeTagType = (type: string) => {
   return typeMap[type] || ''
 }
 
-// 厂商选择变化处理
+// Vendor selection change handler
 const onVendorChange = (vendorId: number) => {
   const selectedVendor = vendorStore.vendors.find(v => v.id === vendorId)
   if (selectedVendor) {
@@ -351,7 +348,7 @@ const onVendorChange = (vendorId: number) => {
   }
 }
 
-// 重置表单
+// Reset form
 const resetForm = () => {
   Object.assign(form, {
     vendor_id: undefined,
@@ -364,9 +361,9 @@ const resetForm = () => {
   formRef.value?.clearValidate()
 }
 
-// 事件处理函数
+// Event handlers
 const handleAdd = async () => {
-  // 确保厂商数据已加载
+  // Ensure vendor data is loaded
   if (vendorStore.vendors.length === 0) {
     await vendorStore.fetchVendors({ is_active: true })
   }
@@ -376,7 +373,7 @@ const handleAdd = async () => {
 }
 
 const handleEdit = async (row: DeviceModel) => {
-  // 确保厂商数据已加载
+  // Ensure vendor data is loaded
   if (vendorStore.vendors.length === 0) {
     await vendorStore.fetchVendors({ is_active: true })
   }
@@ -401,17 +398,17 @@ const handleView = (row: DeviceModel) => {
 const handleDelete = async (row: DeviceModel) => {
   try {
     await ElMessageBox.confirm(
-      `确定要删除型号"${row.oemname} ${row.stdname}"吗？此操作不可恢复。`,
-      '确认删除',
+      `Are you sure to delete model "${row.oemname} ${row.stdname}"? This operation cannot be undone.`,
+      'Confirm Delete',
       {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
+        confirmButtonText: 'Confirm',
+        cancelButtonText: 'Cancel',
         type: 'warning'
       }
     )
     await modelsStore.deleteModel(row.id)
   } catch (error) {
-    // 用户取消删除
+    // User cancelled deletion
   }
 }
 
@@ -459,17 +456,17 @@ const handleCurrentChange = (page: number) => {
 }
 
 const handleSortChange = (sort: any) => {
-  // TODO: 实现排序功能
-  console.log('排序:', sort)
+  // TODO: Implement sorting functionality
+  console.log('Sort:', sort)
 }
 
 const viewSerials = (row: DeviceModel) => {
-  // TODO: 跳转到序列号管理页面
-  console.log('查看序列号:', row)
-  ElMessage.info('序列号管理功能正在开发中')
+  // TODO: Navigate to serial number management page
+  console.log('View serials:', row)
+  ElMessage.info('Serial number management feature is under development')
 }
 
-// 生命周期
+// Lifecycle
 onMounted(async () => {
   await Promise.all([
     modelsStore.fetchModels(),
