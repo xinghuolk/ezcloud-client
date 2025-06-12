@@ -14,7 +14,15 @@ import type {
   DeviceBindParams,
   DeviceQuery,
   DeviceStatus,
-  Plugin
+  Plugin,
+  WiFiStatus,
+  WiFiData,
+  WiFiTemplate,
+  WiFiConfigParams,
+  ModemStatus,
+  DeviceCommand,
+  DeviceOperationParams,
+  BatchOperationParams
 } from './types'
 
 // 认证相关API
@@ -47,6 +55,11 @@ export const authApi = {
   // 修改密码
   changePassword: (params: { currentPassword: string; newPassword: string }): Promise<ApiResponse<void>> => {
     return request.put('/auth/password', params)
+  },
+
+  // 用户登出
+  logout: (): Promise<ApiResponse<null>> => {
+    return request.post('/auth/logout')
   }
 }
 
@@ -73,7 +86,7 @@ export const modelApi = {
   },
 
   // 删除型号
-  deleteModel: (id: number): Promise<ApiResponse<void>> => {
+  deleteModel: (id: number): Promise<ApiResponse<null>> => {
     return request.delete(`/models/${id}`)
   },
 
@@ -116,6 +129,11 @@ export const serialApi = {
   // 检查MAC地址冲突
   checkMacConflict: (params: { mac_start: string; count: number; mac_count: number; mac_interval: number }): Promise<ApiResponse<{ hasConflict: boolean; conflicts: string[] }>> => {
     return request.post('/serials/check-mac-conflict', params)
+  },
+
+  // 删除批次
+  deleteBatch: (batch_id: string): Promise<ApiResponse<null>> => {
+    return request.delete(`/serials/batches/${batch_id}`)
   }
 }
 
@@ -137,7 +155,7 @@ export const deviceApi = {
   },
 
   // 解绑设备
-  unbindDevice: (id: number): Promise<ApiResponse<void>> => {
+  unbindDevice: (id: number): Promise<ApiResponse<null>> => {
     return request.delete(`/devices/${id}/unbind`)
   },
 
@@ -163,6 +181,56 @@ export const deviceApi = {
   // 批量操作设备
   batchOperate: (deviceIds: number[], operation: string, parameters?: Record<string, any>): Promise<ApiResponse<{ operation_id: string }>> => {
     return request.post('/devices/batch-operation', { device_ids: deviceIds, operation, parameters })
+  },
+
+  // 获取设备WiFi状态
+  getDeviceWiFi: (id: number): Promise<ApiResponse<WiFiData>> => {
+    return request.get(`/devices/${id}/wifi`)
+  },
+
+  // 更新设备WiFi配置
+  updateDeviceWiFi: (id: number, params: WiFiConfigParams): Promise<ApiResponse<null>> => {
+    return request.put(`/devices/${id}/wifi`, params)
+  },
+
+  // 获取设备Modem状态
+  getDeviceModem: (id: number): Promise<ApiResponse<ModemStatus>> => {
+    return request.get(`/devices/${id}/modem`)
+  },
+
+  // 获取SIM卡切换历史
+  getModemHistory: (id: number): Promise<ApiResponse<any[]>> => {
+    return request.get(`/devices/${id}/modem/history`)
+  },
+
+  // 设备重启
+  rebootDevice: (id: number): Promise<ApiResponse<DeviceCommand>> => {
+    return request.post(`/devices/${id}/reboot`)
+  },
+
+  // SIM卡切换
+  switchSIM: (id: number, slot: number): Promise<ApiResponse<DeviceCommand>> => {
+    return request.post(`/devices/${id}/modem/switch`, { slot })
+  },
+
+  // 收集设备日志
+  collectLogs: (id: number, params?: { types?: string[]; duration?: number }): Promise<ApiResponse<DeviceCommand>> => {
+    return request.post(`/devices/${id}/logs/collect`, params)
+  },
+
+  // 获取设备日志列表
+  getDeviceLogs: (id: number, params?: { page?: number; limit?: number }): Promise<ApiResponse<any[]>> => {
+    return request.get(`/devices/${id}/logs`, { params })
+  },
+
+  // 批量设备操作
+  batchOperation: (params: BatchOperationParams): Promise<ApiResponse<DeviceCommand[]>> => {
+    return request.post('/devices/batch-operation', params)
+  },
+
+  // 获取设备命令状态
+  getDeviceCommands: (id: number, params?: { status?: string; type?: string }): Promise<ApiResponse<DeviceCommand[]>> => {
+    return request.get(`/devices/${id}/commands`, { params })
   }
 }
 
@@ -210,6 +278,78 @@ export const statsApi = {
   // 获取型号分布统计
   getModelDistribution: (): Promise<ApiResponse<Array<{ oemname: string; stdname: string; count: number }>>> => {
     return request.get('/stats/model-distribution')
+  },
+
+  // 获取仪表板统计数据
+  getDashboardStats: (): Promise<ApiResponse<{
+    totalDevices: number
+    onlineDevices: number
+    activatedDevices: number
+    totalUsers: number
+    recentDevices: Device[]
+  }>> => {
+    return request.get('/stats/dashboard')
+  },
+
+  // 获取设备统计
+  getDeviceStats: (params?: { period?: string }): Promise<ApiResponse<any>> => {
+    return request.get('/stats/devices', { params })
+  }
+}
+
+// WiFi模板相关API
+export const wifiTemplateApi = {
+  // 获取WiFi模板列表
+  getTemplates: (params?: { page?: number; limit?: number; search?: string }): Promise<ApiResponse<PaginationResponse<WiFiTemplate>>> => {
+    return request.get('/wifi-templates', { params })
+  },
+
+  // 获取WiFi模板详情
+  getTemplate: (id: number): Promise<ApiResponse<WiFiTemplate>> => {
+    return request.get(`/wifi-templates/${id}`)
+  },
+
+  // 创建WiFi模板
+  createTemplate: (params: Omit<WiFiTemplate, 'id' | 'created_at' | 'updated_at'>): Promise<ApiResponse<WiFiTemplate>> => {
+    return request.post('/wifi-templates', params)
+  },
+
+  // 更新WiFi模板
+  updateTemplate: (id: number, params: Partial<WiFiTemplate>): Promise<ApiResponse<WiFiTemplate>> => {
+    return request.put(`/wifi-templates/${id}`, params)
+  },
+
+  // 删除WiFi模板
+  deleteTemplate: (id: number): Promise<ApiResponse<null>> => {
+    return request.delete(`/wifi-templates/${id}`)
+  }
+}
+
+// 厂商相关API
+export const vendorApi = {
+  // 获取厂商列表
+  getVendors: (params?: { page?: number; limit?: number; search?: string }): Promise<ApiResponse<any[]>> => {
+    return request.get('/vendors', { params })
+  },
+
+  // 获取厂商详情
+  getVendor: (id: number): Promise<ApiResponse<any>> => {
+    return request.get(`/vendors/${id}`)
+  },
+
+  // 创建厂商
+  createVendor: (params: { name: string; description?: string }): Promise<ApiResponse<any>> => {
+    return request.post('/vendors', params)
+  },
+
+  // 更新厂商
+  updateVendor: (id: number, params: Partial<any>): Promise<ApiResponse<any>> => {
+    return request.put(`/vendors/${id}`, params)
+  },
+
+  // 删除厂商
+  deleteVendor: (id: number): Promise<ApiResponse<null>> => {
+    return request.delete(`/vendors/${id}`)
   }
 }
 
@@ -221,5 +361,7 @@ export default {
   serialApi,
   deviceApi,
   pluginApi,
-  statsApi
+  statsApi,
+  wifiTemplateApi,
+  vendorApi
 } 

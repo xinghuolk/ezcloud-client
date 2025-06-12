@@ -94,6 +94,115 @@ export interface GenerateSerialParams {
   mac_interval: number
 }
 
+// WiFi相关类型
+export interface WiFiStatus {
+  id: number
+  device_id: number
+  interface: string
+  ssid?: string
+  status: 'up' | 'down' | 'error'
+  channel?: number
+  frequency?: string
+  tx_power?: number
+  connected_clients: number
+  rx_bytes: number
+  tx_bytes: number
+  rx_packets: number
+  tx_packets: number
+  error_count: number
+  noise_level?: number
+  reported_at: string
+}
+
+// 新的WiFi数据结构
+export interface WiFiRadio {
+  band: '2.4G' | '5G' | '6G'
+  enabled: boolean
+  channel?: number
+  txpower?: number
+  htmode?: string
+  noise_level?: number
+  temperature?: number
+  total_tx_bytes: number
+  total_rx_bytes: number
+  total_error_count: number
+  reported_at: string
+  ssids: WiFiSSID[]
+}
+
+export interface WiFiSSID {
+  ssid_index: number
+  name?: string
+  ssid?: string
+  enabled: boolean
+  status: 'up' | 'down' | 'error'
+  connected_clients: number
+  max_clients: number
+  rx_bytes: number
+  tx_bytes: number
+  rx_packets: number
+  tx_packets: number
+  rx_errors: number
+  tx_errors: number
+  error_count: number
+  reported_at: string
+}
+
+export interface WiFiData {
+  wifi: {
+    radios: WiFiRadio[]
+  }
+}
+
+export interface WiFiTemplate {
+  id: number
+  name: string
+  description?: string
+  config: {
+    radio_2g: {
+      enabled: boolean
+      channel: number
+      tx_power: number
+      bandwidth: string
+    }
+    radio_5g: {
+      enabled: boolean
+      channel: number
+      tx_power: number
+      bandwidth: string
+    }
+    ssids: Array<{
+      name: string
+      password: string
+      encryption: string
+      enabled: boolean
+      hidden: boolean
+      guest: boolean
+    }>
+  }
+  created_at: string
+  updated_at: string
+}
+
+// Modem相关类型
+export interface ModemStatus {
+  id: number
+  device_id: number
+  active_slot: number
+  operator?: string
+  network_type?: string
+  signal_strength?: number
+  iccid?: string
+  imsi?: string
+  phone_number?: string
+  apn_name?: string
+  rx_bytes: number
+  tx_bytes: number
+  rx_speed: number
+  tx_speed: number
+  last_update: string
+}
+
 // 设备相关类型
 export interface Device {
   id: number
@@ -135,6 +244,9 @@ export interface Device {
     mac_interval: number
     status: string
   }
+  // 5G设备状态
+  wifiStatus?: WiFiStatus[]
+  modemStatus?: ModemStatus
 }
 
 export interface DeviceBindParams {
@@ -164,6 +276,41 @@ export interface DeviceStatus {
   upload_total: number
   download_total: number
   reported_at: string
+}
+
+// 设备操作相关类型
+export interface DeviceCommand {
+  id: string
+  type: 'reboot' | 'sim_switch' | 'wifi_config' | 'log_collect' | 'apn_config'
+  device_id: number
+  params?: Record<string, any>
+  status: 'pending' | 'sent' | 'success' | 'failed'
+  created_at: string
+  executed_at?: string
+  result?: string
+}
+
+export interface DeviceOperationParams {
+  type: DeviceCommand['type']
+  params?: Record<string, any>
+}
+
+export interface BatchOperationParams {
+  device_ids: number[]
+  operation: DeviceOperationParams
+}
+
+// WiFi配置相关类型
+export interface WiFiConfigParams {
+  template_id?: number
+  custom_config?: {
+    ssid_2g?: string
+    password_2g?: string
+    ssid_5g?: string
+    password_5g?: string
+    channel_2g?: number
+    channel_5g?: number
+  }
 }
 
 // 插件相关类型

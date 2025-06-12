@@ -42,7 +42,7 @@ const handleCommand = async (command: string) => {
           }
         )
         
-        userStore.clearAuth()
+        userStore.logout()
         ElMessage.success('Logged out successfully')
         router.push('/login')
       } catch {
@@ -87,6 +87,11 @@ const handleCommand = async (command: string) => {
             <el-menu-item index="/devices/bind">
               <el-icon><Link /></el-icon>
               <span>Bind Device</span>
+            </el-menu-item>
+            
+            <el-menu-item index="/wifi-templates">
+              <el-icon><Setting /></el-icon>
+              <span>WiFi Templates</span>
             </el-menu-item>
             
             <!-- 管理员菜单 -->

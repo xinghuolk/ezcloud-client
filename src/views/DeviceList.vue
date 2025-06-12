@@ -19,6 +19,14 @@
           >
             Refresh
           </el-button>
+          <el-button 
+            v-if="selectedDevices.length > 0"
+            type="warning"
+            @click="showBatchOperationDialog = true"
+            :icon="Operation"
+          >
+            Batch Operations ({{ selectedDevices.length }})
+          </el-button>
         </div>
       </div>
     </div>
@@ -104,84 +112,64 @@
           </template>
         </el-table-column>
         
-        <el-table-column prop="primary_mac" label="MAC Address" width="140" />
-        
         <el-table-column label="Status" width="120">
           <template #default="{ row }">
             <div class="status-indicators">
-              <el-tag 
-                :type="row.is_online ? 'success' : 'danger'" 
-                size="small"
-                effect="dark"
-              >
+              <el-tag :type="row.is_online ? 'success' : 'danger'" size="small">
                 {{ row.is_online ? 'Online' : 'Offline' }}
               </el-tag>
-              <el-tag 
-                :type="row.is_activate ? 'success' : 'info'" 
-                size="small"
-                style="margin-top: 2px"
-              >
+              <el-tag :type="row.is_activate ? 'success' : 'info'" size="small">
                 {{ row.is_activate ? 'Activated' : 'Not Activated' }}
               </el-tag>
             </div>
+          </template>
+        </el-table-column>
+
+        <!-- WiFi状态列 -->
+        <el-table-column label="WiFi Status" width="180">
+          <template #default="{ row }">
+            <WiFiStatus 
+              :wifi-status="row.wifiStatus" 
+              :show-details="false"
+            />
+          </template>
+        </el-table-column>
+
+        <!-- Modem状态列 -->
+        <el-table-column label="Modem Status" width="200">
+          <template #default="{ row }">
+            <ModemStatus 
+              :modem-status="row.modemStatus" 
+              :show-details="false"
+            />
           </template>
         </el-table-column>
         
         <el-table-column label="Network" width="160">
           <template #default="{ row }">
             <div class="network-info">
-              <div v-if="row.wanip">
-                <small>WAN: {{ row.wanip }}</small>
-              </div>
-              <div v-if="row.public_ip">
-                <small>Public: {{ row.public_ip }}</small>
-              </div>
-              <div v-if="!row.wanip && !row.public_ip">
-                <small>-</small>
-              </div>
+              <div v-if="row.wanip">WAN: {{ row.wanip }}</div>
+              <div v-if="row.public_ip">Public: {{ row.public_ip }}</div>
+              <div v-if="row.primary_mac">MAC: {{ row.primary_mac }}</div>
             </div>
-          </template>
-        </el-table-column>
-        
-        <el-table-column prop="version" label="Version" width="100" show-overflow-tooltip>
-          <template #default="{ row }">
-            <span>{{ row.version || '-' }}</span>
           </template>
         </el-table-column>
         
         <el-table-column label="Last Seen" width="140">
           <template #default="{ row }">
             <span v-if="row.last_seen">{{ formatDate(row.last_seen) }}</span>
-            <span v-else>-</span>
+            <span v-else>Never</span>
           </template>
         </el-table-column>
         
-        <el-table-column label="Actions" width="160" fixed="right">
+        <el-table-column label="Actions" width="120" fixed="right">
           <template #default="{ row }">
-            <el-button 
-              type="primary" 
-              link 
-              size="small"
-              @click="handleViewDetails(row)"
-            >
-              Details
-            </el-button>
-            <el-button 
-              type="primary" 
-              link 
-              size="small"
-              @click="handleEdit(row)"
-            >
-              Edit
-            </el-button>
-            <el-button 
-              type="danger" 
-              link 
-              size="small"
-              @click="handleUnbind(row)"
-            >
-              Unbind
-            </el-button>
+            <DeviceActions
+              :device="row"
+              @success="handleOperationSuccess"
+              @details="handleViewDetails"
+              @unbind="handleUnbind"
+            />
           </template>
         </el-table-column>
       </el-table>
@@ -207,12 +195,7 @@
       width="500px"
       @closed="resetBindForm"
     >
-      <el-form 
-        :model="bindForm" 
-        :rules="bindRules" 
-        ref="bindFormRef"
-        label-width="120px"
-      >
+      <el-form :model="bindForm" :rules="bindRules" ref="bindFormRef" label-width="120px">
         <el-form-item label="Serial Number" prop="serial">
           <el-input 
             v-model="bindForm.serial" 
@@ -220,7 +203,7 @@
             clearable
           />
         </el-form-item>
-        <el-form-item label="Device Name" prop="name">
+        <el-form-item label="Device Name">
           <el-input 
             v-model="bindForm.name" 
             placeholder="Enter device name (optional)"
@@ -228,6 +211,7 @@
           />
         </el-form-item>
       </el-form>
+      
       <template #footer>
         <el-button @click="bindDialogVisible = false">Cancel</el-button>
         <el-button 
@@ -240,56 +224,42 @@
       </template>
     </el-dialog>
 
-    <!-- 设备编辑对话框 -->
+    <!-- 批量操作对话框 -->
     <el-dialog 
-      v-model="editDialogVisible" 
-      title="Edit Device" 
+      v-model="showBatchOperationDialog" 
+      title="Batch Operations" 
       width="500px"
-      @closed="resetEditForm"
     >
-      <el-form 
-        :model="editForm" 
-        :rules="editRules" 
-        ref="editFormRef"
-        label-width="120px"
-      >
-        <el-form-item label="Device Name" prop="name">
-          <el-input 
-            v-model="editForm.name" 
-            placeholder="Enter device name"
-            clearable
-          />
-        </el-form-item>
-        <el-form-item label="WAN IP" prop="wanip">
-          <el-input 
-            v-model="editForm.wanip" 
-            placeholder="Enter WAN IP address"
-            clearable
-          />
-        </el-form-item>
-        <el-form-item label="Public IP" prop="public_ip">
-          <el-input 
-            v-model="editForm.public_ip" 
-            placeholder="Enter public IP address"
-            clearable
-          />
-        </el-form-item>
-        <el-form-item label="Version" prop="version">
-          <el-input 
-            v-model="editForm.version" 
-            placeholder="Enter device version"
-            clearable
-          />
-        </el-form-item>
-      </el-form>
+      <div class="batch-operation-content">
+        <el-alert
+          :title="`Selected ${selectedDevices.length} devices`"
+          type="info"
+          show-icon
+          :closable="false"
+          style="margin-bottom: 20px"
+        />
+        
+        <el-form :model="batchForm" label-width="120px">
+          <el-form-item label="Operation">
+            <el-select v-model="batchForm.operation" placeholder="Select operation">
+              <el-option label="Reboot Devices" value="reboot" />
+              <el-option label="Collect Logs" value="logs" />
+              <el-option label="Switch to Slot 1" value="sim_slot_1" />
+              <el-option label="Switch to Slot 2" value="sim_slot_2" />
+            </el-select>
+          </el-form-item>
+        </el-form>
+      </div>
+      
       <template #footer>
-        <el-button @click="editDialogVisible = false">Cancel</el-button>
+        <el-button @click="showBatchOperationDialog = false">Cancel</el-button>
         <el-button 
           type="primary" 
-          @click="handleUpdateDevice"
-          :loading="editLoading"
+          @click="handleBatchOperation"
+          :loading="batchLoading"
+          :disabled="!batchForm.operation"
         >
-          Save Changes
+          Execute
         </el-button>
       </template>
     </el-dialog>
@@ -298,57 +268,78 @@
     <el-dialog 
       v-model="detailsDialogVisible" 
       title="Device Details" 
-      width="700px"
+      width="800px"
     >
       <div v-if="selectedDevice" class="device-details">
-        <el-descriptions :column="2" border>
-          <el-descriptions-item label="Serial Number">
-            {{ selectedDevice.serial }}
-          </el-descriptions-item>
-          <el-descriptions-item label="Device Name">
-            {{ selectedDevice.name || 'Unnamed Device' }}
-          </el-descriptions-item>
-          <el-descriptions-item label="Brand">
-            {{ selectedDevice.deviceModel?.oemname || '-' }}
-          </el-descriptions-item>
-          <el-descriptions-item label="Model">
-            {{ selectedDevice.deviceModel?.stdname || '-' }}
-          </el-descriptions-item>
-          <el-descriptions-item label="Device Type">
-            {{ selectedDevice.deviceModel?.devtype || '-' }}
-          </el-descriptions-item>
-          <el-descriptions-item label="MAC Address">
-            {{ selectedDevice.primary_mac }}
-          </el-descriptions-item>
-          <el-descriptions-item label="Online Status">
-            <el-tag :type="selectedDevice.is_online ? 'success' : 'danger'">
-              {{ selectedDevice.is_online ? 'Online' : 'Offline' }}
-            </el-tag>
-          </el-descriptions-item>
-          <el-descriptions-item label="Activation Status">
-            <el-tag :type="selectedDevice.is_activate ? 'success' : 'info'">
-              {{ selectedDevice.is_activate ? 'Activated' : 'Not Activated' }}
-            </el-tag>
-          </el-descriptions-item>
-          <el-descriptions-item label="WAN IP">
-            {{ selectedDevice.wanip || '-' }}
-          </el-descriptions-item>
-          <el-descriptions-item label="Public IP">
-            {{ selectedDevice.public_ip || '-' }}
-          </el-descriptions-item>
-          <el-descriptions-item label="Version">
-            {{ selectedDevice.version || '-' }}
-          </el-descriptions-item>
-          <el-descriptions-item label="First Connect">
-            {{ selectedDevice.firsttime ? formatDate(selectedDevice.firsttime) : '-' }}
-          </el-descriptions-item>
-          <el-descriptions-item label="Last Seen">
-            {{ selectedDevice.last_seen ? formatDate(selectedDevice.last_seen) : '-' }}
-          </el-descriptions-item>
-          <el-descriptions-item label="Created At">
-            {{ formatDate(selectedDevice.created_at) }}
-          </el-descriptions-item>
-        </el-descriptions>
+        <el-tabs v-model="activeTab">
+          <!-- 基本信息 -->
+          <el-tab-pane label="Basic Info" name="basic">
+            <el-descriptions :column="2" border>
+              <el-descriptions-item label="Serial Number">
+                {{ selectedDevice.serial }}
+              </el-descriptions-item>
+              <el-descriptions-item label="Device Name">
+                {{ selectedDevice.name || 'Unnamed Device' }}
+              </el-descriptions-item>
+              <el-descriptions-item label="Brand">
+                {{ selectedDevice.deviceModel?.oemname || '-' }}
+              </el-descriptions-item>
+              <el-descriptions-item label="Model">
+                {{ selectedDevice.deviceModel?.stdname || '-' }}
+              </el-descriptions-item>
+              <el-descriptions-item label="Device Type">
+                {{ selectedDevice.deviceModel?.devtype || '-' }}
+              </el-descriptions-item>
+              <el-descriptions-item label="MAC Address">
+                {{ selectedDevice.primary_mac }}
+              </el-descriptions-item>
+              <el-descriptions-item label="Online Status">
+                <el-tag :type="selectedDevice.is_online ? 'success' : 'danger'">
+                  {{ selectedDevice.is_online ? 'Online' : 'Offline' }}
+                </el-tag>
+              </el-descriptions-item>
+              <el-descriptions-item label="Activation Status">
+                <el-tag :type="selectedDevice.is_activate ? 'success' : 'info'">
+                  {{ selectedDevice.is_activate ? 'Activated' : 'Not Activated' }}
+                </el-tag>
+              </el-descriptions-item>
+              <el-descriptions-item label="WAN IP">
+                {{ selectedDevice.wanip || '-' }}
+              </el-descriptions-item>
+              <el-descriptions-item label="Public IP">
+                {{ selectedDevice.public_ip || '-' }}
+              </el-descriptions-item>
+              <el-descriptions-item label="Version">
+                {{ selectedDevice.version || '-' }}
+              </el-descriptions-item>
+              <el-descriptions-item label="First Connect">
+                {{ selectedDevice.firsttime ? formatDate(selectedDevice.firsttime) : '-' }}
+              </el-descriptions-item>
+              <el-descriptions-item label="Last Seen">
+                {{ selectedDevice.last_seen ? formatDate(selectedDevice.last_seen) : '-' }}
+              </el-descriptions-item>
+              <el-descriptions-item label="Created At">
+                {{ formatDate(selectedDevice.created_at) }}
+              </el-descriptions-item>
+            </el-descriptions>
+          </el-tab-pane>
+
+          <!-- WiFi状态 -->
+          <el-tab-pane label="WiFi Status" name="wifi">
+            <WiFiStatus 
+              :wifi-status="selectedDevice.wifiStatus" 
+              :show-details="true"
+            />
+          </el-tab-pane>
+
+          <!-- Modem状态 -->
+          <el-tab-pane label="Modem Status" name="modem">
+            <ModemStatus 
+              :modem-status="selectedDevice.modemStatus" 
+              :show-details="true"
+            />
+          </el-tab-pane>
+        </el-tabs>
         
         <div v-if="selectedDevice.user" class="user-info" style="margin-top: 20px">
           <h4>Bound User</h4>
@@ -372,29 +363,34 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
-import { Plus, Refresh, Search } from '@element-plus/icons-vue'
+import { Plus, Refresh, Search, Operation } from '@element-plus/icons-vue'
 import { deviceApi } from '@/api'
 import type { Device, DeviceQuery } from '@/api/types'
 import { useUserStore } from '@/stores/user'
+import WiFiStatus from '@/components/WiFiStatus.vue'
+import ModemStatus from '@/components/ModemStatus.vue'
+import DeviceActions from '@/components/DeviceActions.vue'
 
 const userStore = useUserStore()
 
 // 响应式数据
 const loading = ref(false)
 const bindLoading = ref(false)
-const editLoading = ref(false)
+const batchLoading = ref(false)
 const deviceList = ref<Device[]>([])
 const selectedDevices = ref<Device[]>([])
 const selectedDevice = ref<Device | null>(null)
 
 // 对话框控制
 const bindDialogVisible = ref(false)
-const editDialogVisible = ref(false)
 const detailsDialogVisible = ref(false)
+const showBatchOperationDialog = ref(false)
 
 // 表单引用
 const bindFormRef = ref<FormInstance>()
-const editFormRef = ref<FormInstance>()
+
+// 活动标签页
+const activeTab = ref('basic')
 
 // 筛选表单
 const filterForm = reactive<DeviceQuery>({
@@ -421,13 +417,9 @@ const bindForm = reactive({
   name: ''
 })
 
-// 设备编辑表单
-const editForm = reactive({
-  id: 0,
-  name: '',
-  wanip: '',
-  public_ip: '',
-  version: ''
+// 批量操作表单
+const batchForm = reactive({
+  operation: ''
 })
 
 // 表单验证规则
@@ -435,18 +427,6 @@ const bindRules: FormRules = {
   serial: [
     { required: true, message: 'Please enter serial number', trigger: 'blur' },
     { min: 3, max: 100, message: 'Serial number length should be 3-100 characters', trigger: 'blur' }
-  ]
-}
-
-const editRules: FormRules = {
-  name: [
-    { max: 100, message: 'Device name should not exceed 100 characters', trigger: 'blur' }
-  ],
-  wanip: [
-    { pattern: /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/, message: 'Please enter a valid IP address', trigger: 'blur' }
-  ],
-  public_ip: [
-    { pattern: /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/, message: 'Please enter a valid IP address', trigger: 'blur' }
   ]
 }
 
@@ -472,6 +452,9 @@ const fetchDevices = async () => {
       deviceList.value = response.data.devices
       pagination.total = response.data.pagination.total
       pagination.pages = response.data.pagination.pages
+
+      // 获取设备的WiFi和Modem状态
+      await fetchDeviceStatuses()
     } else {
       ElMessage.error(response.message)
     }
@@ -481,6 +464,58 @@ const fetchDevices = async () => {
   } finally {
     loading.value = false
   }
+}
+
+// 获取设备状态信息
+const fetchDeviceStatuses = async () => {
+  const promises = deviceList.value.map(async (device) => {
+    try {
+      const [wifiResponse, modemResponse] = await Promise.all([
+        deviceApi.getDeviceWiFi(device.id).catch(() => null),
+        deviceApi.getDeviceModem(device.id).catch(() => null)
+      ])
+
+      if (wifiResponse?.success) {
+        // 将新的嵌套结构转换为旧的扁平数组格式，以兼容现有的WiFiStatus组件
+        const wifiData = wifiResponse.data.wifi
+        if (wifiData && wifiData.radios) {
+          device.wifiStatus = []
+          wifiData.radios.forEach((radio: any) => {
+            if (radio.ssids && radio.ssids.length > 0) {
+              radio.ssids.forEach((ssid: any) => {
+                if (!device.wifiStatus) device.wifiStatus = []
+                device.wifiStatus.push({
+                  id: 0, // 临时ID
+                  device_id: device.id,
+                  interface: `${radio.band}-${ssid.ssid_index}`,
+                  ssid: ssid.ssid,
+                  status: ssid.status,
+                  frequency: radio.band,
+                  channel: radio.channel,
+                  tx_power: radio.txpower,
+                  connected_clients: ssid.connected_clients,
+                  rx_bytes: ssid.rx_bytes,
+                  tx_bytes: ssid.tx_bytes,
+                  rx_packets: ssid.rx_packets,
+                  tx_packets: ssid.tx_packets,
+                  error_count: ssid.error_count,
+                  noise_level: radio.noise_level,
+                  reported_at: ssid.reported_at
+                })
+              })
+            }
+          })
+        }
+      }
+      if (modemResponse?.success) {
+        device.modemStatus = modemResponse.data
+      }
+    } catch (error) {
+      console.error(`Error fetching status for device ${device.id}:`, error)
+    }
+  })
+
+  await Promise.all(promises)
 }
 
 const handleRefresh = () => {
@@ -524,6 +559,51 @@ const handleViewDetails = async (device: Device) => {
     const response = await deviceApi.getDevice(device.id)
     if (response.success) {
       selectedDevice.value = response.data
+      
+      // 获取详细的WiFi和Modem状态
+      const [wifiResponse, modemResponse] = await Promise.all([
+        deviceApi.getDeviceWiFi(device.id).catch(() => null),
+        deviceApi.getDeviceModem(device.id).catch(() => null)
+      ])
+
+      if (wifiResponse?.success && selectedDevice.value) {
+        // 将新的嵌套结构转换为旧的扁平数组格式，以兼容现有的WiFiStatus组件
+        const wifiData = wifiResponse.data.wifi
+        if (wifiData && wifiData.radios) {
+          selectedDevice.value.wifiStatus = []
+          wifiData.radios.forEach((radio: any) => {
+            if (radio.ssids && radio.ssids.length > 0) {
+              radio.ssids.forEach((ssid: any) => {
+                if (selectedDevice.value && !selectedDevice.value.wifiStatus) {
+                  selectedDevice.value.wifiStatus = []
+                }
+                selectedDevice.value?.wifiStatus?.push({
+                  id: 0, // 临时ID
+                  device_id: selectedDevice.value?.id || 0,
+                  interface: `${radio.band}-${ssid.ssid_index}`,
+                  ssid: ssid.ssid,
+                  status: ssid.status,
+                  frequency: radio.band,
+                  channel: radio.channel,
+                  tx_power: radio.txpower,
+                  connected_clients: ssid.connected_clients,
+                  rx_bytes: ssid.rx_bytes,
+                  tx_bytes: ssid.tx_bytes,
+                  rx_packets: ssid.rx_packets,
+                  tx_packets: ssid.tx_packets,
+                  error_count: ssid.error_count,
+                  noise_level: radio.noise_level,
+                  reported_at: ssid.reported_at
+                })
+              })
+            }
+          })
+        }
+      }
+      if (modemResponse?.success) {
+        selectedDevice.value.modemStatus = modemResponse.data
+      }
+
       detailsDialogVisible.value = true
     } else {
       ElMessage.error(response.message)
@@ -531,42 +611,6 @@ const handleViewDetails = async (device: Device) => {
   } catch (error) {
     console.error('Error fetching device details:', error)
     ElMessage.error('Failed to fetch device details')
-  }
-}
-
-const handleEdit = (device: Device) => {
-  editForm.id = device.id
-  editForm.name = device.name || ''
-  editForm.wanip = device.wanip || ''
-  editForm.public_ip = device.public_ip || ''
-  editForm.version = device.version || ''
-  editDialogVisible.value = true
-}
-
-const handleUnbind = async (device: Device) => {
-  try {
-    await ElMessageBox.confirm(
-      `Are you sure you want to unbind device "${device.name || device.serial}"? This will remove the device from your account.`,
-      'Confirm Unbind',
-      {
-        confirmButtonText: 'Unbind',
-        cancelButtonText: 'Cancel',
-        type: 'warning'
-      }
-    )
-    
-    const response = await deviceApi.unbindDevice(device.id)
-    if (response.success) {
-      ElMessage.success('Device unbound successfully')
-      fetchDevices()
-    } else {
-      ElMessage.error(response.message)
-    }
-  } catch (error) {
-    if (error !== 'cancel') {
-      console.error('Error unbinding device:', error)
-      ElMessage.error('Failed to unbind device')
-    }
   }
 }
 
@@ -594,29 +638,75 @@ const handleBindDevice = async () => {
   }
 }
 
-const handleUpdateDevice = async () => {
-  if (!editFormRef.value) return
-  
+const handleUnbind = async (device: Device) => {
   try {
-    const valid = await editFormRef.value.validate()
-    if (!valid) return
-    
-    editLoading.value = true
-    const { id, ...updateData } = editForm
-    const response = await deviceApi.updateDevice(id, updateData)
+    const response = await deviceApi.unbindDevice(device.id)
     if (response.success) {
-      ElMessage.success('Device updated successfully')
-      editDialogVisible.value = false
+      ElMessage.success('Device unbound successfully')
       fetchDevices()
     } else {
       ElMessage.error(response.message)
     }
   } catch (error) {
-    console.error('Error updating device:', error)
-    ElMessage.error('Failed to update device')
-  } finally {
-    editLoading.value = false
+    console.error('Error unbinding device:', error)
+    ElMessage.error('Failed to unbind device')
   }
+}
+
+const handleBatchOperation = async () => {
+  if (!batchForm.operation || selectedDevices.value.length === 0) return
+
+  try {
+    await ElMessageBox.confirm(
+      `Are you sure you want to execute "${batchForm.operation}" on ${selectedDevices.value.length} devices?`,
+      'Confirm Batch Operation',
+      {
+        confirmButtonText: 'Execute',
+        cancelButtonText: 'Cancel',
+        type: 'warning'
+      }
+    )
+
+    batchLoading.value = true
+    
+    const deviceIds = selectedDevices.value.map(d => d.id)
+    let operationType = batchForm.operation
+    let params = {}
+
+    if (batchForm.operation === 'sim_slot_1') {
+      operationType = 'sim_switch'
+      params = { slot: 1 }
+    } else if (batchForm.operation === 'sim_slot_2') {
+      operationType = 'sim_switch'
+      params = { slot: 2 }
+    }
+
+    const response = await deviceApi.batchOperation({
+      device_ids: deviceIds,
+      operation: { type: operationType as any, params }
+    })
+
+    if (response.success) {
+      ElMessage.success('Batch operation initiated successfully')
+      showBatchOperationDialog.value = false
+      batchForm.operation = ''
+      selectedDevices.value = []
+    } else {
+      ElMessage.error(response.message || 'Failed to execute batch operation')
+    }
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('Error executing batch operation:', error)
+      ElMessage.error('Failed to execute batch operation')
+    }
+  } finally {
+    batchLoading.value = false
+  }
+}
+
+const handleOperationSuccess = (message: string) => {
+  ElMessage.success(message)
+  fetchDevices()
 }
 
 const resetBindForm = () => {
@@ -625,17 +715,6 @@ const resetBindForm = () => {
     name: ''
   })
   bindFormRef.value?.clearValidate()
-}
-
-const resetEditForm = () => {
-  Object.assign(editForm, {
-    id: 0,
-    name: '',
-    wanip: '',
-    public_ip: '',
-    version: ''
-  })
-  editFormRef.value?.clearValidate()
 }
 
 const formatDate = (dateString: string) => {
@@ -713,26 +792,17 @@ onMounted(() => {
 }
 
 .pagination-wrapper {
+  margin-top: 20px;
   display: flex;
   justify-content: center;
-  margin-top: 20px;
+}
+
+.batch-operation-content {
+  padding: 0 20px;
 }
 
 .user-info h4 {
-  margin: 0 0 10px 0;
+  margin: 0 0 12px 0;
   color: #303133;
-}
-
-:deep(.el-table) {
-  font-size: 14px;
-}
-
-:deep(.el-table th) {
-  background-color: #fafafa;
-}
-
-:deep(.el-descriptions__label) {
-  width: 120px;
-  font-weight: 600;
 }
 </style> 

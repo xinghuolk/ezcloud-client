@@ -1,31 +1,30 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import type { User } from '@/api/types'
+
+export interface User {
+  id: number
+  username: string
+  email: string
+  role: 'admin' | 'user'
+  is_active: boolean
+  created_at?: string
+  updated_at?: string
+}
 
 export const useUserStore = defineStore('user', () => {
-  // State
-  const token = ref<string>('')
+  // 状态
   const user = ref<User | null>(null)
-  const isLoggedIn = ref<boolean>(false)
+  const token = ref<string | null>(localStorage.getItem('auth_token'))
+  const isLoggedIn = ref<boolean>(!!token.value)
 
-  // Getters
-  const isAdmin = computed(() => {
-    return user.value?.role === 'admin'
-  })
+  // 计算属性
+  const isAdmin = computed(() => user.value?.role === 'admin')
+  const isUser = computed(() => user.value?.role === 'user')
+  const isActive = computed(() => user.value?.is_active === true)
+  const userRole = computed(() => user.value?.role || null)
+  const userInfo = computed(() => user.value)
 
-  const isUser = computed(() => {
-    return user.value?.role === 'user'
-  })
-
-  const userRole = computed(() => {
-    return user.value?.role || null
-  })
-
-  const userInfo = computed(() => {
-    return user.value
-  })
-
-  // Actions
+  // 方法
   const setToken = (newToken: string) => {
     token.value = newToken
     localStorage.setItem('auth_token', newToken)
@@ -35,14 +34,22 @@ export const useUserStore = defineStore('user', () => {
   const setUser = (userData: User) => {
     user.value = userData
     localStorage.setItem('user_info', JSON.stringify(userData))
+    isLoggedIn.value = true
   }
 
-  const clearAuth = () => {
-    token.value = ''
+  const logout = () => {
     user.value = null
+    token.value = null
     isLoggedIn.value = false
     localStorage.removeItem('auth_token')
     localStorage.removeItem('user_info')
+  }
+
+  const updateUser = (updatedData: Partial<User>) => {
+    if (user.value) {
+      user.value = { ...user.value, ...updatedData }
+      localStorage.setItem('user_info', JSON.stringify(user.value))
+    }
   }
 
   const initializeAuth = () => {
@@ -64,56 +71,53 @@ export const useUserStore = defineStore('user', () => {
     }
   }
 
-  const updateUser = (updatedData: Partial<User>) => {
-    if (user.value) {
-      user.value = { ...user.value, ...updatedData }
-      localStorage.setItem('user_info', JSON.stringify(user.value))
-    }
-  }
-
+  // 权限检查方法
   const hasPermission = (permission: string) => {
-    if (!user.value) return false
+    if (!user.value || !isActive.value) return false
     
-    // Admin has all permissions
-    if (user.value.role === 'admin') return true
+    // 管理员拥有所有权限
+    if (isAdmin.value) return true
     
-    // Define permission mappings
-    const userPermissions = ['device:view', 'device:bind', 'profile:edit']
-    const adminPermissions = [
-      'vendor:create', 'vendor:edit', 'vendor:delete',
-      'model:create', 'model:edit', 'model:delete',
-      'serial:generate', 'serial:manage', 'serial:export',
-      'user:manage', 'audit:view', 'system:manage'
+    // 普通用户权限检查
+    const userPermissions = [
+      'device:view',
+      'device:bind',
+      'device:unbind',
+      'wifi:view',
+      'wifi:configure',
+      'profile:edit'
     ]
     
-    if (user.value.role === 'user') {
-      return userPermissions.includes(permission)
-    }
-    
-    return false
+    return userPermissions.includes(permission)
   }
 
-  // Initialize auth state when store is created
+  const hasRole = (role: string) => {
+    return user.value?.role === role
+  }
+
+  // 初始化认证状态
   initializeAuth()
 
   return {
-    // State
-    token,
+    // 状态
     user,
+    token,
     isLoggedIn,
     
-    // Getters
+    // 计算属性
     isAdmin,
     isUser,
+    isActive,
     userRole,
     userInfo,
     
-    // Actions
+    // 方法
     setToken,
     setUser,
-    clearAuth,
-    initializeAuth,
+    logout,
     updateUser,
-    hasPermission
+    initializeAuth,
+    hasPermission,
+    hasRole
   }
 }) 

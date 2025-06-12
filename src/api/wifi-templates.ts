@@ -1,50 +1,68 @@
 import request from './request'
 
+// 射频配置接口
+export interface WiFiRadioConfig {
+  id?: number
+  template_id?: number
+  band: '2.4G' | '5G' | '6G'
+  channel: string
+  txpower: number
+  htmode: string
+  enabled: boolean
+  created_at?: string
+  updated_at?: string
+}
+
+// SSID配置接口
+export interface WiFiSSIDConfig {
+  id?: number
+  template_id?: number
+  band: '2.4G' | '5G' | '6G'
+  ssid_index: number // 0-3
+  ssid: string
+  password?: string
+  encryption: string
+  hidden: boolean
+  enabled: boolean
+  isolate: boolean
+  created_at?: string
+  updated_at?: string
+}
+
+// WiFi模板接口（v2.0架构）
 export interface WiFiTemplate {
   id?: number
   name: string
   description?: string
-  radio_2g_channel: string
-  radio_2g_txpower: number
-  radio_2g_htmode: string
-  radio_2g_enabled: boolean
-  radio_5g_channel: string
-  radio_5g_txpower: number
-  radio_5g_htmode: string
-  radio_5g_enabled: boolean
   country: string
-  ssid_2g_main: string
-  ssid_2g_main_password: string
-  ssid_2g_main_encryption: string
-  ssid_2g_main_hidden: boolean
-  ssid_2g_main_enabled: boolean
-  ssid_2g_guest: string
-  ssid_2g_guest_password: string
-  ssid_2g_guest_encryption: string
-  ssid_2g_guest_hidden: boolean
-  ssid_2g_guest_enabled: boolean
-  ssid_2g_guest_isolate: boolean
-  ssid_5g_main: string
-  ssid_5g_main_password: string
-  ssid_5g_main_encryption: string
-  ssid_5g_main_hidden: boolean
-  ssid_5g_main_enabled: boolean
-  ssid_5g_guest: string
-  ssid_5g_guest_password: string
-  ssid_5g_guest_encryption: string
-  ssid_5g_guest_hidden: boolean
-  ssid_5g_guest_enabled: boolean
-  ssid_5g_guest_isolate: boolean
   is_active: boolean
   created_at?: string
   updated_at?: string
+  // 关联数据
+  radioConfigs?: WiFiRadioConfig[]
+  ssidConfigs?: WiFiSSIDConfig[]
 }
+
+// 创建/更新模板时的数据结构
+export interface WiFiTemplateCreateData {
+  name: string
+  description?: string
+  country: string
+  is_active?: boolean
+  radioConfigs: Omit<WiFiRadioConfig, 'id' | 'template_id' | 'created_at' | 'updated_at'>[]
+  ssidConfigs: Omit<WiFiSSIDConfig, 'id' | 'template_id' | 'created_at' | 'updated_at'>[]
+}
+
+export interface WiFiTemplateUpdateData extends Partial<WiFiTemplateCreateData> {}
 
 export interface WiFiTemplateListParams {
   page?: number
   limit?: number
   search?: string
   is_active?: boolean
+  band?: string
+  sort_by?: string
+  sort_order?: 'asc' | 'desc'
 }
 
 export interface WiFiTemplateListResponse {
@@ -69,11 +87,18 @@ export interface ApiResponse {
   message: string
 }
 
+// 克隆模板参数
+export interface WiFiTemplateCloneParams {
+  source_id: number
+  name: string
+  description?: string
+}
+
 export const wifiTemplateApi = {
   // 获取WiFi模板列表
   getTemplates(params: WiFiTemplateListParams = {}): Promise<WiFiTemplateListResponse> {
     return request({
-      url: '/api/v1/wifi-templates',
+      url: '/wifi-templates',
       method: 'get',
       params
     })
@@ -82,24 +107,24 @@ export const wifiTemplateApi = {
   // 获取WiFi模板详情
   getTemplate(id: number): Promise<WiFiTemplateResponse> {
     return request({
-      url: `/api/v1/wifi-templates/${id}`,
+      url: `/wifi-templates/${id}`,
       method: 'get'
     })
   },
 
   // 创建WiFi模板
-  createTemplate(data: Partial<WiFiTemplate>): Promise<WiFiTemplateResponse> {
+  createTemplate(data: WiFiTemplateCreateData): Promise<WiFiTemplateResponse> {
     return request({
-      url: '/api/v1/wifi-templates',
+      url: '/wifi-templates',
       method: 'post',
       data
     })
   },
 
   // 更新WiFi模板
-  updateTemplate(id: number, data: Partial<WiFiTemplate>): Promise<WiFiTemplateResponse> {
+  updateTemplate(id: number, data: WiFiTemplateUpdateData): Promise<WiFiTemplateResponse> {
     return request({
-      url: `/api/v1/wifi-templates/${id}`,
+      url: `/wifi-templates/${id}`,
       method: 'put',
       data
     })
@@ -108,8 +133,25 @@ export const wifiTemplateApi = {
   // 删除WiFi模板
   deleteTemplate(id: number): Promise<ApiResponse> {
     return request({
-      url: `/api/v1/wifi-templates/${id}`,
+      url: `/wifi-templates/${id}`,
       method: 'delete'
+    })
+  },
+
+  // 克隆WiFi模板
+  cloneTemplate(params: WiFiTemplateCloneParams): Promise<WiFiTemplateResponse> {
+    return request({
+      url: '/wifi-templates/clone',
+      method: 'post',
+      data: params
+    })
+  },
+
+  // 切换模板状态
+  toggleTemplate(id: number): Promise<WiFiTemplateResponse> {
+    return request({
+      url: `/wifi-templates/${id}/toggle`,
+      method: 'patch'
     })
   }
 }
