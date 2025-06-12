@@ -65,6 +65,12 @@ const router = createRouter({
       name: 'serials',
       component: () => import('../views/SerialList.vue'),
       meta: { requiresAuth: true, requiresAdmin: true }
+    },
+    {
+      path: '/wifi-templates',
+      name: 'wifi-templates',
+      component: () => import('../views/WiFiTemplateList.vue'),
+      meta: { requiresAuth: true }
     }
   ]
 })
