@@ -93,7 +93,7 @@
       <el-table-column label="SSID Count" width="100" align="center">
         <template #default="{ row }">
           <el-badge :value="row.ssidConfigs?.length || 0" type="primary">
-            <el-icon><Wifi /></el-icon>
+            <el-icon><Connection /></el-icon>
           </el-badge>
         </template>
       </el-table-column>
@@ -173,8 +173,8 @@
         :page-sizes="[10, 20, 50, 100]"
         :total="total"
         layout="total, sizes, prev, pager, next, jumper"
-        @size-change="handleSizeChange"
-        @current-change="handleCurrentChange"
+        :hide-on-single-page="false"
+        :disabled="loading"
       />
     </div>
 
@@ -201,8 +201,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed } from 'vue'
+import { ref, reactive, onMounted, computed, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { Connection } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 import { wifiTemplateApi, type WiFiTemplate } from '@/api/wifi-templates'
 import WiFiTemplateDialog from '@/components/WiFiTemplateDialog.vue'
@@ -215,9 +216,9 @@ const userStore = useUserStore()
 // 响应式数据
 const loading = ref(false)
 const templates = ref<WiFiTemplate[]>([])
-const total = ref(0)
-const currentPage = ref(1)
-const pageSize = ref(10)
+const total = ref<number>(0)
+const currentPage = ref<number>(1)
+const pageSize = ref<number>(10)
 const searchQuery = ref('')
 const activeFilter = ref('')
 
@@ -232,6 +233,9 @@ const cloningTemplate = ref<WiFiTemplate | null>(null)
 // 搜索防抖
 let searchTimeout: number | null = null
 
+// 请求去重
+let loadingRequest: Promise<void> | null = null
+
 // 计算属性
 const getBandTagType = (band: string) => {
   const typeMap: Record<string, string> = {
@@ -244,30 +248,41 @@ const getBandTagType = (band: string) => {
 
 // 方法
 const loadTemplates = async () => {
-  loading.value = true
-  try {
-    const params: any = {
-      page: currentPage.value,
-      limit: pageSize.value
-    }
-    
-    if (searchQuery.value) {
-      params.search = searchQuery.value
-    }
-    
-    if (activeFilter.value !== '') {
-      params.is_active = activeFilter.value === 'true'
-    }
-
-    const response = await wifiTemplateApi.getTemplates(params)
-    templates.value = response.data.templates
-    total.value = response.data.total
-  } catch (error) {
-    ElMessage.error('Failed to load WiFi templates')
-    console.error('Load templates error:', error)
-  } finally {
-    loading.value = false
+  // 如果已有请求在进行中，返回该请求
+  if (loadingRequest) {
+    return loadingRequest
   }
+
+  loading.value = true
+  
+  loadingRequest = (async () => {
+    try {
+      const params: any = {
+        page: currentPage.value,
+        limit: pageSize.value
+      }
+      
+      if (searchQuery.value) {
+        params.search = searchQuery.value
+      }
+      
+      if (activeFilter.value !== '') {
+        params.is_active = activeFilter.value === 'true'
+      }
+
+      const response = await wifiTemplateApi.getTemplates(params)
+      templates.value = response.data.templates
+      total.value = Number(response.data.pagination.total) || 0
+    } catch (error) {
+      ElMessage.error('获取WiFi模版失败')
+      console.error('Load templates error:', error)
+    } finally {
+      loading.value = false
+      loadingRequest = null
+    }
+  })()
+
+  return loadingRequest
 }
 
 const handleSearch = () => {
@@ -276,25 +291,19 @@ const handleSearch = () => {
   }
   searchTimeout = setTimeout(() => {
     currentPage.value = 1
-    loadTemplates()
+    // loadTemplates() 会通过 watcher 自动调用
   }, 500)
 }
 
 const handleFilter = () => {
   currentPage.value = 1
-  loadTemplates()
+  // loadTemplates() 会通过 watcher 自动调用
 }
 
-const handleSizeChange = (size: number) => {
-  pageSize.value = size
-  currentPage.value = 1
+// 监听分页参数变化
+watch([currentPage, pageSize], () => {
   loadTemplates()
-}
-
-const handleCurrentChange = (page: number) => {
-  currentPage.value = page
-  loadTemplates()
-}
+}, { deep: false })
 
 const handleSortChange = ({ prop, order }: { prop: string; order: string }) => {
   // 实现排序逻辑
@@ -330,7 +339,15 @@ const toggleTemplateStatus = async (template: WiFiTemplate) => {
   try {
     await wifiTemplateApi.toggleTemplate(template.id!)
     ElMessage.success(`Template ${template.is_active ? 'disabled' : 'enabled'} successfully`)
-    loadTemplates()
+    // 直接更新本地状态，避免立即请求
+    const index = templates.value.findIndex(t => t.id === template.id)
+    if (index !== -1) {
+      templates.value[index].is_active = !templates.value[index].is_active
+    }
+    // 延迟刷新完整数据
+    setTimeout(() => {
+      loadTemplates()
+    }, 1000)
   } catch (error) {
     ElMessage.error('Failed to update template status')
     console.error('Toggle template error:', error)
@@ -364,13 +381,19 @@ const deleteTemplate = async (template: WiFiTemplate) => {
 const handleTemplateSuccess = () => {
   showCreateDialog.value = false
   editingTemplate.value = null
-  loadTemplates()
+  // 延迟刷新，避免过度请求
+  setTimeout(() => {
+    loadTemplates()
+  }, 500)
 }
 
 const handleCloneSuccess = () => {
   showCloneDialog.value = false
   cloningTemplate.value = null
-  loadTemplates()
+  // 延迟刷新，避免过度请求
+  setTimeout(() => {
+    loadTemplates()
+  }, 500)
 }
 
 const formatDate = (dateString?: string) => {

@@ -45,7 +45,7 @@
               />
               <el-button 
                 v-if="!editingName"
-                type="text" 
+                link 
                 :icon="Edit" 
                 size="small"
                 @click="startEditName"

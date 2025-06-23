@@ -62,7 +62,7 @@
               <div class="batch-header">
                 <span class="batch-id">{{ batch.batch_id }}</span>
                 <el-dropdown @command="handleBatchAction">
-                  <el-button size="small" type="text">
+                  <el-button size="small" link>
                     <el-icon><MoreFilled /></el-icon>
                   </el-button>
                   <template #dropdown>
@@ -100,9 +100,8 @@
                 small
                 layout="prev, pager, next"
                 :total="serialsStore.batchPagination.total"
-                :page-size="serialsStore.batchPagination.limit"
-                :current-page="serialsStore.batchPagination.page"
-                @current-change="changeBatchPage"
+                v-model:page-size="serialsStore.batchPagination.limit"
+                v-model:current-page="serialsStore.batchPagination.page"
               />
             </div>
           </div>
@@ -224,11 +223,9 @@
             <el-pagination
               layout="total, sizes, prev, pager, next, jumper"
               :total="serialsStore.pagination.total"
-              :page-size="serialsStore.pagination.limit"
-              :current-page="serialsStore.pagination.page"
+              v-model:page-size="serialsStore.pagination.limit"
+              v-model:current-page="serialsStore.pagination.page"
               :page-sizes="[20, 50, 100, 200]"
-              @size-change="changePage"
-              @current-change="changePage"
             />
           </div>
         </el-card>

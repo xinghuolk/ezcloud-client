@@ -69,10 +69,12 @@ export interface WiFiTemplateListResponse {
   success: boolean
   data: {
     templates: WiFiTemplate[]
-    total: number
-    page: number
-    limit: number
-    totalPages: number
+    pagination: {
+      page: number
+      limit: number
+      total: number
+      pages: number
+    }
   }
 }
 

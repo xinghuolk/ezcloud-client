@@ -27,7 +27,7 @@
       <!-- 详细信息弹窗触发 -->
       <el-button 
         v-if="showDetails"
-        type="text" 
+        link 
         size="small" 
         @click="showDetailDialog = true"
         class="details-btn"

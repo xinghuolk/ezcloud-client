@@ -71,6 +71,12 @@ const router = createRouter({
       name: 'wifi-templates',
       component: () => import('../views/WiFiTemplateList.vue'),
       meta: { requiresAuth: true }
+    },
+    {
+      path: '/ssh-terminal/:deviceId',
+      name: 'ssh-terminal',
+      component: () => import('../views/SSHTerminalView.vue'),
+      meta: { requiresAuth: true }
     }
   ]
 })

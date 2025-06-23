@@ -47,7 +47,7 @@
         
         <el-form-item>
           <el-button
-            type="text"
+            link
             @click="showRegister = true"
             style="width: 100%"
           >

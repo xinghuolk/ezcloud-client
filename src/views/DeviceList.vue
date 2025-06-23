@@ -161,6 +161,17 @@
             <span v-else>Never</span>
           </template>
         </el-table-column>
+
+        <!-- 远程访问列 -->
+        <el-table-column label="Remote Access" width="200">
+          <template #default="{ row }">
+            <RemoteAccessButton
+              :device="row"
+              :show-status-indicators="false"
+              @status-change="handleRemoteAccessStatusChange"
+            />
+          </template>
+        </el-table-column>
         
         <el-table-column label="Actions" width="120" fixed="right">
           <template #default="{ row }">
@@ -182,8 +193,6 @@
           :page-sizes="[10, 20, 50, 100]"
           :total="pagination.total"
           layout="total, sizes, prev, pager, next, jumper"
-          @size-change="handleSizeChange"
-          @current-change="handleCurrentChange"
         />
       </div>
     </el-card>
@@ -370,6 +379,7 @@ import { useUserStore } from '@/stores/user'
 import WiFiStatus from '@/components/WiFiStatus.vue'
 import ModemStatus from '@/components/ModemStatus.vue'
 import DeviceActions from '@/components/DeviceActions.vue'
+import RemoteAccessButton from '@/components/RemoteAccessButton.vue'
 
 const userStore = useUserStore()
 
@@ -707,6 +717,12 @@ const handleBatchOperation = async () => {
 const handleOperationSuccess = (message: string) => {
   ElMessage.success(message)
   fetchDevices()
+}
+
+const handleRemoteAccessStatusChange = (device: Device, status: any) => {
+  // 远程访问状态变化处理
+  console.log(`设备 ${device.serial} 远程访问状态更新:`, status)
+  // 这里可以添加额外的状态处理逻辑，如通知、日志记录等
 }
 
 const resetBindForm = () => {

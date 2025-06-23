@@ -152,15 +152,18 @@ watch(() => form.template_id, () => {
 
 // 获取WiFi模板列表
 const fetchTemplates = async () => {
-  try {
+    try {
     templatesLoading.value = true
     const response = await wifiTemplateApi.getTemplates()
     if (response.success) {
-      templates.value = response.data.items
+      // 修复：服务端返回的数据结构是 data.templates
+      templates.value = response.data?.templates || []
+    } else {
+      console.warn('获取WiFi模版失败:', response.message)
     }
   } catch (error) {
     console.error('Error fetching WiFi templates:', error)
-    ElMessage.error('Failed to load WiFi templates')
+    ElMessage.error('获取WiFi模版失败')
   } finally {
     templatesLoading.value = false
   }

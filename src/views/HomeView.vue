@@ -112,7 +112,7 @@
         <template #header>
           <div class="card-header">
             <h3>Recent Devices</h3>
-            <el-button type="text" @click="$router.push('/devices')">
+            <el-button link @click="$router.push('/devices')">
               View All
               <el-icon><ArrowRight /></el-icon>
             </el-button>

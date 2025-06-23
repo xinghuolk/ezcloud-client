@@ -25,6 +25,10 @@ import type {
   BatchOperationParams
 } from './types'
 
+// 导出远程访问API
+export { remoteAccessApi } from './remote-access'
+export type { RemoteAccessStatus, StartRemoteAccessParams, StartRemoteAccessResponse } from './remote-access'
+
 // 认证相关API
 export const authApi = {
   // 用户登录
@@ -300,7 +304,15 @@ export const statsApi = {
 // WiFi模板相关API
 export const wifiTemplateApi = {
   // 获取WiFi模板列表
-  getTemplates: (params?: { page?: number; limit?: number; search?: string }): Promise<ApiResponse<PaginationResponse<WiFiTemplate>>> => {
+  getTemplates: (params?: { page?: number; limit?: number; search?: string }): Promise<ApiResponse<{
+    templates: WiFiTemplate[];
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      pages: number;
+    };
+  }>> => {
     return request.get('/wifi-templates', { params })
   },
 

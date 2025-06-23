@@ -54,8 +54,6 @@
         :page-sizes="pageSizes"
         :total="pagination.total"
         layout="total, sizes, prev, pager, next, jumper"
-        @size-change="handleSizeChange"
-        @current-change="handleCurrentChange"
       />
     </div>
   </div>
@@ -141,6 +139,19 @@ const handleSortChange = (sort: { prop: string; order: string }) => {
 // 监听搜索值变化
 watch(searchValue, (newValue) => {
   handleSearch(newValue)
+})
+
+// 监听分页变化
+watch(() => props.pagination?.page, (newPage) => {
+  if (newPage) {
+    emit('page-change', newPage)
+  }
+})
+
+watch(() => props.pagination?.limit, (newSize) => {
+  if (newSize) {
+    emit('size-change', newSize)
+  }
 })
 </script>
 
