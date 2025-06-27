@@ -222,12 +222,17 @@ const handleHttpAccess = async () => {
     const response = await remoteAccessApi.startHttpAccess(props.device.id)
     ElMessage.success(response.data.message)
     
-    // 开始轮询状态
-    startStatusPolling()
+    // 如果响应中直接包含了URL，立即打开
+    if (response.data?.url) {
+      window.open(response.data.url, '_blank')
+      httpLoading.value = false
+    } else {
+      // 开始轮询状态，等待隧道建立
+      startStatusPolling()
+    }
     
   } catch (error: any) {
     ElMessage.error(error.response?.data?.message || '启动HTTP访问失败')
-  } finally {
     httpLoading.value = false
   }
 }
@@ -277,26 +282,53 @@ const handleStopSshAccess = async () => {
 const fetchAccessStatus = async () => {
   try {
     const response = await remoteAccessApi.getRemoteAccessStatus(props.device.id)
-    accessStatus.value = response.data
+    const previousStatus = accessStatus.value
+    
+    // 后端返回的标准数据结构：实际数据在data字段中
+    const statusData = response.data
+    accessStatus.value = statusData
     
     // 通知父组件状态变化
-    emit('statusChange', props.device, response.data)
+    emit('statusChange', props.device, statusData)
     
     // 如果HTTP连接成功，自动打开页面
-    if (httpLoading.value && response.data.http?.status === 'connected') {
+    if (httpLoading.value && statusData.http?.status === 'connected') {
       httpLoading.value = false
-      const url = response.data.http?.url || `https://${props.device.serial}.dev.outdoorrouter.net`
+      const url = statusData.http?.url || `https://${props.device.serial}.dev.outdoorrouter.net`
       window.open(url, '_blank')
+      // 停止轮询，因为已经成功
+      stopStatusPolling()
     }
     
     // 如果SSH连接成功，显示连接信息
-    if (sshLoading.value && response.data.ssh?.status === 'connected') {
+    if (sshLoading.value && statusData.ssh?.status === 'connected') {
       sshLoading.value = false
       sshInfoDialogVisible.value = true
+      // 停止轮询，因为已经成功
+      stopStatusPolling()
+    }
+    
+    // 如果连接失败，停止loading和轮询
+    if (httpLoading.value && statusData.http?.status === 'error') {
+      httpLoading.value = false
+      stopStatusPolling()
+      ElMessage.error('HTTP隧道建立失败')
+    }
+    
+    if (sshLoading.value && statusData.ssh?.status === 'error') {
+      sshLoading.value = false
+      stopStatusPolling()
+      ElMessage.error('SSH隧道建立失败')
     }
     
   } catch (error) {
     console.error('获取远程访问状态失败:', error)
+    // 如果获取状态失败，停止loading
+    if (httpLoading.value || sshLoading.value) {
+      httpLoading.value = false
+      sshLoading.value = false
+      stopStatusPolling()
+    }
   }
 }
 

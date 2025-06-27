@@ -26,12 +26,20 @@ export interface StartRemoteAccessParams {
 }
 
 export interface StartRemoteAccessResponse {
-  operation_id: string
+  operation_id?: string
   message: string
   estimated_time?: number
+  device_id: number
+  serial: string
+  url?: string
+  host?: string
+  port?: number
+  command?: string
+  status: 'connecting' | 'connected' | 'disconnected' | 'error'
+  type: 'http' | 'ssh'
 }
 
-// 远程访问API
+// 远程访问API - 统一使用/api/v1前缀（通过baseURL配置）
 export const remoteAccessApi = {
   // 启动HTTP访问
   startHttpAccess: (deviceId: number, config?: object): Promise<ApiResponse<StartRemoteAccessResponse>> => {
@@ -56,5 +64,30 @@ export const remoteAccessApi = {
   // 批量获取设备远程访问状态
   getBatchRemoteAccessStatus: (deviceIds: number[]): Promise<ApiResponse<RemoteAccessStatus[]>> => {
     return request.post('/remote-access/status/batch', { device_ids: deviceIds })
+  },
+
+  // 获取活跃连接列表
+  getActiveConnections: (): Promise<ApiResponse<any[]>> => {
+    return request.get('/remote-access/active')
+  },
+
+  // 获取端口池状态
+  getPortPoolStats: (): Promise<ApiResponse<any>> => {
+    return request.get('/remote-access/port-pool/stats')
+  },
+
+  // 获取连接统计
+  getConnectionStats: (): Promise<ApiResponse<any>> => {
+    return request.get('/remote-access/connection/stats')
+  },
+
+  // 获取指令统计
+  getCommandStats: (): Promise<ApiResponse<any>> => {
+    return request.get('/remote-access/command/stats')
+  },
+
+  // 释放端口（管理员）
+  releasePort: (deviceId: number, type?: 'http' | 'ssh'): Promise<ApiResponse<{ message: string }>> => {
+    return request.post('/remote-access/port/release', { device_id: deviceId, type })
   }
 } 
