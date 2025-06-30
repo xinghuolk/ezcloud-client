@@ -64,6 +64,11 @@ request.interceptors.response.use(
       }
       
       switch (status) {
+        case 400:
+          // 使用后端返回的具体错误信息
+          errorMessage = errorMessage || 'Bad request'
+          ElMessage.error(errorMessage)
+          break
         case 401:
           errorMessage = 'Unauthorized, please login again'
           ElMessage.error(errorMessage)
@@ -86,7 +91,8 @@ request.interceptors.response.use(
           ElMessage.error(errorMessage)
           break
         case 500:
-          errorMessage = 'Internal server error'
+          // 使用后端返回的具体错误信息
+          errorMessage = errorMessage || 'Internal server error'
           ElMessage.error(errorMessage)
           break
         default:
