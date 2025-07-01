@@ -1,7 +1,7 @@
 <template>
   <div class="remote-access-buttons">
     <!-- HTTP访问按钮 -->
-    <el-tooltip content="通过Web浏览器访问设备管理界面" placement="top">
+    <el-tooltip content="Access device management interface through Web browser" placement="top">
       <el-button
         :type="httpStatus === 'connected' ? 'success' : 'primary'"
         size="small"
@@ -20,7 +20,7 @@
     </el-tooltip>
 
     <!-- SSH访问按钮 -->
-    <el-tooltip content="启动SSH隧道访问设备终端" placement="top">
+    <el-tooltip content="Start SSH Tunnel to access device terminal" placement="top">
       <el-button
         :type="sshStatus === 'connected' ? 'success' : 'info'"
         size="small"
@@ -61,20 +61,22 @@
     <!-- SSH连接信息对话框 -->
     <el-dialog
       v-model="sshInfoDialogVisible"
-      title="SSH连接信息"
+      title="SSH Tunnel Information"
       width="500px"
       :close-on-click-modal="false"
+      :z-index="3000"
+      append-to-body
     >
       <div class="ssh-info-content">
         <el-alert
-          title="SSH隧道已建立"
+          title="SSH Tunnel Established"
           type="success"
           :closable="false"
           show-icon
         />
         
         <div class="connection-info">
-          <h4>连接方式1: 命令行</h4>
+          <h4>Connection Method 1: SSH Command</h4>
           <el-input
             :model-value="sshCommandLine"
             readonly
@@ -87,29 +89,29 @@
             </template>
           </el-input>
           
-          <h4>连接方式2: Web终端</h4>
+          <h4>Connection Method 2: Web Terminal</h4>          
           <div class="connection-details">
             <el-button type="primary" @click="openWebTerminal" :icon="Monitor">
-              打开Web SSH终端
+              Open Web SSH Terminal
             </el-button>
             <p style="margin-top: 8px; font-size: 12px; color: #666;">
-              在浏览器中直接使用SSH终端，无需额外软件
+              Open SSH Terminal in browser, no extra software needed
             </p>
           </div>
 
-          <h4>连接方式3: SSH客户端</h4>
+          <h4>Connection Method 3: SSH Client</h4>
           <div class="connection-details">
             <el-descriptions :column="1" border>
-              <el-descriptions-item label="服务器地址">{{ sshHost }}</el-descriptions-item>
-              <el-descriptions-item label="端口">{{ sshPort }}</el-descriptions-item>
-              <el-descriptions-item label="用户名">root</el-descriptions-item>
-              <el-descriptions-item label="设备序列号">{{ device.serial }}</el-descriptions-item>
+              <el-descriptions-item label="Server Address">{{ sshHost }}</el-descriptions-item>
+              <el-descriptions-item label="Port">{{ sshPort }}</el-descriptions-item>
+              <el-descriptions-item label="Username">root</el-descriptions-item>
+              <el-descriptions-item label="Device Serial Number">{{ device.serial }}</el-descriptions-item>
             </el-descriptions>
           </div>
         </div>
         
         <el-alert
-          title="提示: SSH隧道将在30分钟无活动后自动关闭"
+          title="Note: SSH tunnel will be automatically closed after 30 minutes of inactivity"
           type="info"
           :closable="false"
           show-icon
@@ -168,19 +170,19 @@ const sshStatus = computed(() => accessStatus.value?.ssh?.status || 'disconnecte
 
 const httpButtonText = computed(() => {
   switch (httpStatus.value) {
-    case 'connecting': return '连接中...'
-    case 'connected': return '访问设备'
-    case 'error': return '连接失败'
-    default: return 'Web访问'
+    case 'connecting': return 'Connecting...'
+    case 'connected': return 'Access Device'
+    case 'error': return 'Connection Failed'
+    default: return 'Web Access'
   }
 })
 
 const sshButtonText = computed(() => {
   switch (sshStatus.value) {
-    case 'connecting': return '启动中...'
-    case 'connected': return 'SSH信息'
-    case 'error': return '连接失败'
-    default: return 'SSH访问'
+    case 'connecting': return 'Connecting...'
+    case 'connected': return 'SSH Information'
+    case 'error': return 'Connection Failed'
+    default: return 'SSH Access'
   }
 })
 
@@ -202,10 +204,10 @@ const getStatusTagType = (status: string) => {
 
 const getStatusText = (status: string) => {
   switch (status) {
-    case 'connected': return '已连接'
-    case 'connecting': return '连接中'
-    case 'error': return '错误'
-    default: return '未连接'
+    case 'connected': return 'Connected'
+    case 'connecting': return 'Connecting'
+    case 'error': return 'Error'
+    default: return 'Disconnected'
   }
 }
 
@@ -232,7 +234,7 @@ const handleHttpAccess = async () => {
     }
     
   } catch (error: any) {
-    ElMessage.error(error.response?.data?.message || '启动HTTP访问失败')
+    ElMessage.error(error.response?.data?.message || 'Start HTTP Access Failed')
     httpLoading.value = false
   }
 }
@@ -253,7 +255,7 @@ const handleSshAccess = async () => {
     startStatusPolling()
     
   } catch (error: any) {
-    ElMessage.error(error.response?.data?.message || '启动SSH访问失败')
+    ElMessage.error(error.response?.data?.message || 'Start SSH Access Failed')
   } finally {
     sshLoading.value = false
   }
@@ -261,12 +263,12 @@ const handleSshAccess = async () => {
 
 const handleStopSshAccess = async () => {
   try {
-    await ElMessageBox.confirm('确定要关闭SSH隧道吗？', '确认操作', {
+    await ElMessageBox.confirm('Are you sure you want to close the SSH tunnel?', 'Confirm Operation', {
       type: 'warning'
     })
     
     await remoteAccessApi.stopRemoteAccess(props.device.id, 'ssh')
-    ElMessage.success('SSH隧道已关闭')
+    ElMessage.success('SSH Tunnel Closed')
     sshInfoDialogVisible.value = false
     
     // 刷新状态
@@ -274,7 +276,7 @@ const handleStopSshAccess = async () => {
     
   } catch (error: any) {
     if (error !== 'cancel') {
-      ElMessage.error(error.response?.data?.message || '关闭SSH隧道失败')
+      ElMessage.error(error.response?.data?.message || 'Close SSH Tunnel Failed')
     }
   }
 }
@@ -282,7 +284,6 @@ const handleStopSshAccess = async () => {
 const fetchAccessStatus = async () => {
   try {
     const response = await remoteAccessApi.getRemoteAccessStatus(props.device.id)
-    const previousStatus = accessStatus.value
     
     // 后端返回的标准数据结构：实际数据在data字段中
     const statusData = response.data
@@ -312,17 +313,17 @@ const fetchAccessStatus = async () => {
     if (httpLoading.value && statusData.http?.status === 'error') {
       httpLoading.value = false
       stopStatusPolling()
-      ElMessage.error('HTTP隧道建立失败')
+      ElMessage.error('HTTP Tunnel Establishment Failed')
     }
     
     if (sshLoading.value && statusData.ssh?.status === 'error') {
       sshLoading.value = false
       stopStatusPolling()
-      ElMessage.error('SSH隧道建立失败')
+      ElMessage.error('SSH Tunnel Establishment Failed')
     }
     
   } catch (error) {
-    console.error('获取远程访问状态失败:', error)
+    console.error('Get Remote Access Status Failed:', error)
     // 如果获取状态失败，停止loading
     if (httpLoading.value || sshLoading.value) {
       httpLoading.value = false
@@ -350,15 +351,49 @@ const stopStatusPolling = () => {
 const copyToClipboard = async (text: string) => {
   try {
     await navigator.clipboard.writeText(text)
-    ElMessage.success('已复制到剪贴板')
+    ElMessage.success('Copied to clipboard')
   } catch {
-    ElMessage.error('复制失败，请手动复制')
+    ElMessage.error('Copy Failed, Please Copy Manually')
   }
 }
 
-const openWebTerminal = () => {
-  // 打开Web SSH终端页面
-  router.push(`/ssh-terminal/${props.device.id}`)
+const openWebTerminal = async () => {
+  // 检查SSH连接状态
+  if (!accessStatus.value?.ssh || accessStatus.value.ssh.status !== 'connected') {
+    ElMessage.warning('Please start SSH tunnel connection first')
+    return
+  }
+  
+  // 确保设备ID是有效的
+  if (!props.device?.id) {
+    ElMessage.error('Device ID Invalid')
+    return
+  }
+  
+  try {
+    // 使用router.push进行路由跳转，添加async/await处理
+    await router.push({
+      name: 'ssh-terminal',
+      params: {
+        deviceId: String(props.device.id)
+      }
+    })
+    
+    // 成功跳转后关闭SSH信息对话框
+    sshInfoDialogVisible.value = false
+    
+  } catch (error) {
+    console.error('Route Jump Failed:', error)
+    
+    // 如果路由跳转失败，尝试使用路径方式
+    try {
+      await router.push(`/ssh-terminal/${props.device.id}`)
+      sshInfoDialogVisible.value = false
+    } catch (fallbackError) {
+      console.error('Fallback Route Jump Failed:', fallbackError)
+      ElMessage.error('Failed to open SSH terminal page, please refresh the page and try again')
+    }
+  }
 }
 
 // 生命周期

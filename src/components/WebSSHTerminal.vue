@@ -59,9 +59,10 @@ import { ElMessage } from 'element-plus'
 import { Monitor, Delete, Close } from '@element-plus/icons-vue'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
-import { AttachAddon } from '@xterm/addon-attach'
+// 移除AttachAddon，我们将手动处理WebSocket消息
 import '@xterm/xterm/css/xterm.css'
 import type { Device } from '@/api/types'
+import { useUserStore } from '@/stores/user'
 
 interface Props {
   device: Device
@@ -78,11 +79,13 @@ const emit = defineEmits<{
   statusChange: [status: 'connected' | 'disconnected' | 'error', message?: string]
 }>()
 
+// 用户状态
+const userStore = useUserStore()
+
 // 终端相关
 const terminalContainer = ref<HTMLElement>()
 let terminal: Terminal | null = null
 let fitAddon: FitAddon | null = null
-let attachAddon: AttachAddon | null = null
 
 // WebSocket连接
 let websocket: WebSocket | null = null
@@ -124,10 +127,14 @@ const initTerminal = () => {
   // 将终端挂载到容器
   terminal.open(terminalContainer.value)
   
-  // 调整大小
+  // 调整大小并聚焦
   nextTick(() => {
     if (fitAddon) {
       fitAddon.fit()
+    }
+    // 聚焦终端以便接收键盘输入
+    if (terminal) {
+      terminal.focus()
     }
   })
 
@@ -141,7 +148,9 @@ const connectSSH = async () => {
     return
   }
 
-  if (isConnecting.value || isConnected.value) return
+  if (isConnecting.value || isConnected.value) {
+    return
+  }
 
   try {
     isConnecting.value = true
@@ -150,41 +159,116 @@ const connectSSH = async () => {
 
     // 构建WebSocket连接URL
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const host = window.location.host
-    const wsUrl = `${protocol}//${host}/api/ssh-terminal/${props.device.id}`
+    const host = window.location.hostname + ':3001'
+    
+    // 获取认证Token
+    const token = userStore.token
+    if (!token) {
+      throw new Error('未找到认证Token，请重新登录')
+    }
+    
+    const wsUrl = `${protocol}//${host}/ws/ssh-terminal/device/${props.device.id}?token=${encodeURIComponent(token)}`
+
+    // 添加连接超时
+    const connectionTimeout = setTimeout(() => {
+      if (isConnecting.value) {
+        isConnecting.value = false
+        statusMessage.value = 'SSH连接超时，请检查网络'
+        statusType.value = 'error'
+        ElMessage.error('SSH连接超时，请重试')
+        if (websocket) {
+          websocket.close()
+        }
+      }
+    }, 10000)
 
     // 创建WebSocket连接
     websocket = new WebSocket(wsUrl)
+    
+    // 清除超时定时器的函数
+    const clearConnectionTimeout = () => {
+      if (connectionTimeout) {
+        clearTimeout(connectionTimeout)
+      }
+    }
 
     // 设置WebSocket事件处理
     websocket.onopen = () => {
-      console.log('SSH WebSocket连接已建立')
+      clearConnectionTimeout()
       
       if (terminal && websocket) {
-        // 创建并加载AttachAddon
-        attachAddon = new AttachAddon(websocket)
-        terminal.loadAddon(attachAddon)
-        
-        isConnected.value = true
-        isConnecting.value = false
-        statusMessage.value = 'SSH连接已建立'
-        statusType.value = 'success'
-        
-        // 调整终端大小
-        if (fitAddon) {
-          fitAddon.fit()
+        try {
+          isConnected.value = true
+          isConnecting.value = false
+          statusMessage.value = 'SSH连接已建立'
+          statusType.value = 'success'
+          
+          // 调整终端大小
+          if (fitAddon) {
+            fitAddon.fit()
+          }
+          
+          // 发送初始终端大小
+          sendTerminalSize()
+          
+          // 设置终端数据处理
+          setupTerminalHandlers()
+          
+          emit('statusChange', 'connected', 'SSH终端已连接')
+          ElMessage.success('SSH终端连接成功')
+          
+        } catch (error) {
+          console.error('设置终端处理失败:', error)
+          ElMessage.error('终端初始化失败')
         }
-        
-        // 发送初始终端大小
-        sendTerminalSize()
-        
-        emit('statusChange', 'connected', 'SSH终端已连接')
-        ElMessage.success('SSH终端连接成功')
+      }
+    }
+
+        // WebSocket消息处理
+    websocket.onmessage = (event) => {
+      if (terminal) {
+        try {
+          // 处理不同类型的数据
+          if (event.data instanceof ArrayBuffer) {
+            // ArrayBuffer数据
+            const uint8Array = new Uint8Array(event.data)
+            terminal.write(uint8Array)
+          } else if (event.data instanceof Blob) {
+            // Blob数据，需要转换为ArrayBuffer
+            event.data.arrayBuffer().then(buffer => {
+              const uint8Array = new Uint8Array(buffer)
+              if (terminal) {
+                terminal.write(uint8Array)
+              }
+            })
+          } else if (typeof event.data === 'string') {
+            // 尝试解析JSON控制消息
+            try {
+              const message = JSON.parse(event.data)
+              if (message.type === 'error') {
+                console.error('SSH服务器错误:', message.message)
+                ElMessage.error(`SSH错误: ${message.message}`)
+                return
+              }
+              // 其他控制消息也不写入终端
+            } catch {
+              // 不是JSON，直接作为文本写入终端
+              terminal.write(event.data)
+            }
+          } else {
+            // 其他数据类型
+            terminal.write(event.data)
+          }
+        } catch (error) {
+          console.error('处理WebSocket消息失败:', error)
+        }
       }
     }
 
     websocket.onerror = (error) => {
+      clearConnectionTimeout()
       console.error('SSH WebSocket连接错误:', error)
+      
       isConnecting.value = false
       isConnected.value = false
       statusMessage.value = 'SSH连接失败，请检查网络或重试'
@@ -194,20 +278,37 @@ const connectSSH = async () => {
       ElMessage.error('SSH终端连接失败')
     }
 
-    websocket.onclose = () => {
-      console.log('SSH WebSocket连接已关闭')
+    websocket.onclose = (event) => {
+      clearConnectionTimeout()
+      
       isConnected.value = false
       isConnecting.value = false
-      statusMessage.value = 'SSH连接已断开'
-      statusType.value = 'info'
       
-      // 清理AttachAddon
-      if (attachAddon && terminal) {
+      // 根据关闭代码显示不同的消息
+      if (event.code === 1008) {
+        statusMessage.value = '认证失败，请重新登录'
+        statusType.value = 'error'
+        ElMessage.error('SSH连接认证失败，请重新登录')
+      } else if (event.code === 1002) {
+        statusMessage.value = event.reason || 'SSH隧道未连接'
+        statusType.value = 'error'
+        ElMessage.error(event.reason || 'SSH隧道未连接，请先启动SSH访问')
+      } else if (event.code === 1011) {
+        statusMessage.value = '服务器内部错误'
+        statusType.value = 'error'
+        ElMessage.error('SSH服务连接失败，请重试')
+      } else {
+        statusMessage.value = 'SSH连接已断开'
+        statusType.value = 'info'
+      }
+      
+      // 清理终端处理器
+      if (terminal) {
         terminal.dispose()
         initTerminal() // 重新初始化终端
       }
       
-      emit('statusChange', 'disconnected', 'SSH连接已断开')
+      emit('statusChange', 'disconnected', statusMessage.value)
     }
 
   } catch (error) {
@@ -225,10 +326,9 @@ const disconnectSSH = () => {
     websocket = null
   }
   
-  if (attachAddon && terminal) {
+  if (terminal) {
     terminal.dispose()
     initTerminal() // 重新初始化终端
-    attachAddon = null
   }
   
   isConnected.value = false
@@ -261,6 +361,28 @@ const handleResize = () => {
     fitAddon.fit()
     sendTerminalSize()
   }
+}
+
+const setupTerminalHandlers = () => {
+  if (!terminal || !websocket) return
+  
+  // 处理用户输入
+  terminal.onData((data) => {
+    if (websocket && websocket.readyState === WebSocket.OPEN) {
+      websocket.send(data)
+    }
+  })
+  
+  // 处理键盘事件
+  terminal.onKey(({ key, domEvent }) => {
+    // 处理特殊键
+    if (domEvent.ctrlKey && domEvent.key === 'c') {
+      // Ctrl+C
+      if (websocket && websocket.readyState === WebSocket.OPEN) {
+        websocket.send('\x03')
+      }
+    }
+  })
 }
 
 const sendTerminalSize = () => {

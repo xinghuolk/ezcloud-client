@@ -102,9 +102,11 @@ const initializeTerminal = async () => {
     error.value = ''
     
     // 获取设备ID
-    const deviceId = Number(route.params.deviceId)
-    if (!deviceId) {
-      throw new Error('无效的设备ID')
+    const deviceIdParam = route.params.deviceId
+    const deviceId = Array.isArray(deviceIdParam) ? Number(deviceIdParam[0]) : Number(deviceIdParam)
+    
+    if (!deviceId || isNaN(deviceId)) {
+      throw new Error(`无效的设备ID: ${deviceIdParam}`)
     }
     
     // 获取设备信息
@@ -129,11 +131,6 @@ const initializeTerminal = async () => {
     }
     
     sshPort.value = sshStatus.port
-    
-    console.log('SSH终端初始化完成:', {
-      device: device.value?.serial,
-      port: sshPort.value
-    })
     
   } catch (err: any) {
     console.error('SSH终端初始化失败:', err)
