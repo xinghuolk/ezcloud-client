@@ -4,7 +4,7 @@
     <div class="terminal-header">
       <div class="terminal-title">
         <el-icon><Monitor /></el-icon>
-        <span>SSH终端 - {{ device.serial }}</span>
+        <span>SSH Terminal - {{ device.serial }}</span>
       </div>
       <div class="terminal-controls">
         <el-button-group size="small">
@@ -17,11 +17,11 @@
           </el-button>
           <el-button @click="clearTerminal" :disabled="!isConnected">
             <el-icon><Delete /></el-icon>
-            清屏
+            Clear Screen
           </el-button>
           <el-button @click="closeTerminal">
             <el-icon><Close /></el-icon>
-            关闭
+            Close
           </el-button>
         </el-button-group>
       </div>
@@ -30,7 +30,7 @@
     <!-- 连接状态指示器 -->
     <div v-if="!isConnected && !isConnecting" class="connection-status">
       <el-alert 
-        title="SSH终端未连接"
+        title="SSH Terminal Not Connected"
         :description="statusMessage"
         :type="statusType"
         :closable="false"
@@ -47,8 +47,12 @@
 
     <!-- 加载状态 -->
     <div v-if="isConnecting" class="loading-overlay">
-      <el-loading-spinner size="50px" />
-      <p>正在连接SSH终端...</p>
+      <div class="loading-content">
+        <el-icon class="loading-icon" :size="50">
+          <Loading />
+        </el-icon>
+        <p>Connecting SSH Terminal...</p>
+      </div>
     </div>
   </div>
 </template>
@@ -56,10 +60,10 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Monitor, Delete, Close } from '@element-plus/icons-vue'
+import { Monitor, Delete, Close, Loading } from '@element-plus/icons-vue'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
-import { AttachAddon } from '@xterm/addon-attach'
+// 移除AttachAddon，我们将手动处理WebSocket消息
 import '@xterm/xterm/css/xterm.css'
 import type { Device } from '@/api/types'
 import { getApiBaseUrl, getWebSocketBaseUrl } from '@/utils/config'
@@ -83,20 +87,19 @@ const emit = defineEmits<{
 const terminalContainer = ref<HTMLElement>()
 let terminal: Terminal | null = null
 let fitAddon: FitAddon | null = null
-let attachAddon: AttachAddon | null = null
 
 // WebSocket连接
 let websocket: WebSocket | null = null
 const isConnected = ref(false)
 const isConnecting = ref(false)
-const statusMessage = ref('点击连接按钮启动SSH会话')
+const statusMessage = ref('Click the connect button to start the SSH session')
 const statusType = ref<'info' | 'success' | 'warning' | 'error'>('info')
 
 // 计算属性
 const connectionButtonText = computed(() => {
-  if (isConnecting.value) return '连接中...'
-  if (isConnected.value) return '断开连接'
-  return '连接SSH'
+  if (isConnecting.value) return 'Connecting...'
+  if (isConnected.value) return 'Disconnect'
+  return 'Connect SSH'
 })
 
 // 方法
@@ -141,13 +144,13 @@ const connectSSH = async () => {
 
   try {
     isConnecting.value = true
-    statusMessage.value = '正在检查SSH隧道状态...'
+    statusMessage.value = 'Checking SSH Tunnel Status...'
     statusType.value = 'info'
 
     // 获取JWT token用于认证
     const token = localStorage.getItem('auth_token')
     if (!token) {
-      throw new Error('用户未登录')
+      throw new Error('User not logged in')
     }
 
     // 首先检查SSH隧道状态
@@ -160,40 +163,34 @@ const connectSSH = async () => {
     })
     
     if (!response.ok) {
-      throw new Error('获取SSH隧道状态失败')
+      throw new Error('Failed to get SSH tunnel status')
     }
     
     const statusData = await response.json()
-    console.log('SSH隧道状态:', statusData)
+    console.log('SSH Tunnel Status:', statusData)
     
     // 检查SSH隧道状态
     if (!statusData.data?.ssh || statusData.data.ssh.status !== 'connected') {
-      throw new Error('SSH隧道未连接，请先建立SSH隧道')
+      throw new Error('SSH Tunnel Not Connected, Please Establish SSH Tunnel First')
     }
 
-    statusMessage.value = '正在建立SSH终端连接...'
+    statusMessage.value = 'Establishing SSH Terminal Connection...'
 
     // 构建WebSocket连接URL
     const wsBaseUrl = getWebSocketBaseUrl()
     const wsUrl = `${wsBaseUrl}/ws/ssh-terminal/device/${props.device.id}?token=${encodeURIComponent(token)}`
-
-    console.log('SSH隧道已连接，建立WebSocket连接:', wsUrl)
 
     // 创建WebSocket连接
     websocket = new WebSocket(wsUrl)
 
     // 设置WebSocket事件处理
     websocket.onopen = () => {
-      console.log('SSH WebSocket连接已建立')
+        console.log('SSH WebSocket Connection Established')
       
       if (terminal && websocket) {
-        // 创建并加载AttachAddon
-        attachAddon = new AttachAddon(websocket)
-        terminal.loadAddon(attachAddon)
-        
         isConnected.value = true
         isConnecting.value = false
-        statusMessage.value = 'SSH连接已建立'
+        statusMessage.value = 'SSH Connection Established'
         statusType.value = 'success'
         
         // 调整终端大小
@@ -204,45 +201,89 @@ const connectSSH = async () => {
         // 发送初始终端大小
         sendTerminalSize()
         
-        emit('statusChange', 'connected', 'SSH终端已连接')
-        ElMessage.success('SSH终端连接成功')
+        // 设置终端数据处理
+        setupTerminalHandlers()
+        
+        emit('statusChange', 'connected', 'SSH Terminal Connected')
+        ElMessage.success('SSH Terminal Connected')
+      }
+    }
+
+    // WebSocket消息处理
+    websocket.onmessage = (event) => {
+      if (terminal) {
+        try {
+          // 处理不同类型的数据
+          if (event.data instanceof ArrayBuffer) {
+            // ArrayBuffer数据
+            const uint8Array = new Uint8Array(event.data)
+            terminal.write(uint8Array)
+          } else if (event.data instanceof Blob) {
+            // Blob数据，需要转换为ArrayBuffer
+            event.data.arrayBuffer().then(buffer => {
+              const uint8Array = new Uint8Array(buffer)
+              if (terminal) {
+                terminal.write(uint8Array)
+              }
+            })
+          } else if (typeof event.data === 'string') {
+            // 尝试解析JSON控制消息
+            try {
+              const message = JSON.parse(event.data)
+              if (message.type === 'error') {
+                console.error('SSH Server Error:', message.message)
+                ElMessage.error(`SSH Error: ${message.message}`)
+                return
+              }
+              // 其他控制消息也不写入终端
+            } catch {
+              // 不是JSON，直接作为文本写入终端
+              terminal.write(event.data)
+            }
+          } else {
+            // 其他数据类型
+            terminal.write(event.data)
+          }
+        } catch (error) {
+          console.error('Handle WebSocket Message Failed:', error)
+        }
       }
     }
 
     websocket.onerror = (error) => {
-      console.error('SSH WebSocket连接错误:', error)
+      console.error('SSH WebSocket Connection Error:', error)
       isConnecting.value = false
       isConnected.value = false
-      statusMessage.value = 'SSH连接失败，请检查网络或重试'
+      statusMessage.value = 'SSH Connection Failed, Please Check Network or Retry'
       statusType.value = 'error'
       
-      emit('statusChange', 'error', 'SSH连接失败')
-      ElMessage.error('SSH终端连接失败')
+      emit('statusChange', 'error', 'SSH Connection Failed')
+      ElMessage.error('SSH Terminal Connection Failed')
     }
 
     websocket.onclose = () => {
-      console.log('SSH WebSocket连接已关闭')
+      console.log('SSH WebSocket Connection Closed')
       isConnected.value = false
       isConnecting.value = false
-      statusMessage.value = 'SSH连接已断开'
+      statusMessage.value = 'SSH Connection Closed'
       statusType.value = 'info'
       
-      // 清理AttachAddon
-      if (attachAddon && terminal) {
+      // 清理终端处理器
+      if (terminal) {
         terminal.dispose()
         initTerminal() // 重新初始化终端
       }
       
-      emit('statusChange', 'disconnected', 'SSH连接已断开')
+      emit('statusChange', 'disconnected', 'SSH Connection Closed')
     }
 
   } catch (error) {
-    console.error('建立SSH连接失败:', error)
+    console.error('Establish SSH Connection Failed:', error)
     isConnecting.value = false
-    const errorMsg = error instanceof Error ? error.message : '连接失败，请重试'
+    const errorMsg = error instanceof Error ? error.message : 'Connection Failed, Please Retry'
     statusMessage.value = errorMsg
     statusType.value = 'error'
-    ElMessage.error(`SSH连接失败: ${errorMsg}`)
+    ElMessage.error(`SSH Connection Failed: ${errorMsg}`)
   }
 }
 
@@ -252,15 +293,14 @@ const disconnectSSH = () => {
     websocket = null
   }
   
-  if (attachAddon && terminal) {
+  if (terminal) {
     terminal.dispose()
     initTerminal() // 重新初始化终端
-    attachAddon = null
   }
   
   isConnected.value = false
   isConnecting.value = false
-  statusMessage.value = 'SSH连接已断开'
+  statusMessage.value = 'SSH Connection Closed'
   statusType.value = 'info'
 }
 
@@ -281,6 +321,28 @@ const clearTerminal = () => {
 const closeTerminal = () => {
   disconnectSSH()
   emit('close')
+}
+
+const setupTerminalHandlers = () => {
+  if (!terminal || !websocket) return
+  
+  // 处理用户输入
+  terminal.onData((data) => {
+    if (websocket && websocket.readyState === WebSocket.OPEN) {
+      websocket.send(data)
+    }
+  })
+  
+  // 处理键盘事件
+  terminal.onKey(({ key, domEvent }) => {
+    // 处理特殊键
+    if (domEvent.ctrlKey && domEvent.key === 'c') {
+      // Ctrl+C
+      if (websocket && websocket.readyState === WebSocket.OPEN) {
+        websocket.send('\x03')
+      }
+    }
+  })
 }
 
 const handleResize = () => {
@@ -396,13 +458,32 @@ defineExpose({
   right: 0;
   bottom: 0;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
   background: rgba(30, 30, 30, 0.9);
   color: #cccccc;
   font-size: 14px;
+}
+
+.loading-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   gap: 16px;
+}
+
+.loading-icon {
+  animation: spin 1s linear infinite;
+  color: #409eff;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* 响应式设计 */
