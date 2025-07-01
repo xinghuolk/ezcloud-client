@@ -130,7 +130,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { useRouter } from 'vue-router'
 import {
   Monitor,
   ChromeFilled,
@@ -138,6 +137,7 @@ import {
   CopyDocument
 } from '@element-plus/icons-vue'
 import { remoteAccessApi } from '@/api/remote-access'
+import { useTabsStore } from '@/stores/tabs'
 import type { Device } from '@/api/types'
 import type { RemoteAccessStatus } from '@/api/remote-access'
 
@@ -155,7 +155,7 @@ const emit = defineEmits<{
   openTerminal: [device: Device, sshPort: number]
 }>()
 
-const router = useRouter()
+const tabsStore = useTabsStore()
 
 // 状态管理
 const httpLoading = ref(false)
@@ -371,28 +371,24 @@ const openWebTerminal = async () => {
   }
   
   try {
-    // 使用router.push进行路由跳转，添加async/await处理
-    await router.push({
-      name: 'ssh-terminal',
-      params: {
-        deviceId: String(props.device.id)
-      }
-    })
+    // 使用Tab Store创建SSH终端Tab，而不是路由跳转
+    const tabId = tabsStore.openSSHTerminal(
+      props.device.id,
+      props.device.name || `Device ${props.device.id}`,
+      props.device.serial,
+      accessStatus.value.ssh.port
+    )
     
-    // 成功跳转后关闭SSH信息对话框
+    ElMessage.success(`SSH终端已在新标签页中打开: ${props.device.serial}`)
+    
+    // 成功创建Tab后关闭SSH信息对话框
     sshInfoDialogVisible.value = false
     
-  } catch (error) {
-    console.error('Route Jump Failed:', error)
+    console.log(`SSH Terminal Tab created with ID: ${tabId}`)
     
-    // 如果路由跳转失败，尝试使用路径方式
-    try {
-      await router.push(`/ssh-terminal/${props.device.id}`)
-      sshInfoDialogVisible.value = false
-    } catch (fallbackError) {
-      console.error('Fallback Route Jump Failed:', fallbackError)
-      ElMessage.error('Failed to open SSH terminal page, please refresh the page and try again')
-    }
+  } catch (error) {
+    console.error('Failed to open SSH terminal tab:', error)
+    ElMessage.error('无法打开SSH终端标签页，请刷新页面后重试')
   }
 }
 

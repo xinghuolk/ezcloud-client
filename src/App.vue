@@ -13,12 +13,16 @@ import {
   Document,
   User,
   ArrowDown,
-  SwitchButton
+  SwitchButton,
+  Close
 } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
+import { useTabsStore } from '@/stores/tabs'
+import WebSSHTerminal from '@/components/WebSSHTerminal.vue'
 
 const router = useRouter()
 const userStore = useUserStore()
+const tabsStore = useTabsStore()
 
 onMounted(() => {
   // 初始化用户认证状态
@@ -43,6 +47,7 @@ const handleCommand = async (command: string) => {
         )
         
         userStore.logout()
+        tabsStore.resetTabs() // 清理Tab状态
         ElMessage.success('Logged out successfully')
         router.push('/login')
       } catch {
@@ -50,6 +55,33 @@ const handleCommand = async (command: string) => {
       }
       break
   }
+}
+
+// Tab相关处理函数
+const handleTabClick = (tab: any) => {
+  tabsStore.switchToTab(tab.name)
+}
+
+const handleTabRemove = async (tabId: string) => {
+  const tab = tabsStore.getSSHTerminalTab(tabId)
+  
+  if (tab && tab.connected) {
+    try {
+      await ElMessageBox.confirm(
+        `SSH终端 "${tab.deviceName}" 仍在连接中，确定要关闭吗？`,
+        '确认关闭',
+        {
+          confirmButtonText: '关闭',
+          cancelButtonText: '取消',
+          type: 'warning'
+        }
+      )
+    } catch {
+      return // 用户取消
+    }
+  }
+  
+  tabsStore.closeTab(tabId)
 }
 </script>
 
@@ -158,10 +190,59 @@ const handleCommand = async (command: string) => {
             </div>
           </el-header>
           
-          <!-- 主内容 -->
-          <el-main class="main-content">
-            <router-view />
-          </el-main>
+          <!-- Tab导航和主内容 -->
+          <div class="tabs-main-container">
+            <el-tabs
+              v-model="tabsStore.activeTabId"
+              type="card"
+              closable
+              class="main-tabs"
+              @tab-click="handleTabClick"
+              @tab-remove="handleTabRemove"
+            >
+              <!-- 主工作区Tab -->
+              <el-tab-pane
+                label="工作区"
+                name="main"
+                :closable="false"
+                class="main-tab-pane"
+              >
+                <div class="main-content">
+                  <router-view />
+                </div>
+              </el-tab-pane>
+              
+              <!-- SSH终端Tab -->
+              <el-tab-pane
+                v-for="tab in tabsStore.sshTerminalTabs"
+                :key="tab.id"
+                :label="tab.title"
+                :name="tab.id"
+                closable
+                class="terminal-tab-pane"
+              >
+                <div class="terminal-content">
+                  <WebSSHTerminal
+                    :device="{
+                      id: tab.deviceId,
+                      serial: tab.deviceSerial,
+                      name: tab.deviceName,
+                      model_id: 0,
+                      primary_mac: '',
+                      is_online: true,
+                      is_activate: true,
+                      created_at: '',
+                      updated_at: ''
+                    }"
+                    :ssh-port="tab.sshPort"
+                    :auto-connect="true"
+                    @status-change="(status) => tabsStore.updateSSHTerminalStatus(tab.id, status === 'connected')"
+                    @close="() => tabsStore.closeTab(tab.id)"
+                  />
+                </div>
+              </el-tab-pane>
+            </el-tabs>
+          </div>
         </el-container>
       </el-container>
     </div>
@@ -273,13 +354,64 @@ const handleCommand = async (command: string) => {
   color: #909399;
 }
 
+/* Tab容器样式 */
+.tabs-main-container {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.main-tabs {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.main-tabs :deep(.el-tabs__header) {
+  margin: 0;
+  background-color: #ffffff;
+  border-bottom: 1px solid #e4e7ed;
+  padding: 0 20px;
+  flex-shrink: 0;
+}
+
+.main-tabs :deep(.el-tabs__content) {
+  flex: 1;
+  overflow: hidden;
+}
+
+.main-tabs :deep(.el-tab-pane) {
+  height: 100%;
+  overflow: hidden;
+}
+
+/* 主工作区Tab样式 */
+.main-tab-pane {
+  height: 100%;
+  overflow: hidden;
+}
+
 .main-content {
   background-color: #f0f2f5;
   padding: 20px;
   overflow-y: auto;
-  flex: 1;
+  height: 100%;
   width: 100%;
   max-width: none;
+}
+
+/* SSH终端Tab样式 */
+.terminal-tab-pane {
+  height: 100%;
+  overflow: hidden;
+}
+
+.terminal-content {
+  height: 100%;
+  background-color: #1e1e1e;
+  overflow: hidden;
 }
 
 /* 全局样式重置 */
