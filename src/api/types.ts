@@ -191,7 +191,10 @@ export interface ModemStatus {
   active_slot: number
   operator?: string
   network_type?: string
-  signal_strength?: number
+  rssi?: number
+  rsrp?: number
+  rsrq?: number
+  snr?: number
   iccid?: string
   imsi?: string
   phone_number?: string

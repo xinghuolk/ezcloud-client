@@ -165,7 +165,8 @@ export const useSerialsStore = defineStore('serials', () => {
       const response = await serialsApi.generate(data)
       
       if (response.success) {
-        ElMessage.success(`成功生成 ${response.data.count} 个序列号，批次ID: ${response.data.batch_id}`)
+        const modeText = data.mode === 'auto' ? '自动生成' : '自定义生成'
+        ElMessage.success(`${modeText}成功，共生成 ${response.data.count} 个序列号，批次ID: ${response.data.batch_id}`)
         
         // 刷新批次列表
         await fetchBatches()
@@ -179,7 +180,11 @@ export const useSerialsStore = defineStore('serials', () => {
       
       console.error('生成序列号失败:', error)
       
-      if (error.response?.data?.message) {
+      if (error.response?.data?.error === 'SEQUENCE_OVERFLOW') {
+        ElMessage.error('递增号溢出，无法生成更多序列号（最大值为999999）')
+      } else if (error.response?.data?.error === 'SERIAL_EXISTS') {
+        ElMessage.error('部分序列号已存在，请检查起始序列号')
+      } else if (error.response?.data?.message) {
         ElMessage.error(error.response.data.message)
       } else {
         ElMessage.error('生成序列号失败')

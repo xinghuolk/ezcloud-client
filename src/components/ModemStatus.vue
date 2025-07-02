@@ -14,8 +14,8 @@
             <span class="operator">{{ modemStatus.operator || 'No Operator' }}</span>
           </div>
           <div class="signal-info">
-            <span class="signal-strength" :class="getSignalClass(modemStatus.signal_strength)">
-              📶 {{ formatSignalStrength(modemStatus.signal_strength) }}
+            <span class="signal-strength" :class="getSignalClass(modemStatus.rssi)">
+              📶 {{ formatSignalStrength(modemStatus.rssi) }}
             </span>
           </div>
         </div>
@@ -58,8 +58,8 @@
             </el-tag>
           </el-descriptions-item>
           <el-descriptions-item label="Signal Strength">
-            <span :class="getSignalClass(modemStatus?.signal_strength)">
-              {{ formatSignalStrength(modemStatus?.signal_strength) }}
+            <span :class="getSignalClass(modemStatus?.rssi)">
+              {{ formatSignalStrength(modemStatus?.rssi) }}
             </span>
           </el-descriptions-item>
           <el-descriptions-item label="ICCID">

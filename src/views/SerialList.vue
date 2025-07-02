@@ -261,6 +261,34 @@
             />
           </el-select>
         </el-form-item>
+
+        <el-form-item label="Generate Mode" prop="mode">
+          <el-radio-group v-model="generateForm.mode" @change="onModeChange">
+            <el-radio label="auto">Auto Generate</el-radio>
+            <el-radio label="custom">Custom Start Serial</el-radio>
+          </el-radio-group>
+          <div class="form-help">
+            <el-text size="small" type="info">
+              Auto: EZ + ModelID(2位) + YYYYMM + 6位递增号<br>
+              Custom: 自定义起始序列号，最后6位递增
+            </el-text>
+          </div>
+        </el-form-item>
+
+        <el-form-item 
+          v-if="generateForm.mode === 'custom'" 
+          label="Custom Start Serial" 
+          prop="custom_start_serial"
+        >
+          <el-input
+            v-model="generateForm.custom_start_serial"
+            placeholder="Enter custom start serial (must end with 6 digits)"
+            @blur="validateCustomSerial"
+          />
+          <div class="form-help">
+            <el-text size="small" type="info">Format: Any prefix + 6 digits (e.g., ABC123456789)</el-text>
+          </div>
+        </el-form-item>
         
         <el-form-item label="Generate Count" prop="count">
           <el-input-number
@@ -374,7 +402,9 @@ const generateForm = reactive<SerialGenerateRequest>({
   count: 100,
   mac_start: 'AA:BB:CC:DD:EE:00',
   mac_count: 4,
-  mac_interval: 1
+  mac_interval: 1,
+  mode: 'auto',
+  custom_start_serial: ''
 })
 
 // 计算属性
@@ -401,6 +431,30 @@ const macPreview = computed(() => {
 const generateRules = {
   model_id: [
     { required: true, message: 'Please select a device model', trigger: 'change' }
+  ],
+  mode: [
+    { required: true, message: 'Please select generate mode', trigger: 'change' }
+  ],
+  custom_start_serial: [
+    { 
+      required: true, 
+      message: 'Please enter custom start serial', 
+      trigger: 'blur',
+      validator: (rule: any, value: string, callback: any) => {
+        if (generateForm.mode === 'custom' && !value) {
+          callback(new Error('Custom start serial is required for custom mode'))
+        } else if (generateForm.mode === 'custom' && value) {
+          const last6Digits = value.slice(-6)
+          if (!/^\d{6}$/.test(last6Digits)) {
+            callback(new Error('Custom serial number must end with 6 digits'))
+          } else {
+            callback()
+          }
+        } else {
+          callback()
+        }
+      }
+    }
   ],
   count: [
     { required: true, message: 'Please enter the count', trigger: 'blur' },
@@ -571,11 +625,28 @@ const submitGenerate = async () => {
         count: 100,
         mac_start: 'AA:BB:CC:DD:EE:00',
         mac_count: 4,
-        mac_interval: 1
+        mac_interval: 1,
+        mode: 'auto',
+        custom_start_serial: ''
       })
     }
   } catch (error) {
     // 错误已在store中处理
+  }
+}
+
+const onModeChange = (mode: string) => {
+  if (mode === 'auto') {
+    generateForm.custom_start_serial = ''
+  }
+}
+
+const validateCustomSerial = () => {
+  if (generateForm.mode === 'custom' && generateForm.custom_start_serial) {
+    const last6Digits = generateForm.custom_start_serial.slice(-6)
+    if (!/^\d{6}$/.test(last6Digits)) {
+      ElMessage.warning('Custom serial number must end with 6 digits')
+    }
   }
 }
 

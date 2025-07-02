@@ -51,8 +51,8 @@ export interface SerialGenerateRequest {
   mac_start: string
   mac_count?: number
   mac_interval?: number
-  serial_prefix?: string
-  serial_suffix?: string
+  mode: 'auto' | 'custom'
+  custom_start_serial?: string
 }
 
 export interface ConflictCheckRequest {
