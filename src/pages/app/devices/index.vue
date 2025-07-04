@@ -188,8 +188,8 @@ const handleBatchOperation = async () => {
     }
 
     const success = await deviceStore.batchOperation(
-      selectedDevices.value.map((d) => d.id),
-      operationType,
+      selectedDevices.value.map((d: Device) => d.id),
+      operationType as any,
       params
     )
 
@@ -257,7 +257,7 @@ useHead({
     <!-- Page Header -->
     <div class="page-header">
       <div class="header-content">
-        <h2 class="title is-3">Device Management</h2>
+        <h1 class="title is-3">Device Management</h1>
         <div class="header-actions">
           <VButton 
             color="primary" 
@@ -740,7 +740,8 @@ useHead({
     gap: 1rem;
 
     .title {
-      margin: 0;
+      margin: 0 0 0.5rem 0;
+      line-height: 1.2;
       color: var(--dark-text);
     }
 

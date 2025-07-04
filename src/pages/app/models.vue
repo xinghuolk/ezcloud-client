@@ -306,7 +306,7 @@ useHead({
     <!-- Page Header -->
     <div class="page-header">
       <div class="header-content">
-        <h2 class="title is-3">Device Model Management</h2>
+        <h1 class="title is-3">Device Model Management</h1>
         <VButton color="primary" raised @click="handleAdd">
           <iconify-icon icon="lucide:plus" class="mr-2" />
           Add Model
@@ -695,7 +695,8 @@ useHead({
     gap: 1rem;
 
     .title {
-      margin: 0;
+      margin: 0 0 0.5rem 0;
+      line-height: 1.2;
       color: var(--dark-text);
     }
   }

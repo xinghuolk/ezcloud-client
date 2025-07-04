@@ -379,7 +379,7 @@ useHead({
     <!-- Page Header -->
     <div class="page-header">
       <div class="header-content">
-        <h2 class="title is-3">Serial Number Management</h2>
+        <h1 class="title is-3">Serial Number Management</h1>
         <div class="header-actions">
           <VButton 
             color="primary" 
@@ -852,7 +852,8 @@ useHead({
     gap: 1rem;
 
     .title {
-      margin: 0;
+      margin: 0 0 0.5rem 0;
+      line-height: 1.2;
       color: var(--dark-text);
     }
 

@@ -10,7 +10,6 @@ declare module 'vue' {
   export interface GlobalComponents {
     AuthLayout: typeof import('./../src/components/layouts/auth/AuthLayout.vue')['default']
     ClientOnly: typeof import('./../src/components/ClientOnly.vue')['default']
-    DeviceWorkspace: typeof import('./../src/components/DeviceWorkspace.vue')['default']
     LandingFooter: typeof import('./../src/components/layouts/landing/LandingFooter.vue')['default']
     LandingGrids: typeof import('./../src/components/layouts/landing/LandingGrids.vue')['default']
     LandingLayout: typeof import('./../src/components/layouts/landing/LandingLayout.vue')['default']
@@ -119,6 +118,5 @@ declare module 'vue' {
     VTextEllipsis: typeof import('./../src/components/base/VTextEllipsis.vue')['default']
     WebSSHTerminal: typeof import('./../src/components/WebSSHTerminal.vue')['default']
     WiFiStatus: typeof import('./../src/components/WiFiStatus.vue')['default']
-    WorkspaceTabs: typeof import('./../src/components/WorkspaceTabs.vue')['default']
   }
 }

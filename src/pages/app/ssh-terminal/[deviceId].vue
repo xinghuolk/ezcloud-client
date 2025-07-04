@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { devicesApi } from '/@src/api'
 import type { Device } from '/@src/api/types'
@@ -21,9 +21,10 @@ const device = ref<Device | null>(null)
 const loading = ref(true)
 const error = ref<string>('')
 
-// Get device ID from route params
+// Get device ID from route params and check standalone mode
 const deviceIdParam = (route.params as { deviceId: string | string[] }).deviceId
 const deviceId = Array.isArray(deviceIdParam) ? Number(deviceIdParam[0]) : Number(deviceIdParam)
+const isStandalone = computed(() => route.query.standalone === 'true')
 
 // Initialize device data
 const initializeDevice = async () => {
@@ -53,7 +54,13 @@ const initializeDevice = async () => {
 
 // Handle SSH terminal close
 const handleTerminalClose = () => {
-  router.push('/app/devices')
+  if (isStandalone.value) {
+    // In standalone mode, close the window
+    window.close()
+  } else {
+    // In normal mode, navigate back to devices page
+    router.push('/app/devices')
+  }
 }
 
 // Handle SSH terminal status change
@@ -64,6 +71,16 @@ const handleStatusChange = (status: 'connected' | 'disconnected' | 'error', mess
 // Lifecycle
 onMounted(() => {
   initializeDevice()
+  
+  // 在standalone模式下隐藏布局元素
+  if (isStandalone.value) {
+    document.body.classList.add('ssh-terminal-standalone')
+  }
+})
+
+onUnmounted(() => {
+  // 清理standalone模式的CSS类
+  document.body.classList.remove('ssh-terminal-standalone')
 })
 
 useHead({
@@ -72,7 +89,7 @@ useHead({
 </script>
 
 <template>
-  <div class="ssh-terminal-page">
+  <div class="ssh-terminal-page" :class="{ 'standalone-mode': isStandalone }">
     <!-- Loading State -->
     <div v-if="loading" class="loading-container">
       <VLoader size="large" />
@@ -89,8 +106,8 @@ useHead({
           <VButton color="primary" raised @click="initializeDevice">
             Retry
           </VButton>
-          <VButton @click="router.push('/app/devices')" outlined>
-            Back to Device List
+          <VButton @click="handleTerminalClose" outlined>
+            {{ isStandalone ? 'Close Window' : 'Back to Device List' }}
           </VButton>
         </template>
       </VPlaceholderPage>
@@ -101,6 +118,7 @@ useHead({
       v-else-if="device"
       :device="device"
       :auto-connect="true"
+      :standalone="isStandalone"
       @close="handleTerminalClose"
       @status-change="handleStatusChange"
     />
@@ -113,6 +131,16 @@ useHead({
   flex-direction: column;
   height: 100vh;
   background: var(--background-grey);
+  
+  &.standalone-mode {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 9999;
+    background: #1e1e1e;
+  }
 }
 
 .loading-container {
@@ -142,6 +170,47 @@ useHead({
   .loading-container,
   .error-container {
     background: var(--dark-sidebar);
+  }
+}
+</style>
+
+<!-- Global styles for standalone mode -->
+<style lang="scss">
+body.ssh-terminal-standalone {
+  // 隐藏所有可能的导航和菜单元素
+  .sidebar,
+  .navbar,
+  .toolbar, 
+  .breadcrumb,
+  .mobile-sidebar,
+  .layout-header,
+  .layout-footer,
+  .app-layout .navbar,
+  .app-layout .sidebar,
+  .view-wrapper > .navbar,
+  .view-wrapper > .sidebar,
+  nav,
+  header {
+    display: none !important;
+  }
+  
+  // 让主要内容区域全屏
+  .view-wrapper,
+  .page-content-wrapper,
+  .page-content-inner,
+  .app-layout,
+  .app-wrapper,
+  #app {
+    padding: 0 !important;
+    margin: 0 !important;
+    height: 100vh !important;
+    width: 100vw !important;
+  }
+  
+  // 确保SSH终端页面占满全屏
+  .ssh-terminal-page.standalone-mode {
+    height: 100vh !important;
+    width: 100vw !important;
   }
 }
 </style>

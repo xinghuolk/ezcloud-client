@@ -470,12 +470,14 @@ useHead({
     .header-info {
       .title {
         margin: 0 0 0.5rem 0;
+        line-height: 1.2;
         color: var(--dark-text);
       }
 
       .subtitle {
         color: var(--muted-grey);
         margin: 0;
+        line-height: 1.4;
       }
     }
   }

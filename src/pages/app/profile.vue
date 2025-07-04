@@ -209,7 +209,7 @@ useHead({
     <!-- Page Header -->
     <div class="page-header">
       <div class="header-content">
-        <h2 class="title is-3">User Profile</h2>
+        <h1 class="title is-3">User Profile</h1>
         <p class="subtitle">Manage your account information and settings</p>
       </div>
     </div>
@@ -438,12 +438,14 @@ useHead({
 
     .title {
       margin: 0 0 0.5rem 0;
+      line-height: 1.2;
       color: var(--dark-text);
     }
 
     .subtitle {
       color: var(--muted-grey);
       margin: 0;
+      line-height: 1.4;
     }
   }
 }

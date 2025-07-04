@@ -166,7 +166,7 @@ useHead({
     <!-- Page Header -->
     <div class="page-header">
       <div class="header-content">
-        <h2 class="title is-3">WiFi Template Management</h2>
+        <h1 class="title is-3">WiFi Template Management</h1>
         <p class="subtitle is-6">Manage WiFi configuration templates for tri-band multi-SSID devices</p>
       </div>
       <div class="header-actions">
@@ -451,12 +451,14 @@ useHead({
   .header-content {
     .title {
       margin: 0 0 0.5rem 0;
+      line-height: 1.2;
       color: var(--dark-text);
     }
 
     .subtitle {
       color: var(--muted-grey);
       margin: 0;
+      line-height: 1.4;
     }
   }
 }

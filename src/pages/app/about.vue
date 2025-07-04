@@ -40,7 +40,7 @@ useHead({
     <!-- Page Header -->
     <div class="page-header">
       <div class="header-content">
-        <h2 class="title is-3">{{ appInfo.name }}</h2>
+        <h1 class="title is-3">{{ appInfo.name }}</h1>
         <p class="subtitle">{{ appInfo.description }}</p>
       </div>
     </div>
@@ -160,12 +160,14 @@ useHead({
 
     .title {
       margin: 0 0 0.5rem 0;
+      line-height: 1.2;
       color: var(--dark-text);
     }
 
     .subtitle {
       color: var(--muted-grey);
       margin: 0;
+      line-height: 1.4;
     }
   }
 }

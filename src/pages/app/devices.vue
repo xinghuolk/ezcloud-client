@@ -191,9 +191,13 @@ useHead({
 <template>
   <div class="page-content-inner">
     <!-- Page Header -->
-    <div class="page-title has-text-centered">
-      <h3>Device Management</h3>
-      <p>Manage your 5G gateway devices</p>
+    <div class="dashboard-header">
+      <div class="header-content">
+        <div>
+          <h1 class="title is-3">Device Management</h1>
+          <p class="subtitle is-6">Manage your 5G gateway devices</p>
+        </div>
+      </div>
     </div>
 
     <!-- Stats Cards -->
@@ -613,18 +617,35 @@ useHead({
   padding: 2rem;
 }
 
-.page-title {
+.dashboard-header {
   margin-bottom: 2rem;
-  
-  h3 {
-    font-size: 2rem;
-    font-weight: 600;
-    color: var(--dark-text);
+
+  .header-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    
+    > div:first-child {
+      .title {
+        color: var(--dark-text);
+        margin-bottom: 0.5rem;
+        line-height: 1.2;
+      }
+
+      .subtitle {
+        color: var(--muted-grey);
+        margin-top: 0;
+        line-height: 1.4;
+      }
+    }
   }
-  
-  p {
-    color: var(--muted-grey);
-    margin-top: 0.5rem;
+
+  @media (max-width: 768px) {
+    .header-content {
+      flex-direction: column;
+      gap: 1rem;
+      text-align: center;
+    }
   }
 }
 

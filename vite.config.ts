@@ -27,7 +27,7 @@ export default defineConfig({
   // base: '/my-subdirectory/',
   base: '/',
   publicDir: 'public',
-  logLevel: 'warn',
+  // logLevel: 'warn',
   resolve: {
     alias: [
       {
@@ -42,9 +42,6 @@ export default defineConfig({
     strictPort: true,
     hmr: {
       overlay: true,
-    },
-    watch: {
-      usePolling: true,
     },
   },
   // Predefine dependencies in order to prevent reloading them in the browser during development.
@@ -106,25 +103,23 @@ export default defineConfig({
      *
      * @see https://unhead.harlanzw.com/guide/getting-started/vite-plugin
      */
-    // 暂时禁用Unhead
-    // Unhead(),
+    Unhead(),
 
     /**
      * unplugin-auto-import allow to automaticaly import modules/components
      *
      * @see https://github.com/antfu/unplugin-auto-import
      */
-    // 暂时禁用auto-import
-    // Imports({
-    //   dts: './types/imports.d.ts',
-    //   imports: [
-    //     'vue',
-    //     '@vueuse/core',
-    //     VueRouterAutoImports,
-    //     unheadVueComposablesImports,
-    //   ],
-    //   dirs: ['src/composables', 'src/stores', 'src/utils'],
-    // }),
+    Imports({
+      dts: './types/imports.d.ts',
+      imports: [
+        'vue',
+        '@vueuse/core',
+        VueRouterAutoImports,
+        unheadVueComposablesImports,
+      ],
+      dirs: ['src/composables', 'src/stores', 'src/utils'],
+    }),
 
     /**
      * unplugin-vue-components plugin is responsible of autoloading components
@@ -132,13 +127,12 @@ export default defineConfig({
      *
      * @see https://github.com/antfu/unplugin-vue-components
      */
-    // 暂时禁用Components
-    // Components({
-    //   dirs: ['src/components'],
-    //   extensions: ['vue'],
-    //   dts: './types/components.d.ts',
-    //   include: [/\.vue$/, /\.vue\?vue/, /\.md$/],
-    // }),
+    Components({
+      dirs: ['src/components'],
+      extensions: ['vue'],
+      dts: './types/components.d.ts',
+      include: [/\.vue$/, /\.vue\?vue/, /\.md$/],
+    }),
 
     /**
      * rollup-plugin-purgecss plugin is responsible of purging css rules
@@ -146,24 +140,23 @@ export default defineConfig({
      *
      * @see https://github.com/FullHuman/purgecss/tree/main/packages/rollup-plugin-purgecss
      */
-    // 暂时禁用PurgeCSS
-    // PurgeCSS({
-    //   output: false,
-    //   content: [`./src/**/*.vue`],
-    //   variables: false,
-    //   safelist: {
-    //     standard: [
-    //       /(autv|lnil|lnir|fas?)/,
-    //       /-(leave|enter|appear)(|-(to|from|active))$/,
-    //       /^(?!(|.*?:)cursor-move).+-move$/,
-    //       /^router-link(|-exact)-active$/,
-    //       /data-v-.*/,
-    //     ],
-    //   },
-    //   defaultExtractor(content) {
-    //     const contentWithoutStyleBlocks = content.replace(/<style[^]+?<\/style>/gi, '')
-    //     return contentWithoutStyleBlocks.match(/[A-Za-z0-9-_/:]*[A-Za-z0-9-_/]+/g) || []
-    //   },
-    // }),
+    PurgeCSS({
+      output: false,
+      content: [`./src/**/*.vue`],
+      variables: false,
+      safelist: {
+        standard: [
+          /(autv|lnil|lnir|fas?)/,
+          /-(leave|enter|appear)(|-(to|from|active))$/,
+          /^(?!(|.*?:)cursor-move).+-move$/,
+          /^router-link(|-exact)-active$/,
+          /data-v-.*/,
+        ],
+      },
+      defaultExtractor(content) {
+        const contentWithoutStyleBlocks = content.replace(/<style[^]+?<\/style>/gi, '')
+        return contentWithoutStyleBlocks.match(/[A-Za-z0-9-_/:]*[A-Za-z0-9-_/]+/g) || []
+      },
+    }),
   ],
 })

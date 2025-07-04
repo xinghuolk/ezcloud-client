@@ -390,10 +390,13 @@ useHead({
       .title {
         color: var(--dark-text);
         margin-bottom: 0.5rem;
+        line-height: 1.2;
       }
 
       .subtitle {
         color: var(--muted-grey);
+        margin-top: 0;
+        line-height: 1.4;
       }
     }
   }

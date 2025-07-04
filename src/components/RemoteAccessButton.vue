@@ -230,12 +230,17 @@ const openWebTerminal = () => {
   }
   
   try {
-    // Navigate to SSH terminal page
-    router.push(`/app/ssh-terminal/${props.device.id}`)
-    notyf.success(`Opening SSH Terminal for ${props.device.serial}`)
+    // Open SSH terminal in new browser tab with standalone mode
+    const terminalUrl = `${window.location.origin}/app/ssh-terminal/${props.device.id}?standalone=true`
+    const newWindow = window.open(terminalUrl, '_blank', 'width=1200,height=800,menubar=no,toolbar=no,status=no,scrollbars=yes,resizable=yes')
     
-    // Close SSH info modal after successful navigation
-    showSshInfo.value = false
+    if (newWindow) {
+      notyf.success(`Opening SSH Terminal for ${props.device.serial} in new window`)
+      // Close SSH info modal after successful window opening
+      showSshInfo.value = false
+    } else {
+      notyf.error('Failed to open new window. Please check popup blocker settings.')
+    }
     
   } catch (error) {
     console.error('Failed to open SSH terminal:', error)
