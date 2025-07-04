@@ -105,21 +105,6 @@ const navigateTo = (path: string) => {
   router.push(path)
 }
 
-// 退出登录
-const handleLogout = async () => {
-  try {
-    console.log('Logging out user...')
-    await userSession.logoutUser()
-    console.log('Logout successful, redirecting to login page')
-    router.push('/auth')
-  } catch (error) {
-    console.error('Logout error:', error)
-    // 强制清除并重定向
-    localStorage.clear()
-    sessionStorage.clear()
-    window.location.href = '/auth'
-  }
-}
 
 // Lifecycle
 onMounted(() => {
@@ -140,15 +125,6 @@ useHead({
           <h1 class="title is-2">Dashboard</h1>
           <p class="subtitle is-5">Welcome back, {{ userName }}!</p>
         </div>
-        <!-- 退出登录按钮 -->
-        <VButton 
-          color="danger" 
-          outlined
-          @click="handleLogout"
-        >
-          <iconify-icon icon="lucide:log-out" class="mr-2" />
-          Logout
-        </VButton>
       </div>
     </div>
 
@@ -261,18 +237,6 @@ useHead({
           >
             <iconify-icon icon="lucide:settings" class="mr-2" />
             Manage Models
-          </VButton>
-        </div>
-        <div class="column is-3">
-          <VButton 
-            color="danger" 
-            fullwidth
-            raised
-            size="big"
-            @click="handleLogout"
-          >
-            <iconify-icon icon="lucide:log-out" class="mr-2" />
-            Logout
           </VButton>
         </div>
       </div>

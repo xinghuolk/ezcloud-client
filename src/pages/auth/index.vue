@@ -117,38 +117,6 @@ const validateRegisterForm = () => {
   return isValid
 }
 
-// 开发用测试登录
-const handleTestLogin = async () => {
-  loading.value = true
-  try {
-    // 模拟登录成功，设置测试用户数据
-    const testUser = {
-      id: 1,
-      username: 'TestUser',
-      email: 'test@example.com',
-      role: 'admin' as const,
-      is_active: true,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      phone: '123456789'
-    }
-    
-    // 设置测试token
-    const token = useUserToken()
-    token.value = 'test-token-123'
-    
-    // 设置用户信息
-    userSession.setUser(testUser)
-    
-    notyf.success('Test login successful!')
-    await router.push('/app')
-  } catch (error) {
-    console.error('Test login failed:', error)
-    notyf.error('Test login failed')
-  } finally {
-    loading.value = false
-  }
-}
 
 // Handlers
 const handleLogin = async () => {
@@ -275,19 +243,6 @@ useHead({
           </VButton>
         </VField>
 
-        <!-- 开发用测试登录按钮 -->
-        <VField class="form-item">
-          <VButton
-            color="info"
-            size="big"
-            fullwidth
-            outlined
-            :loading="loading"
-            @click="handleTestLogin"
-          >
-            Test Login (Development)
-          </VButton>
-        </VField>
         
         <VField class="form-item">
           <VButton
