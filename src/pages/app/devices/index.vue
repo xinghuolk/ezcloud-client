@@ -126,7 +126,7 @@ const handleSelectionChange = (selection: Device[]) => {
 
 const handleViewDetails = async (device: Device) => {
   try {
-    const deviceDetails = await deviceStore.getDeviceDetails(device.id)
+    const deviceDetails = await deviceStore.fetchDeviceDetails(device.id)
     if (deviceDetails) {
       selectedDevice.value = deviceDetails
       detailsDialogVisible.value = true
@@ -144,9 +144,7 @@ const handleBindDevice = async () => {
 
   bindLoading.value = true
   try {
-    const success = await deviceStore.bindDevice({
-      serial: bindForm.serial
-    })
+    const success = await deviceStore.bindDevice(bindForm.serial)
     
     if (success) {
       notyf.success('Device bound successfully')
@@ -189,10 +187,11 @@ const handleBatchOperation = async () => {
       params = { slot: 2 }
     }
 
-    const success = await deviceStore.batchOperation({
-      device_ids: selectedDevices.value.map(d => d.id),
-      operation: { type: operationType as any, params }
-    })
+    const success = await deviceStore.batchOperation(
+      selectedDevices.value.map((d) => d.id),
+      operationType,
+      params
+    )
 
     if (success) {
       notyf.success('Batch operation initiated successfully')

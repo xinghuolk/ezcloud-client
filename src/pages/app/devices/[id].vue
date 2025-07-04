@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useDevicesStore } from '/@src/stores/devices'
+import { useDeviceStore } from '/@src/stores/devices'
 import { devicesApi } from '/@src/api'
 import type { Device, DeviceStatus } from '/@src/api/types'
 import { Notyf } from 'notyf'
@@ -14,7 +14,7 @@ definePage({
 
 const route = useRoute()
 const router = useRouter()
-const devicesStore = useDevicesStore()
+const devicesStore = useDeviceStore()
 const notyf = new Notyf()
 
 // State
@@ -98,7 +98,7 @@ const saveDeviceName = async () => {
 
 // Load device details
 const loadDeviceDetails = async () => {
-  const deviceId = Number(route.params.id)
+  const deviceId = Number((route.params as { id: string }).id)
   if (!deviceId) {
     router.push('/app/devices')
     return
@@ -152,7 +152,7 @@ const restartDevice = async () => {
 
 // Configure device
 const configureDevice = () => {
-  notyf.info('Configuration feature coming soon')
+  notyf.success('Configuration feature coming soon')
 }
 
 // Unbind device
