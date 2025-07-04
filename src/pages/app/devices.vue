@@ -521,12 +521,13 @@ useHead({
       <template #content>
         <div v-if="selectedDevice">
           <VTabs 
-            v-model:selected="activeTab"
+            :selected="activeTab"
             :tabs="[
               { label: 'Basic Info', value: 'basic' },
               { label: 'WiFi Status', value: 'wifi' },
               { label: 'Modem Status', value: 'modem' }
             ]"
+            @update:selected="activeTab = $event"
           >
             <template #tab="{ activeValue }">
               <div v-if="activeValue === 'basic'">

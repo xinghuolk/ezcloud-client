@@ -214,10 +214,10 @@ useHead({
           <div class="card-header">
             <h3 class="title is-5">Basic Information</h3>
             <div class="status-badges">
-              <VTag :color="device.is_online ? 'success' : 'danger'" size="medium">
+              <VTag :color="device.is_online ? 'success' : 'danger'" size="tiny">
                 {{ device.is_online ? 'Online' : 'Offline' }}
               </VTag>
-              <VTag :color="device.is_activate ? 'success' : 'warning'" size="medium">
+              <VTag :color="device.is_activate ? 'success' : 'warning'" size="tiny">
                 {{ device.is_activate ? 'Activated' : 'Not Activated' }}
               </VTag>
             </div>
@@ -238,7 +238,7 @@ useHead({
               />
               <VButton 
                 v-if="!editingName"
-                size="small"
+                size="medium"
                 light
                 @click="startEditName"
               >
@@ -365,12 +365,12 @@ useHead({
 
         <VFlexTable v-else>
           <template #header>
-            <VFlexTableSortColumn>Time</VFlexTableSortColumn>
-            <VFlexTableSortColumn>CPU Load</VFlexTableSortColumn>
-            <VFlexTableSortColumn>Memory Load</VFlexTableSortColumn>
-            <VFlexTableSortColumn>Connected Hosts</VFlexTableSortColumn>
-            <VFlexTableSortColumn>Upload</VFlexTableSortColumn>
-            <VFlexTableSortColumn>Download</VFlexTableSortColumn>
+            <VFlexTableSortColumn id="time-col" label="Time">Time</VFlexTableSortColumn>
+            <VFlexTableSortColumn id="cpu-col" label="CPU Load">CPU Load</VFlexTableSortColumn>
+            <VFlexTableSortColumn id="memory-col" label="Memory Load">Memory Load</VFlexTableSortColumn>
+            <VFlexTableSortColumn id="hosts-col" label="Connected Hosts">Connected Hosts</VFlexTableSortColumn>
+            <VFlexTableSortColumn id="upload-col" label="Upload">Upload</VFlexTableSortColumn>
+            <VFlexTableSortColumn id="download-col" label="Download">Download</VFlexTableSortColumn>
           </template>
 
           <template #body>
