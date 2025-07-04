@@ -1,14 +1,41 @@
 {
-  "files": [],
-  "references": [
-    {
-      "path": "./tsconfig.node.json"
+  "compilerOptions": {
+    "target": "esnext",
+    "jsx": "preserve",
+    "jsxImportSource": "vue",
+    "lib": ["esnext", "dom"],
+    "useDefineForClassFields": true,
+    "baseUrl": ".",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "paths": {
+      "/@src/*": ["./src/*"]
     },
-    {
-      "path": "./tsconfig.app.json"
-    },
-    {
-      "path": "./tsconfig.vitest.json"
-    }
-  ]
+    "resolveJsonModule": true,
+    "types": [
+      "vite/client",
+      "unplugin-vue-router/client"
+    ],
+    "allowImportingTsExtensions": true,
+    "allowJs": true,
+    "strict": true,
+    "noImplicitThis": true,
+    "importHelpers": true,
+    "noEmit": true,
+    "removeComments": true,
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "skipLibCheck": true
+  },
+  "include": [
+    "types/**/*.d.ts",
+    "src/**/*.js",
+    "src/**/*.ts",
+    "src/**/*.vue",
+    "*.config.ts"
+  ],
+  "exclude": ["bulma-colors.ts"]
 }

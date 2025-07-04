@@ -23,6 +23,50 @@ export interface PaginationResponse<T = any> {
   }
 }
 
+// 厂商列表响应结构
+export interface VendorListResponse {
+  vendors: Vendor[]
+  pagination: {
+    page: number
+    limit: number
+    total: number
+    totalPages: number
+  }
+}
+
+// 设备列表响应结构
+export interface DeviceListResponse {
+  devices: Device[]
+  pagination: {
+    page: number
+    limit: number
+    total: number
+    pages: number
+  }
+}
+
+// 序列号列表响应结构
+export interface SerialListResponse {
+  serials: SerialNumber[]
+  pagination: {
+    page: number
+    limit: number
+    total: number
+    totalPages: number
+  }
+}
+
+// 设备型号列表响应结构
+export interface ModelListResponse {
+  models: DeviceModel[]
+  pagination: {
+    page: number
+    limit: number
+    total: number
+    totalPages: number
+  }
+}
+
 // 用户相关类型
 export interface User {
   id: number
@@ -48,6 +92,21 @@ export interface RegisterParams {
   phone?: string
 }
 
+// 远程访问状态类型
+export interface RemoteAccessStatus {
+  http: {
+    status: 'disconnected' | 'connecting' | 'connected' | 'error'
+    url?: string
+    port?: number
+    host?: string
+  }
+  ssh: {
+    status: 'disconnected' | 'connecting' | 'connected' | 'error'
+    port?: number
+    host?: string
+  }
+}
+
 export interface LoginResponse {
   token: string
   user: User
@@ -56,6 +115,7 @@ export interface LoginResponse {
 // 设备型号相关类型
 export interface DeviceModel {
   id: number
+  vendor_id: number
   oemname: string
   stdname: string
   devtype: string
@@ -63,9 +123,13 @@ export interface DeviceModel {
   is_active: boolean
   created_at: string
   updated_at: string
+  vendor?: Vendor
+  serial_count?: number
+  device_count?: number
 }
 
 export interface CreateDeviceModelParams {
+  vendor_id: number
   oemname: string
   stdname: string
   devtype: string
@@ -154,34 +218,57 @@ export interface WiFiData {
   }
 }
 
+// WiFi射频配置接口
+export interface WiFiRadioConfig {
+  id?: number
+  template_id?: number
+  band: '2.4G' | '5G' | '6G'
+  channel: string
+  txpower: number
+  htmode: string
+  enabled: boolean
+  created_at?: string
+  updated_at?: string
+}
+
+// WiFi SSID配置接口
+export interface WiFiSSIDConfig {
+  id?: number
+  template_id?: number
+  band: '2.4G' | '5G' | '6G'
+  ssid_index: number // 0-3
+  ssid: string
+  password?: string
+  encryption: string
+  hidden: boolean
+  enabled: boolean
+  isolate: boolean
+  created_at?: string
+  updated_at?: string
+}
+
+// WiFi模板接口（基于API文档v2.0架构）
 export interface WiFiTemplate {
   id: number
   name: string
   description?: string
-  config: {
-    radio_2g: {
-      enabled: boolean
-      channel: number
-      tx_power: number
-      bandwidth: string
-    }
-    radio_5g: {
-      enabled: boolean
-      channel: number
-      tx_power: number
-      bandwidth: string
-    }
-    ssids: Array<{
-      name: string
-      password: string
-      encryption: string
-      enabled: boolean
-      hidden: boolean
-      guest: boolean
-    }>
-  }
+  country: string
+  is_active: boolean
   created_at: string
   updated_at: string
+  // 关联数据
+  radioConfigs?: WiFiRadioConfig[]
+  ssidConfigs?: WiFiSSIDConfig[]
+}
+
+// 创建/更新模板时的数据结构
+export interface WiFiTemplateCreateData {
+  name: string
+  description?: string
+  country: string
+  is_active?: boolean
+  radioConfigs: Omit<WiFiRadioConfig, 'id' | 'template_id' | 'created_at' | 'updated_at'>[]
+  ssidConfigs: Omit<WiFiSSIDConfig, 'id' | 'template_id' | 'created_at' | 'updated_at'>[]
 }
 
 // Modem相关类型
@@ -316,6 +403,21 @@ export interface WiFiConfigParams {
   }
 }
 
+// 厂商相关类型
+export interface Vendor {
+  id: number
+  name: string
+  description?: string
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface CreateVendorParams {
+  name: string
+  description?: string
+}
+
 // 插件相关类型
 export interface Plugin {
   id: number
@@ -327,4 +429,4 @@ export interface Plugin {
   last_heartbeat?: string
   created_at: string
   updated_at: string
-} 
+}

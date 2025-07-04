@@ -1,358 +1,401 @@
-<template>
-  <div class="modem-status">
-    <div v-if="!modemStatus" class="status-offline">
-      <el-icon class="status-icon offline"><Close /></el-icon>
-      <span class="status-text">Modem Offline</span>
-    </div>
-    
-    <div v-else class="status-online">
-      <div class="modem-summary">
-        <el-icon class="status-icon online"><Connection /></el-icon>
-        <div class="status-details">
-          <div class="network-info">
-            <span class="network-type">{{ modemStatus.network_type || 'Unknown' }}</span>
-            <span class="operator">{{ modemStatus.operator || 'No Operator' }}</span>
-          </div>
-          <div class="signal-info">
-            <span class="signal-strength" :class="getSignalClass(modemStatus.rssi)">
-              📶 {{ formatSignalStrength(modemStatus.rssi) }}
-            </span>
-          </div>
-        </div>
-      </div>
-      
-      <!-- 详细信息弹窗触发 -->
-      <el-button 
-        v-if="showDetails"
-        link 
-        size="small" 
-        @click="showDetailDialog = true"
-        class="details-btn"
-      >
-        Details
-      </el-button>
-    </div>
-
-    <!-- Modem详情对话框 -->
-    <el-dialog 
-      v-model="showDetailDialog" 
-      title="Modem Status Details" 
-      width="600px"
-    >
-      <div class="modem-details">
-        <el-descriptions :column="2" border>
-          <el-descriptions-item label="Active SIM Slot">
-            <el-tag type="primary" size="small">
-              Slot {{ modemStatus?.active_slot || 1 }}
-            </el-tag>
-          </el-descriptions-item>
-          <el-descriptions-item label="Operator">
-            {{ modemStatus?.operator || 'Unknown' }}
-          </el-descriptions-item>
-          <el-descriptions-item label="Network Type">
-            <el-tag 
-              :type="getNetworkTypeColor(modemStatus?.network_type)" 
-              size="small"
-            >
-              {{ modemStatus?.network_type || 'Unknown' }}
-            </el-tag>
-          </el-descriptions-item>
-          <el-descriptions-item label="Signal Strength">
-            <span :class="getSignalClass(modemStatus?.rssi)">
-              {{ formatSignalStrength(modemStatus?.rssi) }}
-            </span>
-          </el-descriptions-item>
-          <el-descriptions-item label="ICCID">
-            <span class="mono-text">{{ modemStatus?.iccid || 'N/A' }}</span>
-          </el-descriptions-item>
-          <el-descriptions-item label="IMSI">
-            <span class="mono-text">{{ modemStatus?.imsi || 'N/A' }}</span>
-          </el-descriptions-item>
-          <el-descriptions-item label="Phone Number">
-            {{ modemStatus?.phone_number || 'N/A' }}
-          </el-descriptions-item>
-          <el-descriptions-item label="APN">
-            {{ modemStatus?.apn_name || 'N/A' }}
-          </el-descriptions-item>
-        </el-descriptions>
-        
-        <!-- 流量统计 -->
-        <div class="traffic-section">
-          <h4>Traffic Statistics</h4>
-          <el-row :gutter="16">
-            <el-col :span="12">
-              <el-card class="traffic-card">
-                <div class="traffic-item">
-                  <div class="traffic-label">Download</div>
-                  <div class="traffic-value">{{ formatBytes(modemStatus?.rx_bytes || 0) }}</div>
-                  <div class="traffic-speed">{{ formatSpeed(modemStatus?.rx_speed || 0) }}</div>
-                </div>
-              </el-card>
-            </el-col>
-            <el-col :span="12">
-              <el-card class="traffic-card">
-                <div class="traffic-item">
-                  <div class="traffic-label">Upload</div>
-                  <div class="traffic-value">{{ formatBytes(modemStatus?.tx_bytes || 0) }}</div>
-                  <div class="traffic-speed">{{ formatSpeed(modemStatus?.tx_speed || 0) }}</div>
-                </div>
-              </el-card>
-            </el-col>
-          </el-row>
-        </div>
-        
-        <div v-if="modemStatus?.last_update" class="last-update">
-          Last updated: {{ formatDate(new Date(modemStatus.last_update)) }}
-        </div>
-      </div>
-      
-      <template #footer>
-        <el-button @click="showDetailDialog = false">Close</el-button>
-      </template>
-    </el-dialog>
-  </div>
-</template>
-
 <script setup lang="ts">
-import { ref } from 'vue'
-import { 
-  ElIcon, 
-  ElButton, 
-  ElDialog, 
-  ElDescriptions, 
-  ElDescriptionsItem, 
-  ElTag, 
-  ElCard, 
-  ElRow, 
-  ElCol 
-} from 'element-plus'
-import { Connection, Close } from '@element-plus/icons-vue'
-import type { ModemStatus } from '@/api/types'
+import type { ModemStatus as ModemStatusType } from '/@src/api/types'
+import type { VTagColor } from '/@src/components/base/VTag.vue'
 
 interface Props {
-  modemStatus?: ModemStatus | null
+  modemStatus?: ModemStatusType
   showDetails?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  showDetails: true
+  modemStatus: undefined,
+  showDetails: false
 })
 
-const showDetailDialog = ref(false)
-
-// 获取信号强度等级
-const getSignalClass = (signalStrength?: number) => {
-  if (!signalStrength) return 'signal-unknown'
+// Methods
+const getSignalStrength = (rssi: number | undefined): { level: string; color: VTagColor } => {
+  if (!rssi) return { level: 'Unknown', color: 'light' }
   
-  if (signalStrength >= -70) return 'signal-excellent'
-  if (signalStrength >= -85) return 'signal-good'
-  if (signalStrength >= -100) return 'signal-fair'
-  return 'signal-poor'
+  if (rssi >= -70) return { level: 'Excellent', color: 'success' }
+  if (rssi >= -85) return { level: 'Good', color: 'primary' }
+  if (rssi >= -100) return { level: 'Fair', color: 'warning' }
+  return { level: 'Poor', color: 'danger' }
 }
 
-// 格式化信号强度
-const formatSignalStrength = (signalStrength?: number) => {
-  if (!signalStrength) return 'Unknown'
-  return `${signalStrength}dBm`
-}
-
-// 获取网络类型颜色
-const getNetworkTypeColor = (networkType?: string) => {
-  if (!networkType) return 'info'
-  
-  switch (networkType.toLowerCase()) {
-    case '5g': return 'success'
-    case '4g':
-    case 'lte': return 'primary'
-    case '3g': return 'warning'
-    case '2g': return 'danger'
-    default: return 'info'
-  }
-}
-
-// 格式化字节数
 const formatBytes = (bytes: number) => {
   if (bytes === 0) return '0 B'
-  
   const k = 1024
   const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
   const i = Math.floor(Math.log(bytes) / Math.log(k))
-  
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i]
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
 }
 
-// 格式化速度
 const formatSpeed = (speed: number) => {
   if (speed === 0) return '0 bps'
-  
-  const k = 1024
+  const k = 1000
   const sizes = ['bps', 'Kbps', 'Mbps', 'Gbps']
   const i = Math.floor(Math.log(speed) / Math.log(k))
-  
-  return parseFloat((speed / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i]
+  return parseFloat((speed / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
 }
 
-// 格式化日期
-const formatDate = (date: Date) => {
-  return date.toLocaleString('en-US', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
+const getNetworkTypeColor = (networkType: string | undefined): VTagColor => {
+  if (!networkType) return 'light'
+  
+  switch (networkType.toLowerCase()) {
+    case '5g':
+    case 'nr':
+      return 'success'
+    case '4g':
+    case 'lte':
+      return 'primary'
+    case '3g':
+    case 'wcdma':
+    case 'umts':
+      return 'warning'
+    case '2g':
+    case 'gsm':
+      return 'danger'
+    default:
+      return 'info'
+  }
 }
 </script>
 
-<style scoped>
+<template>
+  <div class="modem-status">
+    <div v-if="!modemStatus" class="no-data">
+      <iconify-icon icon="lucide:signal" />
+      <span>No modem data</span>
+    </div>
+
+    <div v-else-if="!showDetails" class="modem-summary">
+      <div class="summary-row">
+        <div class="network-info">
+          <VTag 
+            v-if="modemStatus.network_type" 
+            :color="getNetworkTypeColor(modemStatus.network_type)"
+            size="tiny"
+          >
+            {{ modemStatus.network_type }}
+          </VTag>
+          <span v-if="modemStatus.operator" class="operator">{{ modemStatus.operator }}</span>
+        </div>
+        <div v-if="modemStatus.rssi" class="signal-info">
+          <iconify-icon icon="lucide:signal" />
+          <span>{{ modemStatus.rssi }} dBm</span>
+        </div>
+      </div>
+    </div>
+
+    <div v-else class="modem-details">
+      <VCard radius="smooth" class="modem-card">
+        <div class="modem-header">
+          <div class="modem-title">
+            <iconify-icon icon="lucide:signal" />
+            <span>Modem Status</span>
+          </div>
+          <div v-if="modemStatus.active_slot" class="active-slot">
+            <VTag color="primary" size="tiny">
+              Slot {{ modemStatus.active_slot }}
+            </VTag>
+          </div>
+        </div>
+
+        <!-- Network Information -->
+        <div class="modem-section">
+          <h4>Network Information</h4>
+          <div class="info-grid">
+            <div v-if="modemStatus.operator" class="info-item">
+              <label>Operator:</label>
+              <span>{{ modemStatus.operator }}</span>
+            </div>
+            <div v-if="modemStatus.network_type" class="info-item">
+              <label>Network Type:</label>
+              <VTag :color="getNetworkTypeColor(modemStatus.network_type)" size="tiny">
+                {{ modemStatus.network_type }}
+              </VTag>
+            </div>
+            <div v-if="modemStatus.apn_name" class="info-item">
+              <label>APN:</label>
+              <span>{{ modemStatus.apn_name }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Signal Quality -->
+        <div v-if="modemStatus.rssi || modemStatus.rsrp || modemStatus.rsrq || modemStatus.snr" class="modem-section">
+          <h4>Signal Quality</h4>
+          <div class="signal-grid">
+            <div v-if="modemStatus.rssi" class="signal-item">
+              <label>RSSI:</label>
+              <div class="signal-value">
+                <span>{{ modemStatus.rssi }} dBm</span>
+                <VTag :color="getSignalStrength(modemStatus.rssi).color" size="tiny">
+                  {{ getSignalStrength(modemStatus.rssi).level }}
+                </VTag>
+              </div>
+            </div>
+            <div v-if="modemStatus.rsrp" class="signal-item">
+              <label>RSRP:</label>
+              <span>{{ modemStatus.rsrp }} dBm</span>
+            </div>
+            <div v-if="modemStatus.rsrq" class="signal-item">
+              <label>RSRQ:</label>
+              <span>{{ modemStatus.rsrq }} dB</span>
+            </div>
+            <div v-if="modemStatus.snr" class="signal-item">
+              <label>SNR:</label>
+              <span>{{ modemStatus.snr }} dB</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- SIM Information -->
+        <div v-if="modemStatus.iccid || modemStatus.imsi || modemStatus.phone_number" class="modem-section">
+          <h4>SIM Information</h4>
+          <div class="info-grid">
+            <div v-if="modemStatus.iccid" class="info-item">
+              <label>ICCID:</label>
+              <span class="mono-text">{{ modemStatus.iccid }}</span>
+            </div>
+            <div v-if="modemStatus.imsi" class="info-item">
+              <label>IMSI:</label>
+              <span class="mono-text">{{ modemStatus.imsi }}</span>
+            </div>
+            <div v-if="modemStatus.phone_number" class="info-item">
+              <label>Phone Number:</label>
+              <span>{{ modemStatus.phone_number }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Data Usage -->
+        <div class="modem-section">
+          <h4>Data Usage</h4>
+          <div class="data-grid">
+            <div class="data-item">
+              <label>RX Bytes:</label>
+              <span>{{ formatBytes(modemStatus.rx_bytes) }}</span>
+            </div>
+            <div class="data-item">
+              <label>TX Bytes:</label>
+              <span>{{ formatBytes(modemStatus.tx_bytes) }}</span>
+            </div>
+            <div class="data-item">
+              <label>RX Speed:</label>
+              <span>{{ formatSpeed(modemStatus.rx_speed) }}</span>
+            </div>
+            <div class="data-item">
+              <label>TX Speed:</label>
+              <span>{{ formatSpeed(modemStatus.tx_speed) }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="modem-timestamp">
+          <iconify-icon icon="lucide:clock" />
+          <span>Last updated: {{ new Date(modemStatus.last_update).toLocaleString() }}</span>
+        </div>
+      </VCard>
+    </div>
+  </div>
+</template>
+
+<style lang="scss" scoped>
 .modem-status {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  .no-data {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--muted-grey);
+    font-size: 0.9rem;
+
+    iconify-icon {
+      font-size: 1.1rem;
+    }
+  }
+
+  .modem-summary {
+    .summary-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+
+      .network-info {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+
+        .operator {
+          font-weight: 500;
+          color: var(--dark-text);
+          font-size: 0.85rem;
+        }
+      }
+
+      .signal-info {
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+        font-size: 0.85rem;
+        color: var(--muted-grey);
+
+        iconify-icon {
+          font-size: 1rem;
+          color: var(--success);
+        }
+      }
+    }
+  }
+
+  .modem-details {
+    .modem-card {
+      padding: 1.5rem;
+    }
+
+    .modem-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.5rem;
+
+      .modem-title {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-weight: 600;
+        color: var(--dark-text);
+        font-size: 1.1rem;
+
+        iconify-icon {
+          font-size: 1.2rem;
+          color: var(--primary);
+        }
+      }
+    }
+
+    .modem-section {
+      margin-bottom: 1.5rem;
+
+      &:last-of-type {
+        margin-bottom: 1rem;
+      }
+
+      h4 {
+        margin: 0 0 1rem 0;
+        color: var(--dark-text);
+        font-size: 1rem;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+
+        &::before {
+          content: '';
+          width: 3px;
+          height: 1rem;
+          background: var(--primary);
+          border-radius: var(--radius-small);
+        }
+      }
+
+      .info-grid,
+      .signal-grid,
+      .data-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+
+        .info-item,
+        .signal-item,
+        .data-item {
+          padding: 1rem;
+          background: var(--fade-grey-light-6);
+          border-radius: var(--radius);
+          border: 1px solid var(--fade-grey-light-3);
+
+          label {
+            display: block;
+            font-size: 0.8rem;
+            color: var(--muted-grey);
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+          }
+
+          span {
+            color: var(--dark-text);
+            font-weight: 500;
+
+            &.mono-text {
+              font-family: var(--font-family-monospace);
+              font-size: 0.9rem;
+            }
+          }
+
+          .signal-value {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 0.5rem;
+          }
+        }
+      }
+    }
+
+    .modem-timestamp {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.85rem;
+      color: var(--muted-grey);
+      margin-top: 1rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--fade-grey-light-3);
+
+      iconify-icon {
+        font-size: 1rem;
+      }
+    }
+  }
 }
 
-.status-offline {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  color: #909399;
+.is-dark {
+  .info-item,
+  .signal-item,
+  .data-item {
+    background: var(--dark-sidebar-light-6) !important;
+    border-color: var(--dark-sidebar-light-12) !important;
+  }
+
+  .modem-timestamp {
+    border-color: var(--dark-sidebar-light-12) !important;
+  }
 }
 
-.status-online {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
+@media only screen and (max-width: 767px) {
+  .summary-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
 
-.modem-summary {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
+  .info-grid,
+  .signal-grid,
+  .data-grid {
+    grid-template-columns: 1fr;
+  }
 
-.status-icon {
-  font-size: 16px;
-}
+  .modem-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
 
-.status-icon.online {
-  color: #67c23a;
+  .signal-value {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25rem;
+  }
 }
-
-.status-icon.offline {
-  color: #f56c6c;
-}
-
-.status-details {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  font-size: 12px;
-}
-
-.network-info {
-  display: flex;
-  gap: 6px;
-  align-items: center;
-}
-
-.network-type {
-  font-weight: 600;
-  color: #409eff;
-}
-
-.operator {
-  color: #606266;
-}
-
-.signal-info {
-  display: flex;
-  align-items: center;
-}
-
-.signal-strength {
-  font-size: 11px;
-  font-weight: 500;
-}
-
-.signal-excellent {
-  color: #67c23a;
-}
-
-.signal-good {
-  color: #e6a23c;
-}
-
-.signal-fair {
-  color: #f56c6c;
-}
-
-.signal-poor {
-  color: #f56c6c;
-}
-
-.signal-unknown {
-  color: #909399;
-}
-
-.details-btn {
-  padding: 2px 4px;
-  font-size: 11px;
-  height: auto;
-  min-height: auto;
-}
-
-.modem-details {
-  max-height: 500px;
-  overflow-y: auto;
-}
-
-.mono-text {
-  font-family: 'Courier New', monospace;
-  font-size: 12px;
-  background-color: #f5f5f5;
-  padding: 2px 4px;
-  border-radius: 2px;
-}
-
-.traffic-section {
-  margin-top: 20px;
-}
-
-.traffic-section h4 {
-  margin: 0 0 12px 0;
-  color: #303133;
-}
-
-.traffic-card {
-  text-align: center;
-}
-
-.traffic-item {
-  padding: 8px;
-}
-
-.traffic-label {
-  font-size: 12px;
-  color: #909399;
-  margin-bottom: 4px;
-}
-
-.traffic-value {
-  font-size: 16px;
-  font-weight: 600;
-  color: #303133;
-  margin-bottom: 2px;
-}
-
-.traffic-speed {
-  font-size: 11px;
-  color: #67c23a;
-}
-
-.last-update {
-  margin-top: 16px;
-  text-align: center;
-  font-size: 12px;
-  color: #909399;
-}
-</style> 
+</style>
