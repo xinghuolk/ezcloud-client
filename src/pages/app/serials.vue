@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed } from 'vue'
+import { ref, reactive, onMounted, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { serialApi, modelApi } from '/@src/api'
 import type { SerialNumber, GenerateSerialParams, DeviceModel } from '/@src/api/types'
@@ -21,6 +21,9 @@ const serials = ref<SerialNumber[]>([])
 const batches = ref<any[]>([])
 const models = ref<DeviceModel[]>([])
 const currentBatch = ref('')
+
+// Search debounce
+let searchTimeout: NodeJS.Timeout | null = null
 
 // Dialog controls
 const generateDialogVisible = ref(false)
@@ -264,10 +267,22 @@ const handleRefresh = () => {
 const selectBatch = (batchId: string) => {
   currentBatch.value = currentBatch.value === batchId ? '' : batchId
   searchForm.batch_id = currentBatch.value
-  handleSearch()
+  handleImmediateSearch()
 }
 
-const handleSearch = () => {
+// Debounced search for text inputs
+const handleDebouncedSearch = () => {
+  if (searchTimeout) {
+    clearTimeout(searchTimeout)
+  }
+  searchTimeout = setTimeout(() => {
+    pagination.page = 1
+    fetchSerials()
+  }, 500)
+}
+
+// Immediate search for dropdowns
+const handleImmediateSearch = () => {
   pagination.page = 1
   fetchSerials()
 }
@@ -359,6 +374,19 @@ const onPageChange = (page: number) => {
   fetchSerials()
 }
 
+// Watch for filter changes
+watch(() => searchForm.batch_id, () => {
+  handleDebouncedSearch()
+})
+
+watch(() => searchForm.status, () => {
+  handleImmediateSearch()
+})
+
+watch(() => searchForm.model_id, () => {
+  handleImmediateSearch()
+})
+
 // Lifecycle
 onMounted(async () => {
   await Promise.all([
@@ -375,9 +403,9 @@ useHead({
 </script>
 
 <template>
-  <div class="page-content-inner">
+  <div class="common-page-layout">
     <!-- Page Header -->
-    <div class="page-header">
+    <div class="common-page-header">
       <div class="header-content">
         <h1 class="title is-3">Serial Number Management</h1>
         <div class="header-actions">
@@ -404,7 +432,7 @@ useHead({
     <!-- Statistics Cards -->
     <div class="columns is-multiline mb-6">
       <div class="column is-3">
-        <VCard radius="smooth" class="stats-card">
+        <VCard radius="smooth" class="common-stats-card">
           <div class="stats-content">
             <div class="stats-icon is-info">
               <iconify-icon icon="lucide:grid-3x3" class="rem-30" />
@@ -418,7 +446,7 @@ useHead({
       </div>
 
       <div class="column is-3">
-        <VCard radius="smooth" class="stats-card">
+        <VCard radius="smooth" class="common-stats-card">
           <div class="stats-content">
             <div class="stats-icon is-success">
               <iconify-icon icon="lucide:package" class="rem-30" />
@@ -432,7 +460,7 @@ useHead({
       </div>
 
       <div class="column is-3">
-        <VCard radius="smooth" class="stats-card">
+        <VCard radius="smooth" class="common-stats-card">
           <div class="stats-content">
             <div class="stats-icon is-warning">
               <iconify-icon icon="lucide:link" class="rem-30" />
@@ -446,7 +474,7 @@ useHead({
       </div>
 
       <div class="column is-3">
-        <VCard radius="smooth" class="stats-card">
+        <VCard radius="smooth" class="common-stats-card">
           <div class="stats-content">
             <div class="stats-icon is-primary">
               <iconify-icon icon="lucide:check-circle" class="rem-30" />
@@ -534,7 +562,7 @@ useHead({
       <div class="column is-8">
         <VCard radius="smooth">
           <!-- Search & Filter -->
-          <div class="filter-section mb-4">
+          <div class="common-filter-section mb-4">
             <div class="columns">
               <div class="column is-4">
                 <VField>
@@ -543,7 +571,7 @@ useHead({
                     <VInput
                       v-model="searchForm.batch_id"
                       placeholder="Filter by batch ID"
-                      @keyup.enter="handleSearch"
+                      @keyup.enter="handleDebouncedSearch"
                     />
                   </VControl>
                 </VField>
@@ -586,8 +614,7 @@ useHead({
                   <VLabel>&nbsp;</VLabel>
                   <VControl>
                     <div class="buttons">
-                      <VButton color="primary" @click="handleSearch">Search</VButton>
-                      <VButton @click="handleReset">Reset</VButton>
+                      <VButton @click="handleReset">Reset Filters</VButton>
                     </div>
                   </VControl>
                 </VField>
@@ -598,32 +625,109 @@ useHead({
           <!-- Serials Table -->
           <VFlexTableWrapper
             :columns="{
-              serial: { label: 'Serial Number', searchable: true },
-              batch_id: { label: 'Batch ID', searchable: true },
-              mac_info: { label: 'MAC Info' },
-              status: { label: 'Status', searchable: true },
-              created_at: { label: 'Created At', sortable: true },
-              bound_at: { label: 'Bound At', sortable: true },
-              actions: { label: 'Actions' }
+              serial: { 
+                label: 'Serial Number', 
+                searchable: true,
+                sortable: true,
+                bold: true,
+                grow: true
+              },
+              batch_id: { 
+                label: 'Batch ID', 
+                searchable: true,
+                sortable: true
+              },
+              mac_info: { 
+                label: 'MAC Info',
+                grow: 'lg'
+              },
+              status: { 
+                label: 'Status', 
+                searchable: true,
+                sortable: true,
+                align: 'center'
+              },
+              created_at: { 
+                label: 'Created At', 
+                sortable: true
+              },
+              bound_at: { 
+                label: 'Bound At', 
+                sortable: true
+              },
+              actions: { 
+                label: 'Actions',
+                align: 'end'
+              }
             }"
             :data="filteredSerials"
             :loading="loading"
           >
-            <template #default="_wrapperState">
+            <template #default="wrapperState">
+              <VFlexTableToolbar>
+                <template #right>
+                  <VField>
+                    <VControl>
+                      <VSelect v-model="wrapperState.limit" class="is-rounded">
+                        <VOption :value="10">10 条/页</VOption>
+                        <VOption :value="20">20 条/页</VOption>
+                        <VOption :value="50">50 条/页</VOption>
+                        <VOption :value="100">100 条/页</VOption>
+                      </VSelect>
+                    </VControl>
+                  </VField>
+                </template>
+              </VFlexTableToolbar>
+
               <VFlexTable rounded>
+                <!-- 加载状态 -->
+                <template #body>
+                  <div v-if="loading" class="flex-list-inner">
+                    <div v-for="key in 5" :key="key" class="flex-table-item">
+                      <VFlexTableCell :column="{ grow: true }"><VPlaceload /></VFlexTableCell>
+                      <VFlexTableCell><VPlaceload width="100px" /></VFlexTableCell>
+                      <VFlexTableCell :column="{ grow: 'lg' }"><VPlaceload /></VFlexTableCell>
+                      <VFlexTableCell><VPlaceload width="80px" /></VFlexTableCell>
+                      <VFlexTableCell><VPlaceload width="120px" /></VFlexTableCell>
+                      <VFlexTableCell><VPlaceload width="120px" /></VFlexTableCell>
+                      <VFlexTableCell :column="{ align: 'end' }"><VPlaceload width="60px" /></VFlexTableCell>
+                    </div>
+                  </div>
+                  
+                  <!-- 空状态 -->
+                  <div v-else-if="wrapperState.data?.length === 0" class="flex-list-inner">
+                    <VPlaceholderSection
+                      title="暂无序列号"
+                      subtitle="请生成序列号或检查搜索条件"
+                      class="my-6"
+                    />
+                  </div>
+                </template>
                 <template #body-cell="{ row: serial, column }">
                   <template v-if="column.key === 'serial'">
-                    <span class="serial-number">{{ serial.serial }}</span>
+                    <VTextEllipsis width="180px" class="serial-number">
+                      {{ serial.serial }}
+                    </VTextEllipsis>
                   </template>
 
                   <template v-if="column.key === 'batch_id'">
-                    <span class="batch-id">{{ serial.batch_id }}</span>
+                    <VTextEllipsis width="120px" class="batch-id">
+                      {{ serial.batch_id }}
+                    </VTextEllipsis>
                   </template>
 
                   <template v-if="column.key === 'mac_info'">
                     <div class="mac-info">
-                      <div>Start: {{ serial.mac_start }}</div>
-                      <div>Count: {{ serial.mac_count }}, Interval: {{ serial.mac_interval }}</div>
+                      <div class="mb-1">
+                        <VTextEllipsis width="160px">
+                          <small class="has-text-weight-semibold">Start:</small> {{ serial.mac_start }}
+                        </VTextEllipsis>
+                      </div>
+                      <div>
+                        <VTextEllipsis width="160px" class="common-text-light">
+                          <small>Count: {{ serial.mac_count }}, Interval: {{ serial.mac_interval }}</small>
+                        </VTextEllipsis>
+                      </div>
                     </div>
                   </template>
 
@@ -631,23 +735,26 @@ useHead({
                     <VTag 
                       :color="serial.status === 'unused' ? 'success' : 
                               serial.status === 'bound' ? 'warning' : 'primary'"
-                      size="tiny"
+                      rounded
                     >
                       {{ serial.status }}
                     </VTag>
                   </template>
 
                   <template v-if="column.key === 'created_at'">
-                    <span class="date-text">{{ formatDateTime(serial.created_at) }}</span>
+                    <VTextEllipsis width="120px" class="date-text">
+                      {{ formatDateTime(serial.created_at) }}
+                    </VTextEllipsis>
                   </template>
 
                   <template v-if="column.key === 'bound_at'">
-                    <span class="date-text">{{ formatDateTime(serial.bound_at || '') }}</span>
+                    <VTextEllipsis width="120px" class="date-text">
+                      {{ serial.bound_at ? formatDateTime(serial.bound_at) : '-' }}
+                    </VTextEllipsis>
                   </template>
 
                   <template v-if="column.key === 'actions'">
                     <VButton 
-                      size="medium" 
                       outlined
                       @click="handleViewDetails(serial)"
                     >
@@ -787,28 +894,28 @@ useHead({
     >
       <template #content>
         <div v-if="selectedSerial" class="serial-details">
-          <div class="serial-info-grid">
-            <div class="info-item">
+          <div class="common-info-grid">
+            <div class="common-info-item">
               <label>Serial Number</label>
               <span>{{ selectedSerial.serial }}</span>
             </div>
-            <div class="info-item">
+            <div class="common-info-item">
               <label>Batch ID</label>
               <span>{{ selectedSerial.batch_id }}</span>
             </div>
-            <div class="info-item">
+            <div class="common-info-item">
               <label>MAC Start</label>
               <span>{{ selectedSerial.mac_start }}</span>
             </div>
-            <div class="info-item">
+            <div class="common-info-item">
               <label>MAC Count</label>
               <span>{{ selectedSerial.mac_count }}</span>
             </div>
-            <div class="info-item">
+            <div class="common-info-item">
               <label>MAC Interval</label>
               <span>{{ selectedSerial.mac_interval }}</span>
             </div>
-            <div class="info-item">
+            <div class="common-info-item">
               <label>Status</label>
               <VTag 
                 :color="selectedSerial.status === 'unused' ? 'success' : 
@@ -817,11 +924,11 @@ useHead({
                 {{ selectedSerial.status }}
               </VTag>
             </div>
-            <div class="info-item">
+            <div class="common-info-item">
               <label>Created At</label>
               <span>{{ formatDateTime(selectedSerial.created_at) }}</span>
             </div>
-            <div class="info-item">
+            <div class="common-info-item">
               <label>Bound At</label>
               <span>{{ formatDateTime(selectedSerial.bound_at || '') }}</span>
             </div>
@@ -837,94 +944,6 @@ useHead({
 </template>
 
 <style lang="scss" scoped>
-.page-content-inner {
-  padding: 2rem;
-}
-
-.page-header {
-  margin-bottom: 2rem;
-
-  .header-content {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 1rem;
-
-    .title {
-      margin: 0 0 0.5rem 0;
-      line-height: 1.2;
-      color: var(--dark-text);
-    }
-
-    .header-actions {
-      display: flex;
-      gap: 0.5rem;
-    }
-  }
-}
-
-.stats-card {
-  transition: all 0.3s;
-
-  &:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--light-box-shadow);
-  }
-
-  .stats-content {
-    display: flex;
-    align-items: center;
-    padding: 1.5rem;
-  }
-
-  .stats-icon {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    height: 60px;
-    width: 60px;
-    min-width: 60px;
-    border-radius: var(--radius-rounded);
-    margin-right: 1rem;
-
-    &.is-primary {
-      background: var(--primary-light);
-      color: var(--primary);
-    }
-
-    &.is-success {
-      background: var(--success-light);
-      color: var(--success);
-    }
-
-    &.is-warning {
-      background: var(--warning-light);
-      color: var(--warning);
-    }
-
-    &.is-info {
-      background: var(--info-light);
-      color: var(--info);
-    }
-  }
-
-  .stats-info {
-    .stats-number {
-      display: block;
-      font-size: 1.8rem;
-      font-weight: 600;
-      color: var(--dark-text);
-      line-height: 1.2;
-    }
-
-    p {
-      font-size: 0.95rem;
-      color: var(--muted-grey);
-      margin: 0;
-    }
-  }
-}
 
 .batch-header {
   display: flex;
@@ -1007,17 +1026,6 @@ useHead({
   }
 }
 
-.filter-section {
-  padding: 1rem;
-  background: var(--fade-grey-light-6);
-  border-radius: var(--radius);
-  margin-bottom: 1rem;
-
-  .buttons {
-    gap: 0.5rem;
-  }
-}
-
 .serial-number {
   font-family: var(--font-family-monospace);
   font-weight: 600;
@@ -1041,45 +1049,11 @@ useHead({
   color: var(--muted-grey);
 }
 
-.serial-details {
-  .serial-info-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 1rem;
-
-    .info-item {
-      padding: 1rem;
-      background: var(--fade-grey-light-6);
-      border-radius: var(--radius);
-      border: 1px solid var(--fade-grey-light-3);
-
-      label {
-        display: block;
-        font-weight: 600;
-        color: var(--muted-grey);
-        font-size: 0.85rem;
-        margin-bottom: 0.5rem;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-      }
-
-      span {
-        color: var(--dark-text);
-        font-weight: 500;
-      }
-    }
-  }
-}
-
 .rem-30 {
   font-size: 1.875rem;
 }
 
 .is-dark {
-  .stats-info .stats-number {
-    color: var(--dark-dark-text);
-  }
-
   .batch-item {
     background: var(--dark-sidebar-light-6);
     border-color: var(--dark-sidebar-light-12);
@@ -1088,23 +1062,9 @@ useHead({
       background: var(--dark-sidebar-light-12);
     }
   }
-
-  .filter-section {
-    background: var(--dark-sidebar-light-6);
-  }
-
-  .serial-info-grid .info-item {
-    background: var(--dark-sidebar-light-6);
-    border-color: var(--dark-sidebar-light-12);
-  }
 }
 
 @media only screen and (max-width: 767px) {
-  .header-content {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
   .columns {
     display: block;
 
@@ -1112,10 +1072,6 @@ useHead({
       width: 100%;
       margin-bottom: 1rem;
     }
-  }
-
-  .serial-info-grid {
-    grid-template-columns: 1fr;
   }
 }
 </style>

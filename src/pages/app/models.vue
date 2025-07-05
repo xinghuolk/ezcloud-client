@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed } from 'vue'
+import { ref, reactive, onMounted, computed, watch } from 'vue'
 import { useVendorStore } from '/@src/stores/vendors'
 import { modelApi } from '/@src/api'
 import type { DeviceModel, CreateDeviceModelParams } from '/@src/api/types'
@@ -31,6 +31,9 @@ const loading = ref(false)
 const submitting = ref(false)
 const models = ref<DeviceModel[]>([])
 const currentModel = ref<DeviceModel | null>(null)
+
+// Search debounce
+let searchTimeout: NodeJS.Timeout | null = null
 
 // Dialog controls
 const dialogVisible = ref(false)
@@ -237,6 +240,23 @@ const handleSearch = () => {
   fetchModels()
 }
 
+// Debounced search for text inputs
+const handleDebouncedSearch = () => {
+  if (searchTimeout) {
+    clearTimeout(searchTimeout)
+  }
+  searchTimeout = setTimeout(() => {
+    pagination.page = 1
+    fetchModels()
+  }, 500)
+}
+
+// Immediate search for dropdowns
+const handleImmediateSearch = () => {
+  pagination.page = 1
+  fetchModels()
+}
+
 const handleReset = () => {
   Object.assign(searchForm, {
     search: '',
@@ -288,6 +308,23 @@ const onVendorChange = (vendorId: number) => {
   }
 }
 
+// Watch for filter changes
+watch(() => searchForm.search, () => {
+  handleDebouncedSearch()
+})
+
+watch(() => searchForm.oemname, () => {
+  handleDebouncedSearch()
+})
+
+watch(() => searchForm.devtype, () => {
+  handleImmediateSearch()
+})
+
+watch(() => searchForm.is_active, () => {
+  handleImmediateSearch()
+})
+
 // Lifecycle
 onMounted(async () => {
   await Promise.all([
@@ -302,9 +339,9 @@ useHead({
 </script>
 
 <template>
-  <div class="page-content-inner">
+  <div class="common-page-layout">
     <!-- Page Header -->
-    <div class="page-header">
+    <div class="common-page-header">
       <div class="header-content">
         <h1 class="title is-3">Device Model Management</h1>
         <VButton color="primary" raised @click="handleAdd">
@@ -317,7 +354,7 @@ useHead({
     <!-- Search & Filter -->
     <VCard radius="smooth" class="mb-6">
       <h3 class="title is-6 mb-4">Search & Filter</h3>
-      <div class="filter-form">
+      <div class="common-filter-form">
         <div class="columns is-multiline">
           <div class="column is-3">
             <VField>
@@ -378,8 +415,7 @@ useHead({
               <VLabel>&nbsp;</VLabel>
               <VControl>
                 <div class="buttons">
-                  <VButton color="primary" @click="handleSearch">Search</VButton>
-                  <VButton @click="handleReset">Reset</VButton>
+                  <VButton @click="handleReset">Reset Filters</VButton>
                 </div>
               </VControl>
             </VField>
@@ -392,21 +428,107 @@ useHead({
     <VCard radius="smooth">
       <VFlexTableWrapper
         :columns="{
-          id: 'ID',
-          vendor: 'Vendor',
-          oemname: 'OEM Name',
-          stdname: 'Standard Model',
-          devtype: 'Device Type',
-          description: 'Description',
-          serial_count: 'Serial Count',
-          is_active: 'Status',
-          created_at: 'Created At',
-          actions: 'Actions'
+          id: { 
+            label: 'ID',
+            sortable: true,
+            bold: true
+          },
+          vendor: { 
+            label: 'Vendor',
+            searchable: true,
+            sortable: true,
+            grow: true
+          },
+          oemname: { 
+            label: 'OEM Name',
+            searchable: true,
+            sortable: true,
+            bold: true,
+            grow: true
+          },
+          stdname: { 
+            label: 'Standard Model',
+            searchable: true,
+            sortable: true,
+            grow: true
+          },
+          devtype: { 
+            label: 'Device Type',
+            searchable: true,
+            sortable: true,
+            align: 'center'
+          },
+          description: { 
+            label: 'Description',
+            searchable: true,
+            grow: 'lg'
+          },
+          serial_count: { 
+            label: 'Serial Count',
+            sortable: true,
+            align: 'center'
+          },
+          is_active: { 
+            label: 'Status',
+            searchable: true,
+            sortable: true,
+            align: 'center'
+          },
+          created_at: { 
+            label: 'Created At',
+            sortable: true
+          },
+          actions: { 
+            label: 'Actions',
+            align: 'end'
+          }
         }"
         :data="models"
       >
         <template #default="wrapperState">
+          <VFlexTableToolbar>
+            <template #right>
+              <VField>
+                <VControl>
+                  <VSelect v-model="wrapperState.limit" class="is-rounded">
+                    <VOption :value="10">10 条/页</VOption>
+                    <VOption :value="20">20 条/页</VOption>
+                    <VOption :value="50">50 条/页</VOption>
+                    <VOption :value="100">100 条/页</VOption>
+                  </VSelect>
+                </VControl>
+              </VField>
+            </template>
+          </VFlexTableToolbar>
+
           <VFlexTable rounded>
+            <!-- 加载状态 -->
+            <template #body>
+              <div v-if="loading" class="flex-list-inner">
+                <div v-for="key in 5" :key="key" class="flex-table-item">
+                  <VFlexTableCell><VPlaceload width="60px" /></VFlexTableCell>
+                  <VFlexTableCell :column="{ grow: true }"><VPlaceload /></VFlexTableCell>
+                  <VFlexTableCell :column="{ grow: true }"><VPlaceload /></VFlexTableCell>
+                  <VFlexTableCell :column="{ grow: true }"><VPlaceload /></VFlexTableCell>
+                  <VFlexTableCell><VPlaceload width="80px" /></VFlexTableCell>
+                  <VFlexTableCell :column="{ grow: 'lg' }"><VPlaceload /></VFlexTableCell>
+                  <VFlexTableCell><VPlaceload width="60px" /></VFlexTableCell>
+                  <VFlexTableCell><VPlaceload width="80px" /></VFlexTableCell>
+                  <VFlexTableCell><VPlaceload width="100px" /></VFlexTableCell>
+                  <VFlexTableCell :column="{ align: 'end' }"><VPlaceload width="40px" /></VFlexTableCell>
+                </div>
+              </div>
+              
+              <!-- 空状态 -->
+              <div v-else-if="wrapperState.data?.length === 0" class="flex-list-inner">
+                <VPlaceholderSection
+                  title="暂无设备型号"
+                  subtitle="请添加设备型号或检查搜索条件"
+                  class="my-6"
+                />
+              </div>
+            </template>
+
             <template #body-cell="{ row: model, column }">
               <template v-if="column.key === 'id'">
                 <span class="model-id">{{ model.id }}</span>
@@ -414,43 +536,51 @@ useHead({
 
               <template v-if="column.key === 'vendor'">
                 <div v-if="model.vendor">
-                  <VTag color="info" size="tiny">{{ model.vendor.name }}</VTag>
+                  <VTag color="info" rounded>
+                    <VTextEllipsis width="100px">{{ model.vendor.name }}</VTextEllipsis>
+                  </VTag>
                 </div>
                 <span v-else>-</span>
               </template>
 
               <template v-if="column.key === 'oemname'">
-                <span class="model-oemname">{{ model.oemname }}</span>
+                <VTextEllipsis width="120px" class="model-oemname">
+                  {{ model.oemname }}
+                </VTextEllipsis>
               </template>
 
               <template v-if="column.key === 'stdname'">
-                <span class="model-stdname">{{ model.stdname }}</span>
+                <VTextEllipsis width="120px" class="model-stdname">
+                  {{ model.stdname }}
+                </VTextEllipsis>
               </template>
 
               <template v-if="column.key === 'devtype'">
-                <VTag :color="getDeviceTypeColor(model.devtype)" size="tiny">
+                <VTag :color="getDeviceTypeColor(model.devtype)" rounded>
                   {{ getDeviceTypeLabel(model.devtype) }}
                 </VTag>
               </template>
 
               <template v-if="column.key === 'description'">
-                <VTextEllipsis width="200px">
+                <VTextEllipsis width="200px" class="common-text-light">
                   {{ model.description || 'No description' }}
                 </VTextEllipsis>
               </template>
 
               <template v-if="column.key === 'serial_count'">
-                <span class="serial-count">{{ model.serial_count || 0 }}</span>
+                <span class="serial-count has-text-weight-semibold">{{ model.serial_count || 0 }}</span>
               </template>
 
               <template v-if="column.key === 'is_active'">
-                <VTag :color="model.is_active ? 'success' : 'danger'" size="tiny">
+                <VTag :color="model.is_active ? 'success' : 'danger'" rounded>
                   {{ model.is_active ? 'Active' : 'Inactive' }}
                 </VTag>
               </template>
 
               <template v-if="column.key === 'created_at'">
-                <span class="date-text">{{ formatDateTime(model.created_at) }}</span>
+                <VTextEllipsis width="120px" class="date-text">
+                  {{ formatDateTime(model.created_at) }}
+                </VTextEllipsis>
               </template>
 
               <template v-if="column.key === 'actions'">
@@ -618,49 +748,49 @@ useHead({
     >
       <template #content>
         <div v-if="currentModel" class="model-details">
-          <div class="model-info-grid">
-            <div class="info-item">
+          <div class="common-info-grid">
+            <div class="common-info-item">
               <label>ID</label>
               <span>{{ currentModel.id }}</span>
             </div>
-            <div class="info-item">
+            <div class="common-info-item">
               <label>Vendor Name</label>
               <VTag v-if="currentModel.vendor" color="info">{{ currentModel.vendor.name }}</VTag>
               <span v-else>-</span>
             </div>
-            <div class="info-item">
+            <div class="common-info-item">
               <label>OEM Name</label>
               <span>{{ currentModel.oemname }}</span>
             </div>
-            <div class="info-item">
+            <div class="common-info-item">
               <label>Standard Model</label>
               <span>{{ currentModel.stdname }}</span>
             </div>
-            <div class="info-item">
+            <div class="common-info-item">
               <label>Device Type</label>
               <VTag :color="getDeviceTypeColor(currentModel.devtype)">
                 {{ getDeviceTypeLabel(currentModel.devtype) }}
               </VTag>
             </div>
-            <div class="info-item">
+            <div class="common-info-item">
               <label>Status</label>
               <VTag :color="currentModel.is_active ? 'success' : 'danger'">
                 {{ currentModel.is_active ? 'Active' : 'Inactive' }}
               </VTag>
             </div>
-            <div class="info-item">
+            <div class="common-info-item">
               <label>Serial Count</label>
               <span>{{ currentModel.serial_count || 0 }}</span>
             </div>
-            <div class="info-item">
+            <div class="common-info-item">
               <label>Device Count</label>
               <span>{{ currentModel.device_count || 0 }}</span>
             </div>
-            <div class="info-item">
+            <div class="common-info-item">
               <label>Created At</label>
               <span>{{ formatDateTime(currentModel.created_at) }}</span>
             </div>
-            <div class="info-item">
+            <div class="common-info-item">
               <label>Updated At</label>
               <span>{{ formatDateTime(currentModel.updated_at) }}</span>
             </div>
@@ -680,47 +810,6 @@ useHead({
 </template>
 
 <style lang="scss" scoped>
-.page-content-inner {
-  padding: 2rem;
-}
-
-.page-header {
-  margin-bottom: 2rem;
-
-  .header-content {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 1rem;
-
-    .title {
-      margin: 0 0 0.5rem 0;
-      line-height: 1.2;
-      color: var(--dark-text);
-    }
-  }
-}
-
-.filter-form {
-  .buttons {
-    gap: 0.5rem;
-  }
-}
-
-:deep(.form-icon) {
-  position: absolute;
-  top: 50%;
-  left: 12px;
-  transform: translateY(-50%);
-  color: var(--muted-grey);
-  font-size: 1rem;
-  z-index: 1;
-}
-
-:deep(.input) {
-  padding-left: 2.5rem;
-}
 
 .model-id {
   font-weight: 600;
@@ -746,55 +835,4 @@ useHead({
   color: var(--muted-grey);
 }
 
-.model-details {
-  .model-info-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: 1rem;
-
-    .info-item {
-      padding: 1rem;
-      background: var(--fade-grey-light-6);
-      border-radius: var(--radius);
-      border: 1px solid var(--fade-grey-light-3);
-
-      &.full-width {
-        grid-column: 1 / -1;
-      }
-
-      label {
-        display: block;
-        font-weight: 600;
-        color: var(--muted-grey);
-        font-size: 0.85rem;
-        margin-bottom: 0.5rem;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-      }
-
-      span {
-        color: var(--dark-text);
-        font-weight: 500;
-      }
-    }
-  }
-}
-
-.is-dark {
-  .model-info-grid .info-item {
-    background: var(--dark-sidebar-light-6);
-    border-color: var(--dark-sidebar-light-12);
-  }
-}
-
-@media only screen and (max-width: 767px) {
-  .header-content {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .model-info-grid {
-    grid-template-columns: 1fr;
-  }
-}
 </style>

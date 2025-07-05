@@ -36,12 +36,14 @@ useHead({
 </script>
 
 <template>
-  <div class="page-content-inner">
+  <div class="common-page-layout">
     <!-- Page Header -->
-    <div class="page-header">
+    <div class="common-page-header">
       <div class="header-content">
-        <h1 class="title is-3">{{ appInfo.name }}</h1>
-        <p class="subtitle">{{ appInfo.description }}</p>
+        <div class="header-info">
+          <h1 class="title is-3">{{ appInfo.name }}</h1>
+          <p class="subtitle">{{ appInfo.description }}</p>
+        </div>
       </div>
     </div>
 
@@ -148,28 +150,8 @@ useHead({
 </template>
 
 <style lang="scss" scoped>
-.page-content-inner {
-  padding: 2rem;
-}
-
-.page-header {
-  margin-bottom: 2rem;
-
-  .header-content {
-    text-align: center;
-
-    .title {
-      margin: 0 0 0.5rem 0;
-      line-height: 1.2;
-      color: var(--dark-text);
-    }
-
-    .subtitle {
-      color: var(--muted-grey);
-      margin: 0;
-      line-height: 1.4;
-    }
-  }
+.common-page-header .header-content .header-info {
+  text-align: center;
 }
 
 .app-info-grid {

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed } from 'vue'
+import { ref, reactive, onMounted, computed, watch } from 'vue'
 import { useVendorStore } from '/@src/stores/vendors'
 import { useUserSession } from '/@src/stores/user-session'
 import type { Vendor, CreateVendorParams } from '/@src/api/types'
@@ -20,6 +20,9 @@ const loading = ref(false)
 const createDialogOpen = ref(false)
 const editDialogOpen = ref(false)
 const selectedVendor = ref<Vendor | null>(null)
+
+// Search debounce
+let searchTimeout: NodeJS.Timeout | null = null
 
 // Form data
 const searchForm = reactive({
@@ -50,9 +53,15 @@ const fetchVendors = async () => {
   }
 }
 
-const handleSearch = () => {
-  searchForm.page = 1
-  fetchVendors()
+// Debounced search for text inputs
+const handleDebouncedSearch = () => {
+  if (searchTimeout) {
+    clearTimeout(searchTimeout)
+  }
+  searchTimeout = setTimeout(() => {
+    searchForm.page = 1
+    fetchVendors()
+  }, 500)
 }
 
 const handleReset = () => {
@@ -124,6 +133,11 @@ const formatDate = (dateString: string) => {
   })
 }
 
+// Watch for filter changes
+watch(() => searchForm.search, () => {
+  handleDebouncedSearch()
+})
+
 // Lifecycle
 onMounted(() => {
   fetchVendors()
@@ -135,11 +149,11 @@ useHead({
 </script>
 
 <template>
-  <div class="page-content-inner">
+  <div class="common-page-layout">
     <!-- Page Header -->
-    <div class="dashboard-header">
+    <div class="common-page-header">
       <div class="header-content">
-        <div>
+        <div class="header-info">
           <h1 class="title is-3">Vendor Management</h1>
           <p class="subtitle is-6">Manage device vendors and manufacturers</p>
         </div>
@@ -150,13 +164,13 @@ useHead({
     <div class="columns is-multiline mb-6">
       <div class="column is-6">
         <VCard class="has-text-centered">
-          <h3 class="title is-4 text-primary">{{ vendorCount }}</h3>
+          <h3 class="title is-4 common-text-primary">{{ vendorCount }}</h3>
           <p class="subtitle is-6">Total Vendors</p>
         </VCard>
       </div>
       <div class="column is-6">
         <VCard class="has-text-centered">
-          <h3 class="title is-4 text-success">{{ activeCount }}</h3>
+          <h3 class="title is-4 common-text-success">{{ activeCount }}</h3>
           <p class="subtitle is-6">Active Vendors</p>
         </VCard>
       </div>
@@ -185,13 +199,8 @@ useHead({
               <VControl>
                 <div class="field is-grouped">
                   <div class="control">
-                    <VButton color="primary" @click="handleSearch">
-                      Search
-                    </VButton>
-                  </div>
-                  <div class="control">
                     <VButton @click="handleReset">
-                      Reset
+                      Reset Filters
                     </VButton>
                   </div>
                   <div class="control">
@@ -214,60 +223,121 @@ useHead({
       <!-- Vendor Table -->
       <VFlexTableWrapper
         :columns="{
-          name: 'Vendor Name',
-          description: 'Description',
-          status: 'Status',
-          created_at: 'Created Date',
-          actions: 'Actions'
+          name: { 
+            label: 'Vendor Name',
+            searchable: true,
+            sortable: true,
+            bold: true,
+            grow: true
+          },
+          description: { 
+            label: 'Description',
+            searchable: true,
+            grow: 'xl'
+          },
+          status: { 
+            label: 'Status',
+            searchable: true,
+            sortable: true,
+            align: 'center'
+          },
+          created_at: { 
+            label: 'Created Date',
+            sortable: true
+          },
+          actions: { 
+            label: 'Actions',
+            align: 'end'
+          }
         }"
         :data="vendors"
       >
         <template #default="wrapperState">
+          <VFlexTableToolbar>
+            <template #right>
+              <VField>
+                <VControl>
+                  <VSelect v-model="wrapperState.limit" class="is-rounded">
+                    <VOption :value="10">10 条/页</VOption>
+                    <VOption :value="20">20 条/页</VOption>
+                    <VOption :value="50">50 条/页</VOption>
+                    <VOption :value="100">100 条/页</VOption>
+                  </VSelect>
+                </VControl>
+              </VField>
+            </template>
+          </VFlexTableToolbar>
+
           <VFlexTable rounded>
+            <!-- 加载状态 -->
+            <template #body>
+              <div v-if="loading" class="flex-list-inner">
+                <div v-for="key in 5" :key="key" class="flex-table-item">
+                  <VFlexTableCell :column="{ grow: true }"><VPlaceload /></VFlexTableCell>
+                  <VFlexTableCell :column="{ grow: 'xl' }"><VPlaceload /></VFlexTableCell>
+                  <VFlexTableCell><VPlaceload width="80px" /></VFlexTableCell>
+                  <VFlexTableCell><VPlaceload width="100px" /></VFlexTableCell>
+                  <VFlexTableCell :column="{ align: 'end' }"><VPlaceload width="120px" /></VFlexTableCell>
+                </div>
+              </div>
+              
+              <!-- 空状态 -->
+              <div v-else-if="wrapperState.data?.length === 0" class="flex-list-inner">
+                <VPlaceholderSection
+                  title="暂无厂商"
+                  subtitle="请添加厂商或检查搜索条件"
+                  class="my-6"
+                />
+              </div>
+            </template>
+
             <template #body-cell="{ row: vendor, column }">
               <template v-if="column.key === 'name'">
-                <span class="item-name dark-inverted">
+                <VTextEllipsis width="150px" class="common-item-name dark-inverted">
                   {{ vendor?.name || 'Unknown' }}
-                </span>
+                </VTextEllipsis>
               </template>
 
               <template v-if="column.key === 'description'">
-                <span>{{ vendor.description || '-' }}</span>
+                <VTextEllipsis width="300px" class="common-text-light">
+                  {{ vendor.description || 'No description' }}
+                </VTextEllipsis>
               </template>
 
               <template v-if="column.key === 'status'">
-                <VTag 
+                <VTag
                   :color="vendor.is_active ? 'success' : 'danger'"
                   outlined
+                  rounded
                 >
                   {{ vendor.is_active ? 'Active' : 'Inactive' }}
                 </VTag>
               </template>
 
               <template v-if="column.key === 'created_at'">
-                <span>{{ formatDate(vendor.created_at) }}</span>
+                <VTextEllipsis width="100px" class="date-text">
+                  {{ formatDate(vendor.created_at) }}
+                </VTextEllipsis>
               </template>
 
               <template v-if="column.key === 'actions'">
-                <VButtons v-if="isAdmin">
+                <div v-if="isAdmin" class="buttons">
                   <VButton 
-                    size="medium"
                     color="primary" 
                     outlined
                     @click="openEditDialog(vendor)"
                   >
-                    Edit
+                    编辑
                   </VButton>
                   <VButton 
-                    size="medium"
                     color="danger" 
                     outlined
                     @click="handleDelete(vendor)"
                   >
-                    Delete
+                    删除
                   </VButton>
-                </VButtons>
-                <span v-else>-</span>
+                </div>
+                <span v-else class="common-text-light">-</span>
               </template>
             </template>
           </VFlexTable>
@@ -355,58 +425,6 @@ useHead({
 </template>
 
 <style lang="scss" scoped>
-.page-content-inner {
-  padding: 2rem;
-}
-
-.dashboard-header {
-  margin-bottom: 2rem;
-
-  .header-content {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    
-    > div:first-child {
-      .title {
-        color: var(--dark-text);
-        margin-bottom: 0.5rem;
-        line-height: 1.2;
-      }
-
-      .subtitle {
-        color: var(--muted-grey);
-        margin-top: 0;
-        line-height: 1.4;
-      }
-    }
-  }
-
-  @media (max-width: 768px) {
-    .header-content {
-      flex-direction: column;
-      gap: 1rem;
-      text-align: center;
-    }
-  }
-}
-
-.text-primary {
-  color: var(--primary) !important;
-}
-
-.text-success {
-  color: var(--success) !important;
-}
-
-.text-danger {
-  color: var(--danger) !important;
-}
-
-:deep(.flex-table-item) {
-  padding: 1rem 0.75rem;
-}
-
 :deep(.field.is-grouped) {
   flex-wrap: wrap;
   gap: 0.5rem;

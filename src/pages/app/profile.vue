@@ -205,37 +205,30 @@ useHead({
 </script>
 
 <template>
-  <div class="page-content-inner">
+  <div class="common-page-layout">
     <!-- Page Header -->
-    <div class="page-header">
+    <div class="common-page-header">
       <div class="header-content">
-        <h1 class="title is-3">User Profile</h1>
-        <p class="subtitle">Manage your account information and settings</p>
+        <div class="header-info">
+          <h1 class="title is-3">User Profile</h1>
+          <p class="subtitle">Manage your account information and settings</p>
+        </div>
       </div>
     </div>
 
     <VCard radius="smooth">
-      <VTabs v-model="activeTab">
-        <div class="tabs is-boxed">
-          <ul>
-            <li :class="{ 'is-active': activeTab === 'profile' }">
-              <a @click="activeTab = 'profile'">
-                <iconify-icon icon="lucide:user" class="mr-2" />
-                Profile Information
-              </a>
-            </li>
-            <li :class="{ 'is-active': activeTab === 'password' }">
-              <a @click="activeTab = 'password'">
-                <iconify-icon icon="lucide:lock" class="mr-2" />
-                Change Password
-              </a>
-            </li>
-          </ul>
-        </div>
-
-        <div class="tab-content">
+      <VTabs 
+        type="boxed"
+        :selected="activeTab"
+        :tabs="[
+          { label: 'Profile Information', value: 'profile', icon: 'lucide:user' },
+          { label: 'Change Password', value: 'password', icon: 'lucide:lock' }
+        ]"
+        @update:selected="activeTab = $event"
+      >
+        <template #tab="{ activeValue }">
           <!-- Profile Information Tab -->
-          <div v-show="activeTab === 'profile'" class="tab-pane">
+          <div v-if="activeValue === 'profile'" class="tab-pane">
             <form @submit.prevent="handleUpdateProfile">
               <div class="columns is-multiline">
                 <div class="column is-6">
@@ -345,7 +338,7 @@ useHead({
           </div>
 
           <!-- Change Password Tab -->
-          <div v-show="activeTab === 'password'" class="tab-pane">
+          <div v-else-if="activeValue === 'password'" class="tab-pane">
             <form @submit.prevent="handleChangePassword">
               <div class="columns is-multiline">
                 <div class="column is-12">
@@ -419,35 +412,15 @@ useHead({
               </div>
             </form>
           </div>
-        </div>
+        </template>
       </VTabs>
     </VCard>
   </div>
 </template>
 
 <style lang="scss" scoped>
-.page-content-inner {
-  padding: 2rem;
-}
-
-.page-header {
-  margin-bottom: 2rem;
-
-  .header-content {
-    text-align: center;
-
-    .title {
-      margin: 0 0 0.5rem 0;
-      line-height: 1.2;
-      color: var(--dark-text);
-    }
-
-    .subtitle {
-      color: var(--muted-grey);
-      margin: 0;
-      line-height: 1.4;
-    }
-  }
+.common-page-header .header-content .header-info {
+  text-align: center;
 }
 
 .tab-content {

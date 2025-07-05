@@ -273,6 +273,7 @@ const connectSSH = async () => {
         statusDescription.value = 'Terminal is ready for use'
         statusType.value = 'success'
         
+        
         // 应用VSCode主题
         applyVSCodeTheme()
         
@@ -349,6 +350,7 @@ const connectSSH = async () => {
       console.error('SSH WebSocket Connection Error:', error)
       isConnecting.value = false
       isConnected.value = false
+      
       statusMessage.value = 'SSH Connection Failed'
       // 尝试从错误事件中提取更具体的错误信息
       let errorDetail = 'WebSocket connection failed. Please check network connection or retry.'
@@ -508,6 +510,7 @@ const sendTerminalSize = () => {
     websocket.send(JSON.stringify(message))
   }
 }
+
 
 // 应用VSCode终端主题
 const applyVSCodeTheme = () => {

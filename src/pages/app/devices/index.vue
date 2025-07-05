@@ -253,9 +253,9 @@ useHead({
 </script>
 
 <template>
-  <div class="page-content-inner">
+  <div class="common-page-layout">
     <!-- Page Header -->
-    <div class="page-header">
+    <div class="common-page-header">
       <div class="header-content">
         <h1 class="title is-3">Device Management</h1>
         <div class="header-actions">
@@ -289,7 +289,7 @@ useHead({
     <!-- Filter Section -->
     <VCard radius="smooth" class="mb-6">
       <h3 class="title is-6 mb-4">Search & Filter</h3>
-      <div class="filter-form">
+      <div class="common-filter-form">
         <div class="columns is-multiline">
           <div class="column is-3">
             <VField>
@@ -725,109 +725,10 @@ useHead({
 </template>
 
 <style lang="scss" scoped>
-.page-content-inner {
-  padding: 2rem;
-}
-
-.page-header {
-  margin-bottom: 2rem;
-
-  .header-content {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 1rem;
-
-    .title {
-      margin: 0 0 0.5rem 0;
-      line-height: 1.2;
-      color: var(--dark-text);
-    }
-
-    .header-actions {
-      display: flex;
-      gap: 0.5rem;
-      flex-wrap: wrap;
-    }
-  }
-}
-
-.filter-form {
-  .buttons {
-    margin-top: 1rem;
-  }
-}
-
-:deep(.form-icon) {
-  position: absolute;
-  top: 50%;
-  left: 12px;
-  transform: translateY(-50%);
-  color: var(--muted-grey);
-  font-size: 1rem;
-  z-index: 1;
-}
-
-:deep(.input) {
-  padding-left: 2.5rem;
-}
-
-.status-indicators {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.model-info {
-  line-height: 1.4;
-
-  .model-stdname {
-    color: var(--muted-grey);
-  }
-}
-
-.network-info {
-  font-size: 0.85rem;
-  line-height: 1.3;
-}
-
-.device-serial {
-  font-family: var(--font-family-monospace);
-  font-weight: 600;
-}
 
 .device-details {
   .tab-content {
     padding: 1.5rem 0;
-  }
-
-  .device-info-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 1rem;
-
-    .info-item {
-      padding: 1rem;
-      background: var(--fade-grey-light-6);
-      border-radius: var(--radius);
-      border: 1px solid var(--fade-grey-light-3);
-
-      label {
-        display: block;
-        font-weight: 600;
-        color: var(--muted-grey);
-        font-size: 0.85rem;
-        margin-bottom: 0.5rem;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-      }
-
-      span {
-        color: var(--dark-text);
-        font-weight: 500;
-      }
-    }
   }
 
   .status-section {
@@ -887,7 +788,6 @@ useHead({
 }
 
 .is-dark {
-  .device-info-grid .info-item,
   .wifi-item,
   .modem-info {
     background: var(--dark-sidebar-light-6);
@@ -896,15 +796,6 @@ useHead({
 }
 
 @media only screen and (max-width: 767px) {
-  .header-content {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .device-info-grid {
-    grid-template-columns: 1fr;
-  }
-
   .wifi-details {
     flex-direction: column;
     gap: 0.25rem;

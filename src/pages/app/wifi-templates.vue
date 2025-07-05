@@ -71,7 +71,7 @@ const loadTemplates = async () => {
   }
 }
 
-// Handle search
+// Handle search (debounced for text input)
 const handleSearch = () => {
   if (searchTimeout) {
     clearTimeout(searchTimeout)
@@ -82,7 +82,7 @@ const handleSearch = () => {
   }, 500)
 }
 
-// Handle filter
+// Handle filter (immediate for dropdowns)
 const handleFilter = () => {
   currentPage.value = 1
   loadTemplates()
@@ -146,6 +146,15 @@ const formatDate = (dateString?: string) => {
 }
 
 
+// Watch for search and filter changes
+watch(() => searchQuery.value, () => {
+  handleSearch()
+})
+
+watch(() => activeFilter.value, () => {
+  handleFilter()
+})
+
 // Watch pagination
 watch([currentPage, pageSize], () => {
   loadTemplates()
@@ -162,23 +171,25 @@ useHead({
 </script>
 
 <template>
-  <div class="page-content-inner">
+  <div class="common-page-layout">
     <!-- Page Header -->
-    <div class="page-header">
+    <div class="common-page-header">
       <div class="header-content">
-        <h1 class="title is-3">WiFi Template Management</h1>
-        <p class="subtitle is-6">Manage WiFi configuration templates for tri-band multi-SSID devices</p>
-      </div>
-      <div class="header-actions">
-        <VButton 
-          v-if="userSession.isAdmin"
-          color="primary" 
-          raised
-          @click="createTemplate"
-        >
-          <iconify-icon icon="lucide:plus" class="mr-2" />
-          Create Template
-        </VButton>
+        <div class="header-info">
+          <h1 class="title is-3">WiFi Template Management</h1>
+          <p class="subtitle is-6">Manage WiFi configuration templates for tri-band multi-SSID devices</p>
+        </div>
+        <div class="header-actions">
+          <VButton 
+            v-if="userSession.isAdmin"
+            color="primary" 
+            raised
+            @click="createTemplate"
+          >
+            <iconify-icon icon="lucide:plus" class="mr-2" />
+            Create Template
+          </VButton>
+        </div>
       </div>
     </div>
 
@@ -192,7 +203,6 @@ useHead({
                 v-model="searchQuery"
                 placeholder="Search templates..."
                 icon="feather:search"
-                @input="handleSearch"
               />
             </VControl>
           </VField>
@@ -202,7 +212,6 @@ useHead({
               <VSelect
                 v-model="activeFilter"
                 placeholder="All Status"
-                @change="handleFilter"
               >
                 <VOption value="">All Status</VOption>
                 <VOption value="true">Active</VOption>
@@ -225,26 +234,93 @@ useHead({
     <VCard radius="smooth">
       <VFlexTableWrapper
         :columns="{
-          name: { label: 'Template Name', searchable: true },
-          description: { label: 'Description' },
-          bands: { label: 'Radio Bands' },
-          ssidCount: { label: 'SSID Count', align: 'center' },
-          country: { label: 'Country', align: 'center' },
-          created: { label: 'Created', sortable: true },
-          actions: { label: 'Actions', align: 'end' }
+          name: { 
+            label: 'Template Name', 
+            searchable: true,
+            sortable: true,
+            bold: true,
+            grow: true
+          },
+          description: { 
+            label: 'Description',
+            searchable: true,
+            grow: 'lg'
+          },
+          bands: { 
+            label: 'Radio Bands',
+            align: 'center'
+          },
+          ssidCount: { 
+            label: 'SSID Count', 
+            sortable: true,
+            align: 'center'
+          },
+          country: { 
+            label: 'Country', 
+            sortable: true,
+            align: 'center'
+          },
+          created: { 
+            label: 'Created', 
+            sortable: true
+          },
+          actions: { 
+            label: 'Actions', 
+            align: 'end'
+          }
         }"
         :data="templates"
         :loading="loading"
       >
-        <template #default>
+        <template #default="wrapperState">
+          <VFlexTableToolbar>
+            <template #right>
+              <VField>
+                <VControl>
+                  <VSelect v-model="wrapperState.limit" class="is-rounded">
+                    <VOption :value="10">10 条/页</VOption>
+                    <VOption :value="20">20 条/页</VOption>
+                    <VOption :value="50">50 条/页</VOption>
+                    <VOption :value="100">100 条/页</VOption>
+                  </VSelect>
+                </VControl>
+              </VField>
+            </template>
+          </VFlexTableToolbar>
+
           <VFlexTable rounded>
+            <!-- 加载状态 -->
+            <template #body>
+              <div v-if="loading" class="flex-list-inner">
+                <div v-for="key in 5" :key="key" class="flex-table-item">
+                  <VFlexTableCell :column="{ grow: true }"><VPlaceload /></VFlexTableCell>
+                  <VFlexTableCell :column="{ grow: 'lg' }"><VPlaceload /></VFlexTableCell>
+                  <VFlexTableCell><VPlaceload width="120px" /></VFlexTableCell>
+                  <VFlexTableCell><VPlaceload width="80px" /></VFlexTableCell>
+                  <VFlexTableCell><VPlaceload width="80px" /></VFlexTableCell>
+                  <VFlexTableCell><VPlaceload width="100px" /></VFlexTableCell>
+                  <VFlexTableCell :column="{ align: 'end' }"><VPlaceload width="60px" /></VFlexTableCell>
+                </div>
+              </div>
+              
+              <!-- 空状态 -->
+              <div v-else-if="wrapperState.data?.length === 0" class="flex-list-inner">
+                <VPlaceholderSection
+                  title="暂无WiFi模板"
+                  subtitle="请创建WiFi模板或检查搜索条件"
+                  class="my-6"
+                />
+              </div>
+            </template>
             <template #body-cell="{ row: template, column }">
               <template v-if="column.key === 'name'">
                 <div class="template-name">
-                  <span class="name">{{ template.name }}</span>
+                  <VTextEllipsis width="150px" class="name">
+                    {{ template.name }}
+                  </VTextEllipsis>
                   <VTag 
                     :color="template.is_active ? 'success' : 'light'" 
-                    size="tiny"
+                    rounded
                     class="ml-2"
                   >
                     {{ template.is_active ? 'Active' : 'Inactive' }}
@@ -253,7 +329,9 @@ useHead({
               </template>
 
               <template v-if="column.key === 'description'">
-                <span class="description">{{ template.description || 'No description' }}</span>
+                <VTextEllipsis width="250px" class="description">
+                  {{ template.description || 'No description' }}
+                </VTextEllipsis>
               </template>
 
               <template v-if="column.key === 'bands'">
@@ -262,7 +340,7 @@ useHead({
                     v-for="radio in template.radioConfigs || []"
                     :key="radio.band"
                     :color="getBandTagColor(radio.band)"
-                    size="tiny"
+                    rounded
                     class="mr-1"
                   >
                     {{ radio.band }}
@@ -271,17 +349,21 @@ useHead({
               </template>
 
               <template v-if="column.key === 'ssidCount'">
-                <VTag color="primary" outlined>
+                <VTag color="primary" outlined rounded>
                   {{ template.ssidConfigs?.length || 0 }}
                 </VTag>
               </template>
 
               <template v-if="column.key === 'country'">
-                <span class="country-code">{{ template.country || '-' }}</span>
+                <VTextEllipsis width="80px" class="country-code">
+                  {{ template.country || '-' }}
+                </VTextEllipsis>
               </template>
 
               <template v-if="column.key === 'created'">
-                <span class="date-text">{{ formatDate(template.created_at) }}</span>
+                <VTextEllipsis width="100px" class="date-text">
+                  {{ formatDate(template.created_at) }}
+                </VTextEllipsis>
               </template>
 
               <template v-if="column.key === 'actions'">
@@ -438,30 +520,6 @@ useHead({
 </template>
 
 <style lang="scss" scoped>
-.page-content-inner {
-  padding: 2rem;
-}
-
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 2rem;
-
-  .header-content {
-    .title {
-      margin: 0 0 0.5rem 0;
-      line-height: 1.2;
-      color: var(--dark-text);
-    }
-
-    .subtitle {
-      color: var(--muted-grey);
-      margin: 0;
-      line-height: 1.4;
-    }
-  }
-}
 
 .filter-bar {
   display: flex;
@@ -597,16 +655,6 @@ useHead({
 }
 
 @media only screen and (max-width: 767px) {
-  .page-content-inner {
-    padding: 1rem;
-  }
-
-  .page-header {
-    flex-direction: column;
-    gap: 1rem;
-    align-items: stretch;
-  }
-  
   .filter-bar {
     flex-direction: column;
     gap: 1rem;

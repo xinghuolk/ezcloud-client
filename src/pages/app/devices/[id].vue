@@ -184,9 +184,9 @@ useHead({
 </script>
 
 <template>
-  <div class="page-content-inner">
+  <div class="common-page-layout">
     <!-- Page Header -->
-    <div class="page-header">
+    <div class="common-page-header">
       <div class="header-content">
         <VButton @click="$router.back()" outlined>
           <iconify-icon icon="lucide:arrow-left" class="mr-2" />
@@ -211,7 +211,7 @@ useHead({
       <!-- Basic Information -->
       <VCard radius="smooth" class="mb-6">
         <template #header>
-          <div class="card-header">
+          <div class="common-card-header">
             <h3 class="title is-5">Basic Information</h3>
             <div class="status-badges">
               <VTag :color="device.is_online ? 'success' : 'danger'" size="tiny">
@@ -224,10 +224,10 @@ useHead({
           </div>
         </template>
 
-        <div class="device-info-grid">
-          <div class="info-item">
+        <div class="common-info-grid">
+          <div class="common-info-item">
             <label>Device Name</label>
-            <div class="editable-field">
+            <div class="common-editable-field">
               <span v-if="!editingName">{{ device.name || 'Unnamed Device' }}</span>
               <VInput 
                 v-else 
@@ -247,57 +247,57 @@ useHead({
             </div>
           </div>
 
-          <div class="info-item">
+          <div class="common-info-item">
             <label>Serial Number</label>
             <span>{{ device.serial }}</span>
           </div>
 
-          <div class="info-item">
+          <div class="common-info-item">
             <label>Primary MAC</label>
             <span>{{ device.primary_mac }}</span>
           </div>
 
-          <div class="info-item">
+          <div class="common-info-item">
             <label>Brand</label>
             <span>{{ device.deviceModel?.oemname || 'Unknown' }}</span>
           </div>
 
-          <div class="info-item">
+          <div class="common-info-item">
             <label>Model</label>
             <span>{{ device.deviceModel?.stdname || 'Unknown' }}</span>
           </div>
 
-          <div class="info-item">
+          <div class="common-info-item">
             <label>Device Type</label>
             <span>{{ device.deviceModel?.devtype || 'Unknown' }}</span>
           </div>
 
-          <div class="info-item">
+          <div class="common-info-item">
             <label>WAN IP</label>
             <span>{{ device.wanip || 'Not Available' }}</span>
           </div>
 
-          <div class="info-item">
+          <div class="common-info-item">
             <label>Public IP</label>
             <span>{{ device.public_ip || 'Not Available' }}</span>
           </div>
 
-          <div class="info-item">
+          <div class="common-info-item">
             <label>Firmware Version</label>
             <span>{{ device.version || 'Unknown' }}</span>
           </div>
 
-          <div class="info-item">
+          <div class="common-info-item">
             <label>First Connection</label>
             <span>{{ formatDateTime(device.firsttime || null) }}</span>
           </div>
 
-          <div class="info-item">
+          <div class="common-info-item">
             <label>Last Seen</label>
             <span>{{ formatDateTime(device.last_seen || null) }}</span>
           </div>
 
-          <div class="info-item">
+          <div class="common-info-item">
             <label>Created At</label>
             <span>{{ formatDateTime(device.created_at) }}</span>
           </div>
@@ -310,20 +310,20 @@ useHead({
           <h3 class="title is-5">MAC Address Range</h3>
         </template>
 
-        <div class="mac-info-grid">
-          <div class="info-item">
+        <div class="common-info-grid">
+          <div class="common-info-item">
             <label>Batch ID</label>
             <span>{{ device.serialNumber.batch_id }}</span>
           </div>
-          <div class="info-item">
+          <div class="common-info-item">
             <label>MAC Start</label>
             <span>{{ device.serialNumber.mac_start }}</span>
           </div>
-          <div class="info-item">
+          <div class="common-info-item">
             <label>MAC Count</label>
             <span>{{ device.serialNumber.mac_count }}</span>
           </div>
-          <div class="info-item">
+          <div class="common-info-item">
             <label>MAC Interval</label>
             <span>{{ device.serialNumber.mac_interval }}</span>
           </div>
@@ -347,7 +347,7 @@ useHead({
       <!-- Status History -->
       <VCard radius="smooth" class="mb-6">
         <template #header>
-          <div class="card-header">
+          <div class="common-card-header">
             <h3 class="title is-5">Status History</h3>
             <VButton @click="loadStatusHistory" outlined>
               <iconify-icon icon="lucide:refresh-cw" class="mr-2" />
@@ -455,34 +455,6 @@ useHead({
 </template>
 
 <style lang="scss" scoped>
-.page-content-inner {
-  padding: 2rem;
-}
-
-.page-header {
-  margin-bottom: 2rem;
-
-  .header-content {
-    display: flex;
-    align-items: center;
-    gap: 1.5rem;
-
-    .header-info {
-      .title {
-        margin: 0 0 0.5rem 0;
-        line-height: 1.2;
-        color: var(--dark-text);
-      }
-
-      .subtitle {
-        color: var(--muted-grey);
-        margin: 0;
-        line-height: 1.4;
-      }
-    }
-  }
-}
-
 .loading-container {
   .v-placeload {
     height: 200px;
@@ -492,58 +464,6 @@ useHead({
 .device-content {
   display: flex;
   flex-direction: column;
-}
-
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-
-  .title {
-    margin: 0;
-    color: var(--dark-text);
-  }
-
-  .status-badges {
-    display: flex;
-    gap: 0.75rem;
-  }
-}
-
-.device-info-grid,
-.mac-info-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 1.5rem;
-
-  .info-item {
-    padding: 1.25rem;
-    background: var(--fade-grey-light-6);
-    border-radius: var(--radius);
-    border: 1px solid var(--fade-grey-light-3);
-
-    label {
-      display: block;
-      font-weight: 600;
-      color: var(--muted-grey);
-      font-size: 0.85rem;
-      margin-bottom: 0.5rem;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-    }
-
-    span {
-      color: var(--dark-text);
-      font-weight: 500;
-      word-break: break-all;
-    }
-  }
-}
-
-.editable-field {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
 }
 
 .mac-range {
@@ -584,40 +504,7 @@ useHead({
   min-height: 400px;
 }
 
-.is-dark {
-  .info-item {
-    background: var(--dark-sidebar-light-6);
-    border-color: var(--dark-sidebar-light-12);
-  }
-}
-
 @media only screen and (max-width: 767px) {
-  .page-content-inner {
-    padding: 1rem;
-  }
-
-  .page-header .header-content {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 1rem;
-  }
-  
-  .card-header {
-    flex-direction: column;
-    gap: 1rem;
-    align-items: flex-start;
-  }
-  
-  .status-badges {
-    align-self: stretch;
-    justify-content: space-between;
-  }
-
-  .device-info-grid,
-  .mac-info-grid {
-    grid-template-columns: 1fr;
-  }
-  
   .action-buttons {
     flex-direction: column;
 

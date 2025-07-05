@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed } from 'vue'
+import { ref, reactive, onMounted, computed, watch } from 'vue'
 import { useDeviceStore } from '/@src/stores/devices'
 import { useUserSession } from '/@src/stores/user-session'
 import type { Device, DeviceQuery } from '/@src/api/types'
@@ -24,6 +24,9 @@ const batchDialogOpen = ref(false)
 const selectedDevices = ref<Device[]>([])
 const selectedDevice = ref<Device | null>(null)
 const activeTab = ref('basic')
+
+// Search debounce
+let searchTimeout: NodeJS.Timeout | null = null
 
 // Form data
 const filterForm = reactive<DeviceQuery>({
@@ -68,6 +71,23 @@ const handleRefresh = () => {
 }
 
 const handleSearch = () => {
+  filterForm.page = 1
+  fetchDevices()
+}
+
+// Debounced search for text inputs
+const handleDebouncedSearch = () => {
+  if (searchTimeout) {
+    clearTimeout(searchTimeout)
+  }
+  searchTimeout = setTimeout(() => {
+    filterForm.page = 1
+    fetchDevices()
+  }, 500)
+}
+
+// Immediate search for dropdowns
+const handleImmediateSearch = () => {
   filterForm.page = 1
   fetchDevices()
 }
@@ -178,6 +198,27 @@ const getStatusText = (isOnline: boolean, isActivated: boolean) => {
   return 'Offline'
 }
 
+// Watch for filter changes
+watch(() => filterForm.is_online, () => {
+  handleImmediateSearch()
+})
+
+watch(() => filterForm.is_activate, () => {
+  handleImmediateSearch()
+})
+
+watch(() => filterForm.search, () => {
+  handleDebouncedSearch()
+})
+
+watch(() => filterForm.oemname, () => {
+  handleDebouncedSearch()
+})
+
+watch(() => filterForm.stdname, () => {
+  handleDebouncedSearch()
+})
+
 // Lifecycle
 onMounted(() => {
   fetchDevices()
@@ -189,11 +230,11 @@ useHead({
 </script>
 
 <template>
-  <div class="page-content-inner">
+  <div class="common-page-layout">
     <!-- Page Header -->
-    <div class="dashboard-header">
+    <div class="common-page-header">
       <div class="header-content">
-        <div>
+        <div class="header-info">
           <h1 class="title is-3">Device Management</h1>
           <p class="subtitle is-6">Manage your 5G gateway devices</p>
         </div>
@@ -204,19 +245,19 @@ useHead({
     <div class="columns is-multiline mb-6">
       <div class="column is-4">
         <VCard class="has-text-centered">
-          <h3 class="title is-4 text-primary">{{ deviceCount }}</h3>
+          <h3 class="title is-4 common-text-primary">{{ deviceCount }}</h3>
           <p class="subtitle is-6">Total Devices</p>
         </VCard>
       </div>
       <div class="column is-4">
         <VCard class="has-text-centered">
-          <h3 class="title is-4 text-success">{{ onlineCount }}</h3>
+          <h3 class="title is-4 common-text-success">{{ onlineCount }}</h3>
           <p class="subtitle is-6">Online Devices</p>
         </VCard>
       </div>
       <div class="column is-4">
         <VCard class="has-text-centered">
-          <h3 class="title is-4 text-danger">{{ offlineCount }}</h3>
+          <h3 class="title is-4 common-text-danger">{{ offlineCount }}</h3>
           <p class="subtitle is-6">Offline Devices</p>
         </VCard>
       </div>
@@ -289,13 +330,8 @@ useHead({
         
         <div class="field is-grouped">
           <div class="control">
-            <VButton color="primary" @click="handleSearch">
-              Search
-            </VButton>
-          </div>
-          <div class="control">
             <VButton @click="handleReset">
-              Reset
+              Reset Filters
             </VButton>
           </div>
           <div class="control">
@@ -319,54 +355,158 @@ useHead({
       <!-- Device Table -->
       <VFlexTableWrapper
         :columns="{
-          serial: { label: 'Serial Number', searchable: true, sortable: true },
-          name: { label: 'Device Name', searchable: true },
-          model: { label: 'Model', searchable: true },
-          status: { label: 'Status', searchable: true },
-          network: { label: 'Network' },
-          remoteAccess: { label: 'Remote Access' },
-          lastSeen: { label: 'Last Seen', sortable: true },
-          actions: { label: 'Actions', align: 'end' }
+          serial: { 
+            label: 'Serial Number', 
+            sortable: true,
+            searchable: true,
+            bold: true,
+            grow: true
+          },
+          name: { 
+            label: 'Device Name',
+            searchable: true,
+            grow: true
+          },
+          model: { 
+            label: 'Model',
+            searchable: true,
+            grow: true
+          },
+          status: { 
+            label: 'Status',
+            searchable: true,
+            align: 'center'
+          },
+          network: { 
+            label: 'Network Info',
+            grow: 'lg'
+          },
+          remoteAccess: { 
+            label: 'Remote Access',
+            align: 'center'
+          },
+          lastSeen: { 
+            label: 'Last Seen',
+            sortable: true
+          },
+          actions: { 
+            label: 'Actions', 
+            align: 'end'
+          }
         }"
         :data="devices"
         @selection-change="handleSelectionChange"
       >
         <template #default="wrapperState">
+          <VFlexTableToolbar>
+            <template #right>
+              <VField>
+                <VControl>
+                  <VSelect v-model="wrapperState.limit" class="is-rounded">
+                    <VOption :value="10">10 条/页</VOption>
+                    <VOption :value="20">20 条/页</VOption>
+                    <VOption :value="50">50 条/页</VOption>
+                    <VOption :value="100">100 条/页</VOption>
+                  </VSelect>
+                </VControl>
+              </VField>
+            </template>
+          </VFlexTableToolbar>
+
           <VFlexTable rounded selectable>
+            <!-- 加载状态 -->
+            <template #body>
+              <div v-if="loading" class="flex-list-inner">
+                <div v-for="key in 5" :key="key" class="flex-table-item">
+                  <VFlexTableCell :column="{ grow: true }">
+                    <VPlaceload />
+                  </VFlexTableCell>
+                  <VFlexTableCell :column="{ grow: true }">
+                    <VPlaceload />
+                  </VFlexTableCell>
+                  <VFlexTableCell :column="{ grow: true }">
+                    <VPlaceload />
+                  </VFlexTableCell>
+                  <VFlexTableCell>
+                    <VPlaceload width="60px" />
+                  </VFlexTableCell>
+                  <VFlexTableCell :column="{ grow: 'lg' }">
+                    <VPlaceload />
+                  </VFlexTableCell>
+                  <VFlexTableCell>
+                    <VPlaceload width="80px" />
+                  </VFlexTableCell>
+                  <VFlexTableCell>
+                    <VPlaceload width="100px" />
+                  </VFlexTableCell>
+                  <VFlexTableCell :column="{ align: 'end' }">
+                    <VPlaceload width="40px" />
+                  </VFlexTableCell>
+                </div>
+              </div>
+              
+              <!-- 空状态 -->
+              <div v-else-if="wrapperState.data?.length === 0" class="flex-list-inner">
+                <VPlaceholderSection
+                  title="暂无设备"
+                  subtitle="请先绑定设备或检查搜索条件"
+                  class="my-6"
+                />
+              </div>
+            </template>
+
             <template #body-cell="{ row: device, column }">
               <template v-if="column.key === 'serial'">
-                <span class="item-name dark-inverted">
+                <VTextEllipsis width="180px" class="common-item-name dark-inverted">
                   {{ device.serial }}
-                </span>
+                </VTextEllipsis>
               </template>
 
               <template v-if="column.key === 'name'">
-                <span>{{ device.name || 'Unnamed Device' }}</span>
+                <VTextEllipsis width="150px">
+                  {{ device.name || 'Unnamed Device' }}
+                </VTextEllipsis>
               </template>
 
               <template v-if="column.key === 'model'">
-                <div v-if="device.deviceModel">
-                  <strong>{{ device.deviceModel.oemname }}</strong><br>
-                  <small class="text-light">{{ device.deviceModel.stdname }}</small>
+                <div v-if="device.deviceModel" class="model-info">
+                  <VTextEllipsis width="120px" class="has-text-weight-semibold model-brand">
+                    {{ device.deviceModel.oemname }}
+                  </VTextEllipsis>
+                  <VTextEllipsis width="120px" class="common-text-light model-name">
+                    <small>{{ device.deviceModel.stdname }}</small>
+                  </VTextEllipsis>
                 </div>
-                <span v-else>-</span>
+                <span v-else class="common-text-light">-</span>
               </template>
 
               <template v-if="column.key === 'status'">
                 <VTag 
                   :color="getStatusColor(device.is_online, device.is_activate)"
-                  size="tiny"
                   outlined
+                  rounded
                 >
                   {{ getStatusText(device.is_online, device.is_activate) }}
                 </VTag>
               </template>
 
               <template v-if="column.key === 'network'">
-                <div class="network-info">
-                  <div v-if="device.wanip">WAN: {{ device.wanip }}</div>
-                  <div v-if="device.public_ip">Public: {{ device.public_ip }}</div>
-                  <small v-if="device.primary_mac">{{ device.primary_mac }}</small>
+                <div class="common-network-info">
+                  <div v-if="device.wanip" class="mb-1">
+                    <VTextEllipsis width="140px">
+                      <small class="has-text-weight-semibold">WAN:</small> {{ device.wanip }}
+                    </VTextEllipsis>
+                  </div>
+                  <div v-if="device.public_ip" class="mb-1">
+                    <VTextEllipsis width="140px">
+                      <small class="has-text-weight-semibold">Public:</small> {{ device.public_ip }}
+                    </VTextEllipsis>
+                  </div>
+                  <div v-if="device.primary_mac">
+                    <VTextEllipsis width="140px" class="common-text-light">
+                      <small>{{ device.primary_mac }}</small>
+                    </VTextEllipsis>
+                  </div>
                 </div>
               </template>
 
@@ -379,8 +519,10 @@ useHead({
               </template>
 
               <template v-if="column.key === 'lastSeen'">
-                <span v-if="device.last_seen">{{ formatDate(device.last_seen) }}</span>
-                <span v-else>Never</span>
+                <VTextEllipsis width="120px">
+                  <span v-if="device.last_seen">{{ formatDate(device.last_seen) }}</span>
+                  <span v-else class="common-text-light">Never</span>
+                </VTextEllipsis>
               </template>
 
               <template v-if="column.key === 'actions'">
@@ -614,79 +756,31 @@ useHead({
 </template>
 
 <style lang="scss" scoped>
-.page-content-inner {
-  padding: 2rem;
-}
-
-.dashboard-header {
-  margin-bottom: 2rem;
-
-  .header-content {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    
-    > div:first-child {
-      .title {
-        color: var(--dark-text);
-        margin-bottom: 0.5rem;
-        line-height: 1.2;
-      }
-
-      .subtitle {
-        color: var(--muted-grey);
-        margin-top: 0;
-        line-height: 1.4;
-      }
-    }
-  }
-
-  @media (max-width: 768px) {
-    .header-content {
-      flex-direction: column;
-      gap: 1rem;
-      text-align: center;
-    }
-  }
-}
-
-.network-info {
-  font-size: 0.8rem;
-  line-height: 1.3;
-  
-  div {
-    margin-bottom: 0.2rem;
-  }
-  
-  small {
-    color: var(--muted-grey);
-  }
-}
-
-.text-primary {
-  color: var(--primary) !important;
-}
-
-.text-success {
-  color: var(--success) !important;
-}
-
-.text-danger {
-  color: var(--danger) !important;
-}
-
-.text-light {
-  color: var(--muted-grey);
-}
-
-:deep(.flex-table-item) {
-  padding: 1rem 0.75rem;
-}
-
-:deep(.dropdown-item) {
-  padding: 0.5rem 1rem;
+.model-info {
   display: flex;
-  align-items: center;
-  gap: 0.5rem;
+  flex-direction: column;
+  gap: 0.25rem;
+
+  .model-brand {
+    color: var(--dark-text);
+    font-weight: 600;
+  }
+
+  .model-name {
+    color: var(--muted-grey);
+    font-size: 0.85rem;
+  }
+}
+
+:deep(.dark) {
+  .model-info {
+    .model-brand {
+      color: var(--dark-dark-text);
+    }
+    
+    .model-name {
+      color: var(--dark-light-text);
+    }
+  }
 }
 </style>
