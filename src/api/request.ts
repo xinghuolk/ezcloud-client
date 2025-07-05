@@ -1,6 +1,32 @@
 import axios, { type AxiosResponse, type AxiosError, type InternalAxiosRequestConfig } from 'axios'
-import { ElMessage } from 'element-plus'
-import router from '@/router'
+import { Notyf } from 'notyf'
+import { useRouter } from 'vue-router'
+
+// 创建通知实例
+const notyf = new Notyf({
+  duration: 4000,
+  position: { x: 'right', y: 'top' },
+  types: [
+    {
+      type: 'warning',
+      background: 'orange',
+      icon: {
+        className: 'fas fa-exclamation-triangle',
+        tagName: 'i',
+        color: 'white'
+      }
+    },
+    {
+      type: 'info',
+      background: 'blue',
+      icon: {
+        className: 'fas fa-info-circle',
+        tagName: 'i',
+        color: 'white'
+      }
+    }
+  ]
+})
 
 // 创建axios实例
 const request = axios.create({
@@ -14,8 +40,8 @@ const request = axios.create({
 // 请求拦截器
 request.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
-    // 从localStorage获取token
-    const token = localStorage.getItem('auth_token')
+    // 从localStorage获取token (保持与user-token composable一致)
+    const token = localStorage.getItem('token')
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`
     }
@@ -41,7 +67,7 @@ request.interceptors.response.use(
     if (typeof data === 'object' && data !== null) {
       // 如果响应不成功，显示错误消息
       if (data.success === false) {
-        ElMessage.error(data.message || 'Request failed')
+        notyf.error(data.message || 'Request failed')
         return Promise.reject(new Error(data.message || 'Request failed'))
       }
       
@@ -67,45 +93,48 @@ request.interceptors.response.use(
         case 400:
           // 使用后端返回的具体错误信息
           errorMessage = errorMessage || 'Bad request'
-          ElMessage.error(errorMessage)
+          notyf.error(errorMessage)
           break
         case 401:
           errorMessage = 'Unauthorized, please login again'
-          ElMessage.error(errorMessage)
+          notyf.error(errorMessage)
           // 清除本地存储的认证信息
-          localStorage.removeItem('auth_token')
+          localStorage.removeItem('token')
           localStorage.removeItem('user_info')
           // 跳转到登录页面
-          router.push('/login')
+          const router = useRouter()
+          router.push('/auth')
           break
         case 403:
           errorMessage = 'Access denied'
-          ElMessage.error(errorMessage)
+          notyf.error(errorMessage)
           break
         case 404:
+          // 对于某些预期的404（如开发中的API），不显示通知
           errorMessage = 'Resource not found'
-          ElMessage.error(errorMessage)
+          // 只在控制台记录，不显示用户通知（允许应用优雅降级）
+          console.warn(`API endpoint not found: ${error.config?.url}`)
           break
         case 429:
           errorMessage = 'Too many requests, please try again later'
-          ElMessage.error(errorMessage)
+          notyf.error(errorMessage)
           break
         case 500:
           // 使用后端返回的具体错误信息
           errorMessage = errorMessage || 'Internal server error'
-          ElMessage.error(errorMessage)
+          notyf.error(errorMessage)
           break
         default:
-          ElMessage.error(errorMessage)
+          notyf.error(errorMessage)
       }
     } else if (error.request) {
-      ElMessage.error('Network error, please check your connection')
+      notyf.error('Network error, please check your connection')
     } else {
-      ElMessage.error('Request configuration error')
+      notyf.error('Request configuration error')
     }
     
     return Promise.reject(error)
   }
 )
 
-export default request 
+export default request

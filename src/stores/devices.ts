@@ -1,8 +1,10 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import type { Device, DeviceQuery, PaginationResponse } from '@/api/types'
-import { ElMessage } from 'element-plus'
-import { deviceApi } from '@/api'
+import type { Device, DeviceQuery } from '/@src/api/types'
+import { Notyf } from 'notyf'
+import { deviceApi } from '/@src/api'
+
+const notyf = new Notyf()
 
 export const useDeviceStore = defineStore('devices', () => {
   // State
@@ -21,6 +23,9 @@ export const useDeviceStore = defineStore('devices', () => {
   const onlineDevices = computed(() => devices.value.filter(device => device.is_online))
   const offlineDevices = computed(() => devices.value.filter(device => !device.is_online))
   const activatedDevices = computed(() => devices.value.filter(device => device.is_activate))
+  const onlineCount = computed(() => onlineDevices.value.length)
+  const offlineCount = computed(() => offlineDevices.value.length)
+  const activatedCount = computed(() => activatedDevices.value.length)
 
   // Actions
   const fetchDevices = async (query: DeviceQuery = {}) => {
@@ -31,11 +36,11 @@ export const useDeviceStore = defineStore('devices', () => {
         devices.value = response.data.devices
         pagination.value = response.data.pagination
       } else {
-        ElMessage.error(response.message || 'Failed to fetch devices')
+        notyf.error(response.message || 'Failed to fetch devices')
       }
     } catch (error) {
       console.error('Failed to fetch devices:', error)
-      ElMessage.error('Failed to fetch devices')
+      notyf.error('Failed to fetch devices')
     } finally {
       loading.value = false
     }
@@ -48,12 +53,12 @@ export const useDeviceStore = defineStore('devices', () => {
         currentDevice.value = response.data
         return response.data
       } else {
-        ElMessage.error(response.message || 'Failed to fetch device details')
+        notyf.error(response.message || 'Failed to fetch device details')
         return null
       }
     } catch (error) {
       console.error('Failed to fetch device details:', error)
-      ElMessage.error('Failed to fetch device details')
+      notyf.error('Failed to fetch device details')
       return null
     }
   }
@@ -62,17 +67,17 @@ export const useDeviceStore = defineStore('devices', () => {
     try {
       const response = await deviceApi.bindDevice({ serial })
       if (response.success) {
-        ElMessage.success('Device bound successfully')
-        // 刷新设备列表
+        notyf.success('Device bound successfully')
+        // Refresh device list
         await fetchDevices()
         return true
       } else {
-        ElMessage.error(response.message || 'Failed to bind device')
+        notyf.error(response.message || 'Failed to bind device')
         return false
       }
     } catch (error) {
       console.error('Failed to bind device:', error)
-      ElMessage.error('Failed to bind device')
+      notyf.error('Failed to bind device')
       return false
     }
   }
@@ -81,17 +86,17 @@ export const useDeviceStore = defineStore('devices', () => {
     try {
       const response = await deviceApi.unbindDevice(deviceId)
       if (response.success) {
-        ElMessage.success('Device unbound successfully')
-        // 从列表中移除设备或刷新列表
+        notyf.success('Device unbound successfully')
+        // Remove device from list or refresh list
         await fetchDevices()
         return true
       } else {
-        ElMessage.error(response.message || 'Failed to unbind device')
+        notyf.error(response.message || 'Failed to unbind device')
         return false
       }
     } catch (error) {
       console.error('Failed to unbind device:', error)
-      ElMessage.error('Failed to unbind device')
+      notyf.error('Failed to unbind device')
       return false
     }
   }
@@ -100,8 +105,8 @@ export const useDeviceStore = defineStore('devices', () => {
     try {
       const response = await deviceApi.updateDevice(deviceId, { name })
       if (response.success) {
-        ElMessage.success('Device name updated successfully')
-        // 更新本地数据
+        notyf.success('Device name updated successfully')
+        // Update local data
         const device = devices.value.find(d => d.id === deviceId)
         if (device) {
           device.name = name
@@ -111,12 +116,83 @@ export const useDeviceStore = defineStore('devices', () => {
         }
         return true
       } else {
-        ElMessage.error(response.message || 'Failed to update device name')
+        notyf.error(response.message || 'Failed to update device name')
         return false
       }
     } catch (error) {
       console.error('Failed to update device name:', error)
-      ElMessage.error('Failed to update device name')
+      notyf.error('Failed to update device name')
+      return false
+    }
+  }
+
+  const rebootDevice = async (deviceId: number) => {
+    try {
+      const response = await deviceApi.rebootDevice(deviceId)
+      if (response.success) {
+        notyf.success('Device reboot command sent successfully')
+        return true
+      } else {
+        notyf.error(response.message || 'Failed to send reboot command')
+        return false
+      }
+    } catch (error) {
+      console.error('Failed to reboot device:', error)
+      notyf.error('Failed to reboot device')
+      return false
+    }
+  }
+
+  const switchSIM = async (deviceId: number, slot: number) => {
+    try {
+      const response = await deviceApi.switchSIM(deviceId, slot)
+      if (response.success) {
+        notyf.success(`SIM switch to slot ${slot} command sent successfully`)
+        return true
+      } else {
+        notyf.error(response.message || 'Failed to send SIM switch command')
+        return false
+      }
+    } catch (error) {
+      console.error('Failed to switch SIM:', error)
+      notyf.error('Failed to switch SIM')
+      return false
+    }
+  }
+
+  const collectLogs = async (deviceId: number, params?: { types?: string[]; duration?: number }) => {
+    try {
+      const response = await deviceApi.collectLogs(deviceId, params)
+      if (response.success) {
+        notyf.success('Log collection command sent successfully')
+        return true
+      } else {
+        notyf.error(response.message || 'Failed to send log collection command')
+        return false
+      }
+    } catch (error) {
+      console.error('Failed to collect logs:', error)
+      notyf.error('Failed to collect logs')
+      return false
+    }
+  }
+
+  const batchOperation = async (deviceIds: number[], operation: string, parameters?: Record<string, any>) => {
+    try {
+      const response = await deviceApi.batchOperation({
+        device_ids: deviceIds,
+        operation: { type: operation as any, params: parameters }
+      })
+      if (response.success) {
+        notyf.success(`Batch ${operation} command sent successfully to ${deviceIds.length} devices`)
+        return true
+      } else {
+        notyf.error(response.message || `Failed to send batch ${operation} command`)
+        return false
+      }
+    } catch (error) {
+      console.error(`Failed to perform batch ${operation}:`, error)
+      notyf.error(`Failed to perform batch ${operation}`)
       return false
     }
   }
@@ -132,6 +208,20 @@ export const useDeviceStore = defineStore('devices', () => {
     }
   }
 
+  const setCurrentDevice = (device: Device | null) => {
+    currentDevice.value = device
+  }
+
+  const updateDeviceInList = (deviceId: number, updates: Partial<Device>) => {
+    const device = devices.value.find(d => d.id === deviceId)
+    if (device) {
+      Object.assign(device, updates)
+    }
+    if (currentDevice.value && currentDevice.value.id === deviceId) {
+      Object.assign(currentDevice.value, updates)
+    }
+  }
+
   return {
     // State
     devices,
@@ -144,6 +234,9 @@ export const useDeviceStore = defineStore('devices', () => {
     onlineDevices,
     offlineDevices,
     activatedDevices,
+    onlineCount,
+    offlineCount,
+    activatedCount,
     
     // Actions
     fetchDevices,
@@ -151,6 +244,12 @@ export const useDeviceStore = defineStore('devices', () => {
     bindDevice,
     unbindDevice,
     updateDeviceName,
-    clearDevices
+    rebootDevice,
+    switchSIM,
+    collectLogs,
+    batchOperation,
+    clearDevices,
+    setCurrentDevice,
+    updateDeviceInList
   }
-}) 
+})

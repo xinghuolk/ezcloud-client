@@ -1,278 +1,366 @@
-<template>
-  <div class="wifi-status">
-    <div v-if="!wifiStatus || wifiStatus.length === 0" class="status-offline">
-      <el-icon class="status-icon offline"><Close /></el-icon>
-      <span class="status-text">WiFi Offline</span>
-    </div>
-    
-    <div v-else class="status-online">
-      <div class="wifi-summary">
-        <el-icon class="status-icon online"><Connection /></el-icon>
-        <div class="status-details">
-          <div class="frequency-status">
-            <span 
-              v-for="status in frequencyStatus" 
-              :key="status.frequency"
-              :class="['frequency-badge', status.status]"
-            >
-              {{ status.frequency }}
-            </span>
-          </div>
-          <div class="client-count">
-            {{ totalClients }} clients
-          </div>
-        </div>
-      </div>
-      
-      <!-- 详细信息弹窗触发 -->
-      <el-button 
-        v-if="showDetails"
-        link 
-        size="small" 
-        @click="showDetailDialog = true"
-        class="details-btn"
-      >
-        Details
-      </el-button>
-    </div>
-
-    <!-- WiFi详情对话框 -->
-    <el-dialog 
-      v-model="showDetailDialog" 
-      title="WiFi Status Details" 
-      width="600px"
-    >
-      <div class="wifi-details">
-        <el-table :data="wifiStatus" stripe>
-          <el-table-column prop="interface" label="Interface" width="100" />
-          <el-table-column prop="ssid" label="SSID" width="150" show-overflow-tooltip />
-          <el-table-column label="Status" width="80">
-            <template #default="{ row }">
-              <el-tag 
-                :type="getStatusType(row.status)" 
-                size="small"
-              >
-                {{ row.status.toUpperCase() }}
-              </el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column prop="frequency" label="Band" width="80" />
-          <el-table-column prop="channel" label="Channel" width="80" />
-          <el-table-column prop="connected_clients" label="Clients" width="80" />
-          <el-table-column prop="tx_power" label="Power" width="80">
-            <template #default="{ row }">
-              {{ row.tx_power }}dBm
-            </template>
-          </el-table-column>
-          <el-table-column label="Traffic" width="120">
-            <template #default="{ row }">
-              <div class="traffic-info">
-                <div>↓ {{ formatBytes(row.rx_bytes) }}</div>
-                <div>↑ {{ formatBytes(row.tx_bytes) }}</div>
-              </div>
-            </template>
-          </el-table-column>
-        </el-table>
-        
-        <div v-if="lastUpdate" class="last-update">
-          Last updated: {{ formatDate(lastUpdate) }}
-        </div>
-      </div>
-      
-      <template #footer>
-        <el-button @click="showDetailDialog = false">Close</el-button>
-      </template>
-    </el-dialog>
-  </div>
-</template>
-
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import { ElIcon, ElButton, ElDialog, ElTable, ElTableColumn, ElTag } from 'element-plus'
-import { Connection, Close } from '@element-plus/icons-vue'
-import type { WiFiStatus } from '@/api/types'
+import type { WiFiStatus as WiFiStatusType } from '/@src/api/types'
 
 interface Props {
-  wifiStatus?: WiFiStatus[]
+  wifiStatus?: WiFiStatusType[]
   showDetails?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  showDetails: true
+  wifiStatus: () => [],
+  showDetails: false
 })
 
-const showDetailDialog = ref(false)
-
-// 计算频段状态
-const frequencyStatus = computed(() => {
-  if (!props.wifiStatus || props.wifiStatus.length === 0) return []
-  
-  const frequencies = new Map<string, { status: string, clients: number }>()
-  
-  props.wifiStatus.forEach(status => {
-    const freq = status.frequency || 'Unknown'
-    const existing = frequencies.get(freq) || { status: 'down', clients: 0 }
-    
-    if (status.status === 'up') {
-      existing.status = 'up'
-    }
-    existing.clients += status.connected_clients || 0
-    
-    frequencies.set(freq, existing)
-  })
-  
-  return Array.from(frequencies.entries()).map(([frequency, data]) => ({
-    frequency,
-    status: data.status,
-    clients: data.clients
-  }))
-})
-
-// 计算总客户端数
-const totalClients = computed(() => {
-  if (!props.wifiStatus) return 0
-  return props.wifiStatus.reduce((total, status) => total + (status.connected_clients || 0), 0)
-})
-
-// 最后更新时间
-const lastUpdate = computed(() => {
-  if (!props.wifiStatus || props.wifiStatus.length === 0) return null
-  
-  const dates = props.wifiStatus
-    .map(status => new Date(status.reported_at))
-    .sort((a, b) => b.getTime() - a.getTime())
-  
-  return dates[0]
-})
-
-// 获取状态类型
-const getStatusType = (status: string) => {
+// Methods
+const getStatusColor = (status: string) => {
   switch (status) {
-    case 'up': return 'success'
-    case 'down': return 'info'
-    case 'error': return 'danger'
-    default: return 'info'
+    case 'up':
+      return 'success'
+    case 'down':
+      return 'danger'
+    case 'error':
+      return 'warning'
+    default:
+      return 'light'
   }
 }
 
-// 格式化字节数
 const formatBytes = (bytes: number) => {
   if (bytes === 0) return '0 B'
-  
   const k = 1024
   const sizes = ['B', 'KB', 'MB', 'GB']
   const i = Math.floor(Math.log(bytes) / Math.log(k))
-  
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i]
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
 }
 
-// 格式化日期
-const formatDate = (date: Date) => {
-  return date.toLocaleString('en-US', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
+const getFrequencyBand = (frequency: string | undefined) => {
+  if (!frequency) return 'Unknown'
+  if (frequency.includes('2.4')) return '2.4GHz'
+  if (frequency.includes('5')) return '5GHz'
+  if (frequency.includes('6')) return '6GHz'
+  return frequency
 }
 </script>
 
-<style scoped>
+<template>
+  <div class="wifi-status">
+    <div v-if="!wifiStatus || wifiStatus.length === 0" class="no-data">
+      <iconify-icon icon="lucide:wifi-off" />
+      <span>No WiFi data</span>
+    </div>
+
+    <div v-else-if="!showDetails" class="wifi-summary">
+      <div 
+        v-for="wifi in wifiStatus.slice(0, 2)" 
+        :key="wifi.interface"
+        class="wifi-item-summary"
+      >
+        <div class="wifi-interface">
+          <iconify-icon icon="lucide:wifi" />
+          <span>{{ getFrequencyBand(wifi.frequency) }}</span>
+        </div>
+        <VTag :color="getStatusColor(wifi.status)" size="tiny">
+          {{ wifi.status }}
+        </VTag>
+        <span class="client-count">{{ wifi.connected_clients }} clients</span>
+      </div>
+      <div v-if="wifiStatus.length > 2" class="more-indicator">
+        +{{ wifiStatus.length - 2 }} more
+      </div>
+    </div>
+
+    <div v-else class="wifi-details">
+      <div 
+        v-for="wifi in wifiStatus" 
+        :key="wifi.interface"
+        class="wifi-item-detail"
+      >
+        <VCard radius="smooth" class="wifi-card">
+          <div class="wifi-header">
+            <div class="wifi-title">
+              <iconify-icon icon="lucide:wifi" />
+              <span class="interface-name">{{ wifi.interface }}</span>
+              <VTag :color="getStatusColor(wifi.status)" size="tiny">
+                {{ wifi.status }}
+              </VTag>
+            </div>
+            <div class="wifi-frequency">
+              {{ getFrequencyBand(wifi.frequency) }}
+            </div>
+          </div>
+
+          <div class="wifi-info">
+            <div v-if="wifi.ssid" class="info-row">
+              <label>SSID:</label>
+              <span>{{ wifi.ssid }}</span>
+            </div>
+            <div v-if="wifi.channel" class="info-row">
+              <label>Channel:</label>
+              <span>{{ wifi.channel }}</span>
+            </div>
+            <div v-if="wifi.tx_power" class="info-row">
+              <label>TX Power:</label>
+              <span>{{ wifi.tx_power }} dBm</span>
+            </div>
+            <div class="info-row">
+              <label>Connected Clients:</label>
+              <span>{{ wifi.connected_clients }}</span>
+            </div>
+            <div v-if="wifi.noise_level" class="info-row">
+              <label>Noise Level:</label>
+              <span>{{ wifi.noise_level }} dBm</span>
+            </div>
+          </div>
+
+          <div class="wifi-traffic">
+            <h4>Traffic Statistics</h4>
+            <div class="traffic-grid">
+              <div class="traffic-item">
+                <label>RX Bytes:</label>
+                <span>{{ formatBytes(wifi.rx_bytes) }}</span>
+              </div>
+              <div class="traffic-item">
+                <label>TX Bytes:</label>
+                <span>{{ formatBytes(wifi.tx_bytes) }}</span>
+              </div>
+              <div class="traffic-item">
+                <label>RX Packets:</label>
+                <span>{{ wifi.rx_packets.toLocaleString() }}</span>
+              </div>
+              <div class="traffic-item">
+                <label>TX Packets:</label>
+                <span>{{ wifi.tx_packets.toLocaleString() }}</span>
+              </div>
+              <div v-if="wifi.error_count > 0" class="traffic-item error">
+                <label>Errors:</label>
+                <span>{{ wifi.error_count }}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="wifi-timestamp">
+            <iconify-icon icon="lucide:clock" />
+            <span>Last updated: {{ new Date(wifi.reported_at).toLocaleString() }}</span>
+          </div>
+        </VCard>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style lang="scss" scoped>
 .wifi-status {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  .no-data {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--muted-grey);
+    font-size: 0.9rem;
+
+    iconify-icon {
+      font-size: 1.1rem;
+    }
+  }
+
+  .wifi-summary {
+    .wifi-item-summary {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.5rem;
+      font-size: 0.85rem;
+
+      &:last-child {
+        margin-bottom: 0;
+      }
+
+      .wifi-interface {
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+        font-weight: 500;
+
+        iconify-icon {
+          font-size: 1rem;
+          color: var(--primary);
+        }
+      }
+
+      .client-count {
+        color: var(--muted-grey);
+        font-size: 0.8rem;
+      }
+    }
+
+    .more-indicator {
+      font-size: 0.8rem;
+      color: var(--muted-grey);
+      margin-top: 0.5rem;
+    }
+  }
+
+  .wifi-details {
+    .wifi-item-detail {
+      margin-bottom: 1.5rem;
+
+      &:last-child {
+        margin-bottom: 0;
+      }
+    }
+
+    .wifi-card {
+      padding: 1.5rem;
+    }
+
+    .wifi-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+
+      .wifi-title {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+
+        iconify-icon {
+          font-size: 1.2rem;
+          color: var(--primary);
+        }
+
+        .interface-name {
+          font-weight: 600;
+          color: var(--dark-text);
+          font-family: var(--font-family-monospace);
+        }
+      }
+
+      .wifi-frequency {
+        font-weight: 500;
+        color: var(--muted-grey);
+        background: var(--fade-grey-light-6);
+        padding: 0.25rem 0.5rem;
+        border-radius: var(--radius-small);
+      }
+    }
+
+    .wifi-info {
+      margin-bottom: 1.5rem;
+
+      .info-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.5rem 0;
+        border-bottom: 1px solid var(--fade-grey-light-3);
+
+        &:last-child {
+          border-bottom: none;
+        }
+
+        label {
+          font-weight: 500;
+          color: var(--muted-grey);
+        }
+
+        span {
+          color: var(--dark-text);
+          font-weight: 500;
+        }
+      }
+    }
+
+    .wifi-traffic {
+      margin-bottom: 1rem;
+
+      h4 {
+        margin: 0 0 1rem 0;
+        color: var(--dark-text);
+        font-size: 1rem;
+        font-weight: 600;
+      }
+
+      .traffic-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 0.75rem;
+
+        .traffic-item {
+          padding: 0.75rem;
+          background: var(--fade-grey-light-6);
+          border-radius: var(--radius);
+          border: 1px solid var(--fade-grey-light-3);
+
+          &.error {
+            border-color: var(--danger);
+            background: var(--danger-light);
+          }
+
+          label {
+            display: block;
+            font-size: 0.8rem;
+            color: var(--muted-grey);
+            margin-bottom: 0.25rem;
+          }
+
+          span {
+            display: block;
+            font-weight: 600;
+            color: var(--dark-text);
+          }
+        }
+      }
+    }
+
+    .wifi-timestamp {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.85rem;
+      color: var(--muted-grey);
+      margin-top: 1rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--fade-grey-light-3);
+
+      iconify-icon {
+        font-size: 1rem;
+      }
+    }
+  }
 }
 
-.status-offline {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  color: #909399;
+.is-dark {
+  .wifi-frequency {
+    background: var(--dark-sidebar-light-6) !important;
+  }
+
+  .traffic-item {
+    background: var(--dark-sidebar-light-6) !important;
+    border-color: var(--dark-sidebar-light-12) !important;
+
+    &.error {
+      background: var(--danger-dark) !important;
+    }
+  }
+
+  .info-row {
+    border-color: var(--dark-sidebar-light-12) !important;
+  }
+
+  .wifi-timestamp {
+    border-color: var(--dark-sidebar-light-12) !important;
+  }
 }
 
-.status-online {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
+@media only screen and (max-width: 767px) {
+  .traffic-grid {
+    grid-template-columns: 1fr;
+  }
 
-.wifi-summary {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+  .wifi-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
 }
-
-.status-icon {
-  font-size: 16px;
-}
-
-.status-icon.online {
-  color: #67c23a;
-}
-
-.status-icon.offline {
-  color: #f56c6c;
-}
-
-.status-details {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  font-size: 12px;
-}
-
-.frequency-status {
-  display: flex;
-  gap: 4px;
-}
-
-.frequency-badge {
-  padding: 1px 4px;
-  border-radius: 2px;
-  font-size: 10px;
-  font-weight: 500;
-}
-
-.frequency-badge.up {
-  background-color: #f0f9ff;
-  color: #67c23a;
-  border: 1px solid #b3e19d;
-}
-
-.frequency-badge.down {
-  background-color: #f5f5f5;
-  color: #909399;
-  border: 1px solid #dcdfe6;
-}
-
-.client-count {
-  color: #606266;
-  font-weight: 500;
-}
-
-.details-btn {
-  padding: 2px 4px;
-  font-size: 11px;
-  height: auto;
-  min-height: auto;
-}
-
-.wifi-details {
-  max-height: 400px;
-  overflow-y: auto;
-}
-
-.traffic-info {
-  font-size: 11px;
-  line-height: 1.2;
-}
-
-.last-update {
-  margin-top: 16px;
-  text-align: center;
-  font-size: 12px;
-  color: #909399;
-}
-</style> 
+</style>

@@ -22,12 +22,14 @@ import type {
   ModemStatus,
   DeviceCommand,
   DeviceOperationParams,
-  BatchOperationParams
+  BatchOperationParams,
+  Vendor,
+  CreateVendorParams,
+  VendorListResponse,
+  DeviceListResponse,
+  SerialListResponse,
+  ModelListResponse
 } from './types'
-
-// 导出远程访问API
-export { remoteAccessApi } from './remote-access'
-export type { RemoteAccessStatus, StartRemoteAccessParams, StartRemoteAccessResponse } from './remote-access'
 
 // 认证相关API
 export const authApi = {
@@ -70,7 +72,7 @@ export const authApi = {
 // 设备型号管理API
 export const modelApi = {
   // 获取型号列表
-  getModels: (params?: { page?: number; limit?: number; oemname?: string; devtype?: string }): Promise<ApiResponse<PaginationResponse<DeviceModel>>> => {
+  getModels: (params?: { page?: number; limit?: number; oemname?: string; devtype?: string }): Promise<ApiResponse<ModelListResponse>> => {
     return request.get('/models', { params })
   },
 
@@ -96,7 +98,7 @@ export const modelApi = {
 
   // 获取所有可用型号（用于下拉选择）
   getAllModels: (): Promise<ApiResponse<DeviceModel[]>> => {
-    return request.get('/models/all')
+    return request.get('/models')
   }
 }
 
@@ -114,12 +116,15 @@ export const serialApi = {
     batch_id?: string
     status?: string
     model_id?: number
-  }): Promise<ApiResponse<PaginationResponse<SerialNumber>>> => {
+  }): Promise<ApiResponse<SerialListResponse>> => {
     return request.get('/serials', { params })
   },
 
   // 获取批次列表
-  getBatches: (): Promise<ApiResponse<{ batch_id: string; count: number; created_at: string }[]>> => {
+  getBatches: (): Promise<ApiResponse<{ 
+    batches: { batch_id: string; count: number; created_at: string }[]; 
+    pagination: { page: number; limit: number; total: number; pages: number }
+  }>> => {
     return request.get('/serials/batches')
   },
 
@@ -144,7 +149,7 @@ export const serialApi = {
 // 设备管理API
 export const deviceApi = {
   // 获取设备列表
-  getDevices: (params?: DeviceQuery): Promise<ApiResponse<{ devices: Device[]; pagination: { page: number; limit: number; total: number; pages: number } }>> => {
+  getDevices: (params?: DeviceQuery): Promise<ApiResponse<DeviceListResponse>> => {
     return request.get('/devices', { params })
   },
 
@@ -340,30 +345,108 @@ export const wifiTemplateApi = {
 // 厂商相关API
 export const vendorApi = {
   // 获取厂商列表
-  getVendors: (params?: { page?: number; limit?: number; search?: string }): Promise<ApiResponse<any[]>> => {
+  getVendors: (params?: { page?: number; limit?: number; search?: string }): Promise<ApiResponse<VendorListResponse>> => {
     return request.get('/vendors', { params })
   },
 
   // 获取厂商详情
-  getVendor: (id: number): Promise<ApiResponse<any>> => {
+  getVendor: (id: number): Promise<ApiResponse<Vendor>> => {
     return request.get(`/vendors/${id}`)
   },
 
   // 创建厂商
-  createVendor: (params: { name: string; description?: string }): Promise<ApiResponse<any>> => {
+  createVendor: (params: CreateVendorParams): Promise<ApiResponse<Vendor>> => {
     return request.post('/vendors', params)
   },
 
   // 更新厂商
-  updateVendor: (id: number, params: Partial<any>): Promise<ApiResponse<any>> => {
+  updateVendor: (id: number, params: Partial<CreateVendorParams>): Promise<ApiResponse<Vendor>> => {
     return request.put(`/vendors/${id}`, params)
   },
 
   // 删除厂商
   deleteVendor: (id: number): Promise<ApiResponse<null>> => {
     return request.delete(`/vendors/${id}`)
+  },
+
+  // 获取所有活跃厂商（用于下拉选择）
+  getAllActiveVendors: (): Promise<ApiResponse<Vendor[]>> => {
+    return request.get('/vendors/active')
   }
 }
+
+// 远程访问API
+export const remoteAccessApi = {
+  // 启动HTTP访问
+  startHttpAccess: (deviceId: number): Promise<ApiResponse<{ message: string; url?: string }>> => {
+    return request.post('/remote-access/http/start', { device_id: deviceId })
+  },
+
+  // 启动SSH访问
+  startSshAccess: (deviceId: number): Promise<ApiResponse<{ message: string }>> => {
+    return request.post('/remote-access/ssh/start', { device_id: deviceId })
+  },
+
+  // 停止远程访问
+  stopRemoteAccess: (deviceId: number, type: 'http' | 'ssh'): Promise<ApiResponse<{ message: string }>> => {
+    return request.post(`/remote-access/${type}/stop`, { device_id: deviceId })
+  },
+
+  // 获取远程访问状态
+  getRemoteAccessStatus: (deviceId: number): Promise<ApiResponse<{
+    http: { status: string; url?: string; port?: number; host?: string }
+    ssh: { status: string; port?: number; host?: string }
+  }>> => {
+    return request.get(`/remote-access/status/${deviceId}`)
+  }
+}
+
+// WiFi模板相关API
+export const wifiTemplatesApi = {
+  // 获取WiFi模板列表
+  getTemplates: (params?: { page?: number; limit?: number; search?: string; is_active?: boolean }): Promise<ApiResponse<{
+    templates: WiFiTemplate[];
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      pages: number;
+    };
+  }>> => {
+    return request.get('/wifi-templates', { params })
+  },
+
+  // 获取WiFi模板详情
+  getTemplate: (id: number): Promise<ApiResponse<WiFiTemplate>> => {
+    return request.get(`/wifi-templates/${id}`)
+  },
+
+  // 创建WiFi模板
+  createTemplate: (params: Omit<WiFiTemplate, 'id' | 'created_at' | 'updated_at'>): Promise<ApiResponse<WiFiTemplate>> => {
+    return request.post('/wifi-templates', params)
+  },
+
+  // 更新WiFi模板
+  updateTemplate: (id: number, params: Partial<WiFiTemplate>): Promise<ApiResponse<WiFiTemplate>> => {
+    return request.put(`/wifi-templates/${id}`, params)
+  },
+
+  // 删除WiFi模板
+  deleteTemplate: (id: number): Promise<ApiResponse<null>> => {
+    return request.delete(`/wifi-templates/${id}`)
+  },
+
+  // 切换模板状态
+  toggleTemplate: (id: number): Promise<ApiResponse<null>> => {
+    return request.patch(`/wifi-templates/${id}/toggle`)
+  }
+}
+
+// 设备管理API（别名）
+export const devicesApi = deviceApi
+
+// 厂商管理API（别名）
+export const vendorsApi = vendorApi
 
 // 导出所有API
 export * from './types'
@@ -372,8 +455,12 @@ export default {
   modelApi,
   serialApi,
   deviceApi,
+  devicesApi,
   pluginApi,
   statsApi,
   wifiTemplateApi,
-  vendorApi
-} 
+  wifiTemplatesApi,
+  vendorApi,
+  vendorsApi,
+  remoteAccessApi
+}
