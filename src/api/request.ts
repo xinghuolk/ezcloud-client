@@ -28,9 +28,15 @@ const notyf = new Notyf({
   ]
 })
 
+// 获取API基础URL
+// 推荐使用相对路径配置，通过nginx代理访问
+function getApiBaseUrl(): string {
+  return import.meta.env.VITE_API_BASE_URL || '/api/v1'
+}
+
 // 创建axios实例
 const request = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || '/api/v1',
+  baseURL: getApiBaseUrl(),
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
@@ -96,18 +102,15 @@ request.interceptors.response.use(
           notyf.error(errorMessage)
           break
         case 401:
-          errorMessage = 'Unauthorized, please login again'
+        case 403:
+          // 401和403都可能是token无效导致的，统一处理
+          errorMessage = status === 401 ? 'Unauthorized, please login again' : 'Access denied, please login again'
           notyf.error(errorMessage)
           // 清除本地存储的认证信息
           localStorage.removeItem('token')
           localStorage.removeItem('user_info')
-          // 跳转到登录页面
-          const router = useRouter()
-          router.push('/auth')
-          break
-        case 403:
-          errorMessage = 'Access denied'
-          notyf.error(errorMessage)
+          // 跳转到登录页面（使用window.location避免router问题）
+          window.location.href = '/auth'
           break
         case 404:
           // 对于某些预期的404（如开发中的API），不显示通知

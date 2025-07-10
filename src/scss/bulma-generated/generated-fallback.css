@@ -3751,3 +3751,19 @@ code {
   border-color: rgb(255, 255, 255);
   color: rgba(0, 0, 0, 0.7);
 }
+
+.common-stats-card .stats-icon.is-primary {
+  color: rgb(255, 255, 255);
+}
+
+.common-stats-card .stats-icon.is-success {
+  color: rgb(255, 255, 255);
+}
+
+.common-stats-card .stats-icon.is-warning {
+  color: rgb(255, 255, 255);
+}
+
+.common-stats-card .stats-icon.is-info {
+  color: rgb(255, 255, 255);
+}

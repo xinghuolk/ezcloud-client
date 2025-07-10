@@ -20,6 +20,12 @@ COPY client/ ./client/
 # 设置工作目录到client
 WORKDIR /app/client
 
+# 接收构建参数
+ARG VITE_API_BASE_URL
+ARG VITE_WS_BASE_URL
+ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
+ENV VITE_WS_BASE_URL=$VITE_WS_BASE_URL
+
 # 构建应用
 RUN npm run build
 
@@ -54,11 +60,11 @@ RUN touch /var/run/nginx.pid && \
     chown -R nginx:nginx /var/run/nginx.pid
 
 # 暴露端口
-EXPOSE 8080
+EXPOSE 80
 
 # 健康检查
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost:8080/ || exit 1
+  CMD curl -f http://localhost:80/ || exit 1
 
 # 使用非root用户运行
 USER nginx

@@ -156,6 +156,8 @@ export interface GenerateSerialParams {
   mac_start: string
   mac_count: number
   mac_interval: number
+  mode: 'auto' | 'custom'
+  custom_start_serial?: string
 }
 
 // WiFi相关类型

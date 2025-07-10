@@ -328,6 +328,9 @@ declare global {
   export type { VFieldContext } from '../src/composables/field-context'
   import('../src/composables/field-context')
   // @ts-ignore
+  export type { FilterConfig, UseTableFiltersOptions } from '../src/composables/useTableFilters'
+  import('../src/composables/useTableFilters')
+  // @ts-ignore
   export type { VueroContext } from '../src/composables/vuero-context'
   import('../src/composables/vuero-context')
   // @ts-ignore

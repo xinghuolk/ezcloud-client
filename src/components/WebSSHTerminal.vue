@@ -255,8 +255,16 @@ const connectSSH = async () => {
     }
 
     // Build WebSocket connection URL
-    // 前端WebSocket通过API服务器端口，不是设备网关端口
-    const wsBaseUrl = import.meta.env.VITE_WS_BASE_URL || 'ws://localhost:3001'
+    // 自动检测协议并通过nginx代理连接
+    let wsBaseUrl = import.meta.env.VITE_WS_BASE_URL
+    
+    if (wsBaseUrl === 'AUTO' || !wsBaseUrl) {
+      // 自动检测当前页面协议
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+      const host = window.location.host
+      wsBaseUrl = `${protocol}//${host}`
+    }
+    
     const wsUrl = `${wsBaseUrl}/ws/ssh-terminal/device/${props.device.id}?token=${encodeURIComponent(token)}`
 
     // Create WebSocket connection

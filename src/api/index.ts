@@ -130,7 +130,8 @@ export const serialApi = {
 
   // 导出序列号Excel
   exportSerials: (batch_id: string): Promise<Blob> => {
-    return request.get(`/serials/export/${batch_id}`, { 
+    return request.get('/serials/export', { 
+      params: { batch_id },
       responseType: 'blob' 
     })
   },

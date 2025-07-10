@@ -1,9 +1,21 @@
 <script setup lang="ts">
+import { ref, onMounted } from 'vue'
+import { Notyf } from 'notyf'
+import request from '/@src/api/request'
+
 definePage({
   meta: {
     requiresAuth: true
   }
 })
+
+const notyf = new Notyf()
+
+// 系统配置数据
+const systemConfig = ref<any>(null)
+const frpStatus = ref<any>(null)
+const isLoadingConfig = ref(false)
+const isLoadingStatus = ref(false)
 
 const appInfo = {
   name: 'EzCloud IoT Management Platform',
@@ -29,6 +41,55 @@ const appInfo = {
     { name: 'MySQL', description: 'Relational database system' }
   ]
 }
+
+// 获取系统配置
+const fetchSystemConfig = async () => {
+  try {
+    isLoadingConfig.value = true
+    const response = await request.get('/system/config')
+    systemConfig.value = response.data
+  } catch (error) {
+    console.error('获取系统配置失败:', error)
+    notyf.error('获取系统配置失败')
+  } finally {
+    isLoadingConfig.value = false
+  }
+}
+
+// 获取FRP状态
+const fetchFrpStatus = async () => {
+  try {
+    isLoadingStatus.value = true
+    const response = await request.get('/system/frp/status')
+    frpStatus.value = response.data
+  } catch (error) {
+    console.error('获取FRP状态失败:', error)
+    notyf.error('获取FRP状态失败')
+  } finally {
+    isLoadingStatus.value = false
+  }
+}
+
+// 重新加载FRP配置
+const reloadFrpConfig = async () => {
+  try {
+    await request.post('/system/frp/reload')
+    notyf.success('FRP配置重新加载成功')
+    await fetchSystemConfig()
+    await fetchFrpStatus()
+  } catch (error) {
+    console.error('重新加载FRP配置失败:', error)
+    notyf.error('重新加载FRP配置失败')
+  }
+}
+
+// 页面挂载时获取数据
+onMounted(async () => {
+  await Promise.all([
+    fetchSystemConfig(),
+    fetchFrpStatus()
+  ])
+})
 
 useHead({
   title: 'About - EzCloud'
@@ -109,7 +170,7 @@ useHead({
     </div>
 
     <!-- System Status -->
-    <VCard radius="smooth">
+    <VCard radius="smooth" class="mb-6">
       <h3 class="title is-5 mb-4">System Status</h3>
       
       <div class="status-grid">
@@ -144,6 +205,236 @@ useHead({
           </div>
           <VTag color="success">Secure</VTag>
         </div>
+      </div>
+    </VCard>
+
+    <!-- Server Configuration -->
+    <div class="columns" v-if="systemConfig">
+      <div class="column is-6">
+        <!-- FRP Configuration -->
+        <VCard radius="smooth" class="mb-6">
+          <div class="card-header">
+            <h3 class="title is-5 mb-2">FRP Configuration</h3>
+            <VButton
+              icon="lucide:refresh-cw"
+              color="primary"
+              outlined
+              size="small"
+              @click="reloadFrpConfig"
+              :loading="isLoadingConfig || isLoadingStatus"
+            >
+              Reload Config
+            </VButton>
+          </div>
+          
+          <div class="config-grid">
+            <div class="config-item">
+              <label>Server Address</label>
+              <span>{{ systemConfig.frp.server_addr }}</span>
+            </div>
+            <div class="config-item">
+              <label>Server Port</label>
+              <span>{{ systemConfig.frp.server_port }}</span>
+            </div>
+            <div class="config-item">
+              <label>HTTP Vhost Port</label>
+              <span>{{ systemConfig.frp.vhost_http_port }}</span>
+            </div>
+            <div class="config-item">
+              <label>Dashboard Port</label>
+              <span>{{ systemConfig.frp.dashboard_port }}</span>
+            </div>
+            <div class="config-item">
+              <label>Subdomain Host</label>
+              <span>{{ systemConfig.frp.subdomain_host }}</span>
+            </div>
+            <div class="config-item">
+              <label>Allowed Ports</label>
+              <span>{{ systemConfig.frp.privilege_allow_ports }}</span>
+            </div>
+            <div class="config-item">
+              <label>Token</label>
+              <VTag :color="systemConfig.frp.token_configured ? 'success' : 'warning'">
+                {{ systemConfig.frp.token_configured ? 'Configured' : 'Not Set' }}
+              </VTag>
+            </div>
+            <div class="config-item">
+              <label>Privilege Token</label>
+              <VTag :color="systemConfig.frp.privilege_token_configured ? 'success' : 'warning'">
+                {{ systemConfig.frp.privilege_token_configured ? 'Configured' : 'Not Set' }}
+              </VTag>
+            </div>
+          </div>
+        </VCard>
+
+        <!-- Environment Information -->
+        <VCard radius="smooth">
+          <h3 class="title is-5 mb-4">Environment Information</h3>
+          
+          <div class="config-grid">
+            <div class="config-item">
+              <label>Environment</label>
+              <VTag :color="systemConfig.environment.node_env === 'production' ? 'success' : 'info'">
+                {{ systemConfig.environment.node_env }}
+              </VTag>
+            </div>
+            <div class="config-item">
+              <label>Docker Environment</label>
+              <VTag :color="systemConfig.environment.docker_env ? 'primary' : 'light'">
+                {{ systemConfig.environment.docker_env ? 'Yes' : 'No' }}
+              </VTag>
+            </div>
+            <div class="config-item">
+              <label>Application Version</label>
+              <span>{{ systemConfig.environment.version }}</span>
+            </div>
+            <div class="config-item">
+              <label>API Port</label>
+              <span>{{ systemConfig.application.port }}</span>
+            </div>
+            <div class="config-item">
+              <label>WebSocket Port</label>
+              <span>{{ systemConfig.application.ws_port }}</span>
+            </div>
+            <div class="config-item">
+              <label>Log Level</label>
+              <span>{{ systemConfig.application.log_level }}</span>
+            </div>
+          </div>
+        </VCard>
+      </div>
+
+      <div class="column is-6">
+        <!-- FRP Status -->
+        <VCard radius="smooth" class="mb-6" v-if="frpStatus">
+          <h3 class="title is-5 mb-4">FRP Service Status</h3>
+          
+          <div class="config-grid">
+            <div class="config-item">
+              <label>Service Running</label>
+              <VTag :color="frpStatus.is_running ? 'success' : 'danger'">
+                {{ frpStatus.is_running ? 'Running' : 'Stopped' }}
+              </VTag>
+            </div>
+            <div class="config-item">
+              <label>External Process</label>
+              <VTag :color="frpStatus.external_process ? 'info' : 'light'">
+                {{ frpStatus.external_process ? 'Yes' : 'No' }}
+              </VTag>
+            </div>
+            <div class="config-item">
+              <label>Active Tunnels</label>
+              <span>{{ frpStatus.tunnels_count }}</span>
+            </div>
+            <div class="config-item">
+              <label>Process Management</label>
+              <VTag :color="frpStatus.process_manage_enabled ? 'success' : 'warning'">
+                {{ frpStatus.process_manage_enabled ? 'Enabled' : 'Disabled' }}
+              </VTag>
+            </div>
+            <div class="config-item full-width" v-if="frpStatus.uptime">
+              <label>Uptime</label>
+              <span>{{ new Date(frpStatus.uptime).toLocaleString() }}</span>
+            </div>
+          </div>
+
+          <!-- Port Status -->
+          <div class="mt-4" v-if="frpStatus.port_status">
+            <h4 class="title is-6 mb-3">Port Status</h4>
+            <div class="port-status-grid">
+              <div 
+                v-for="(status, portName) in frpStatus.port_status" 
+                :key="portName"
+                class="port-status-item"
+              >
+                <div class="port-info">
+                  <span class="port-name">{{ portName }}</span>
+                  <span class="port-number">:{{ status.port }}</span>
+                </div>
+                <VTag :color="status.status === 'listening' ? 'success' : 'danger'">
+                  {{ status.status === 'listening' ? 'Listening' : 'Not Listening' }}
+                </VTag>
+              </div>
+            </div>
+          </div>
+
+          <!-- Allocated Ports -->
+          <div class="mt-4" v-if="frpStatus.allocated_ports && frpStatus.allocated_ports.length > 0">
+            <h4 class="title is-6 mb-3">Allocated Ports</h4>
+            <div class="allocated-ports">
+              <VTag 
+                v-for="port in frpStatus.allocated_ports" 
+                :key="port"
+                color="primary"
+                size="small"
+                class="mr-2 mb-2"
+              >
+                {{ port }}
+              </VTag>
+            </div>
+          </div>
+        </VCard>
+
+        <!-- Database & Redis Configuration -->
+        <VCard radius="smooth">
+          <h3 class="title is-5 mb-4">Data Storage Configuration</h3>
+          
+          <div class="config-section">
+            <h4 class="title is-6 mb-3">Database (MySQL)</h4>
+            <div class="config-grid">
+              <div class="config-item">
+                <label>Host</label>
+                <span>{{ systemConfig.database.host }}</span>
+              </div>
+              <div class="config-item">
+                <label>Port</label>
+                <span>{{ systemConfig.database.port }}</span>
+              </div>
+              <div class="config-item">
+                <label>Database Name</label>
+                <span>{{ systemConfig.database.name }}</span>
+              </div>
+              <div class="config-item">
+                <label>User</label>
+                <span>{{ systemConfig.database.user }}</span>
+              </div>
+              <div class="config-item">
+                <label>Password</label>
+                <VTag :color="systemConfig.database.password_configured ? 'success' : 'warning'">
+                  {{ systemConfig.database.password_configured ? 'Configured' : 'Not Set' }}
+                </VTag>
+              </div>
+            </div>
+          </div>
+
+          <div class="config-section mt-4">
+            <h4 class="title is-6 mb-3">Cache (Redis)</h4>
+            <div class="config-grid">
+              <div class="config-item">
+                <label>Host</label>
+                <span>{{ systemConfig.redis.host }}</span>
+              </div>
+              <div class="config-item">
+                <label>Port</label>
+                <span>{{ systemConfig.redis.port }}</span>
+              </div>
+              <div class="config-item">
+                <label>Password</label>
+                <VTag :color="systemConfig.redis.password_configured ? 'success' : 'warning'">
+                  {{ systemConfig.redis.password_configured ? 'Configured' : 'Not Set' }}
+                </VTag>
+              </div>
+            </div>
+          </div>
+        </VCard>
+      </div>
+    </div>
+
+    <!-- Loading State -->
+    <VCard radius="smooth" v-else-if="isLoadingConfig">
+      <div class="has-text-centered py-6">
+        <VPlaceload />
+        <p class="mt-4">Loading system configuration...</p>
       </div>
     </VCard>
   </div>
@@ -287,10 +578,100 @@ useHead({
   }
 }
 
+// 新增样式
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.config-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+
+  .config-item {
+    padding: 1rem;
+    background: var(--fade-grey-light-6);
+    border-radius: var(--radius);
+    border: 1px solid var(--fade-grey-light-3);
+
+    &.full-width {
+      grid-column: 1 / -1;
+    }
+
+    label {
+      display: block;
+      font-weight: 600;
+      color: var(--muted-grey);
+      font-size: 0.85rem;
+      margin-bottom: 0.5rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    span {
+      color: var(--dark-text);
+      font-weight: 500;
+    }
+  }
+}
+
+.config-section {
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--fade-grey-light-3);
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.port-status-grid {
+  display: grid;
+  gap: 0.75rem;
+
+  .port-status-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem;
+    background: var(--fade-grey-light-6);
+    border-radius: var(--radius);
+    border: 1px solid var(--fade-grey-light-3);
+
+    .port-info {
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+
+      .port-name {
+        font-weight: 600;
+        color: var(--dark-text);
+        text-transform: capitalize;
+      }
+
+      .port-number {
+        color: var(--muted-grey);
+        font-family: monospace;
+        font-size: 0.9rem;
+      }
+    }
+  }
+}
+
+.allocated-ports {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
 .is-dark {
   .info-item,
   .tech-item,
-  .status-item {
+  .status-item,
+  .config-item,
+  .port-status-item {
     background: var(--dark-sidebar-light-6);
     border-color: var(--dark-sidebar-light-12);
   }
@@ -299,6 +680,10 @@ useHead({
     &:hover {
       background: var(--dark-sidebar-light-6);
     }
+  }
+
+  .config-section {
+    border-color: var(--dark-sidebar-light-12);
   }
 }
 

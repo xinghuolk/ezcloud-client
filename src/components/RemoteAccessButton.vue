@@ -78,7 +78,8 @@ const getStatusText = (status: string) => {
 const handleHttpAccess = async () => {
   if (httpStatus.value === 'connected') {
     // If already connected, open device page directly
-    const url = accessStatus.value?.http?.url || `https://${props.device.serial}.dev.outdoorrouter.net`
+    // 优先使用API返回的URL，如果没有则使用默认格式（域名应该从后端配置获取）
+    const url = accessStatus.value?.http?.url || `https://${props.device.serial}.${import.meta.env.VITE_DEVICE_DOMAIN || 'localhost'}`
     window.open(url, '_blank')
     return
   }

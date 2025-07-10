@@ -36,7 +36,9 @@ const generateForm = reactive<GenerateSerialParams>({
   count: 10,
   mac_start: '',
   mac_count: 1,
-  mac_interval: 1
+  mac_interval: 1,
+  mode: 'auto',
+  custom_start_serial: ''
 })
 
 // Search form
@@ -67,13 +69,21 @@ const generateErrors = ref({
   count: '',
   mac_start: '',
   mac_count: '',
-  mac_interval: ''
+  mac_interval: '',
+  mode: '',
+  custom_start_serial: ''
 })
 
 // Computed
 const filteredSerials = computed(() => {
   if (!currentBatch.value) return serials.value
   return serials.value.filter(s => s.batch_id === currentBatch.value)
+})
+
+// 调试用计算属性
+const debugModels = computed(() => {
+  console.log('computed debugModels called, models.value:', models.value)
+  return models.value
 })
 
 // Methods
@@ -83,7 +93,9 @@ const validateGenerateForm = () => {
     count: '',
     mac_start: '',
     mac_count: '',
-    mac_interval: ''
+    mac_interval: '',
+    mode: '',
+    custom_start_serial: ''
   }
   
   let isValid = true
@@ -91,6 +103,24 @@ const validateGenerateForm = () => {
   if (!generateForm.model_id || generateForm.model_id === 0) {
     generateErrors.value.model_id = 'Please select a device model'
     isValid = false
+  }
+
+  if (!generateForm.mode) {
+    generateErrors.value.mode = 'Please select generation mode'
+    isValid = false
+  }
+
+  if (generateForm.mode === 'custom') {
+    if (!generateForm.custom_start_serial) {
+      generateErrors.value.custom_start_serial = 'Please enter custom start serial'
+      isValid = false
+    } else {
+      const last6Digits = generateForm.custom_start_serial.slice(-6)
+      if (!/^\d{6}$/.test(last6Digits)) {
+        generateErrors.value.custom_start_serial = 'Custom serial number must end with 6 digits'
+        isValid = false
+      }
+    }
   }
 
   if (!generateForm.count || generateForm.count < 1 || generateForm.count > 10000) {
@@ -178,11 +208,47 @@ const fetchBatches = async () => {
 const fetchModels = async () => {
   try {
     const response = await modelApi.getAllModels()
-    if (response.success) {
-      models.value = response.data
+    console.log('fetchModels response:', response)
+    console.log('response type:', typeof response)
+    console.log('response is array:', Array.isArray(response))
+    
+    // 强制初始化为数组
+    if (!models.value) {
+      models.value = []
     }
+    
+    // 兼容处理：如果响应有success字段，使用response.data；否则直接使用response
+    if (response && typeof response === 'object') {
+      if ('success' in response && response.success && response.data) {
+        // 检查是否有models字段（分页响应）
+        if (response.data.models && Array.isArray(response.data.models)) {
+          models.value = response.data.models
+          console.log('Set models from response.data.models:', models.value.length)
+        } else if (Array.isArray(response.data)) {
+          models.value = response.data
+          console.log('Set models from response.data array:', models.value.length)
+        } else {
+          console.warn('No models found in response.data:', response.data)
+          models.value = []
+        }
+      } else if (Array.isArray(response)) {
+        // 直接返回数组的情况
+        models.value = response
+        console.log('Set models from response array:', models.value.length)
+      } else {
+        console.warn('Unexpected models response format:', response)
+        models.value = []
+      }
+    } else {
+      console.warn('Invalid response:', response)
+      models.value = []
+    }
+    
+    console.log('Final models.value:', models.value)
+    console.log('Final models.value.length:', models.value?.length)
   } catch (error) {
     console.error('Error fetching models:', error)
+    models.value = []
   }
 }
 
@@ -227,9 +293,16 @@ const updateStats = () => {
 }
 
 const handleGenerate = async () => {
-  if (models.value.length === 0) {
+  console.log('handleGenerate called')
+  console.log('current models.value:', models.value)
+  console.log('current models.value.length:', models.value?.length)
+  
+  if (!models.value || models.value.length === 0) {
+    console.log('Models array is empty or undefined, fetching models...')
     await fetchModels()
   }
+  console.log('Models after potential fetch:', models.value)
+  console.log('Models length after fetch:', models.value?.length)
   resetGenerateForm()
   generateDialogVisible.value = true
 }
@@ -347,14 +420,18 @@ const resetGenerateForm = () => {
     count: 10,
     mac_start: '',
     mac_count: 1,
-    mac_interval: 1
+    mac_interval: 1,
+    mode: 'auto',
+    custom_start_serial: ''
   })
   generateErrors.value = {
     model_id: '',
     count: '',
     mac_start: '',
     mac_count: '',
-    mac_interval: ''
+    mac_interval: '',
+    mode: '',
+    custom_start_serial: ''
   }
 }
 
@@ -372,6 +449,24 @@ const formatDateTime = (dateString: string) => {
 const onPageChange = (page: number) => {
   pagination.page = page
   fetchSerials()
+}
+
+const onModeChange = (mode: string) => {
+  if (mode === 'auto') {
+    generateForm.custom_start_serial = ''
+    generateErrors.value.custom_start_serial = ''
+  }
+}
+
+const validateCustomSerial = () => {
+  if (generateForm.mode === 'custom' && generateForm.custom_start_serial) {
+    const last6Digits = generateForm.custom_start_serial.slice(-6)
+    if (!/^\d{6}$/.test(last6Digits)) {
+      generateErrors.value.custom_start_serial = 'Custom serial number must end with 6 digits'
+    } else {
+      generateErrors.value.custom_start_serial = ''
+    }
+  }
 }
 
 // Watch for filter changes
@@ -795,18 +890,81 @@ useHead({
               <VSelect 
                 v-model="generateForm.model_id"
                 :class="{ 'is-danger': generateErrors.model_id }"
+                placeholder="Please select device model"
               >
                 <VOption :value="0">Please select device model</VOption>
-                <VOption 
-                  v-for="model in models" 
-                  :key="model.id" 
-                  :value="model.id"
-                >
-                  {{ model.oemname }} {{ model.stdname }}
-                </VOption>
+                <template v-if="debugModels && debugModels.length > 0">
+                  <VOption 
+                    v-for="model in debugModels" 
+                    :key="model.id" 
+                    :value="model.id"
+                  >
+                    {{ model.oemname }} {{ model.stdname }}
+                  </VOption>
+                </template>
               </VSelect>
+              <!-- 调试信息 -->
+              <div v-if="debugModels.length === 0" style="color: orange; font-size: 12px; margin-top: 4px;">
+                Debug: No models available ({{ debugModels.length }} models)
+              </div>
+              <div v-else style="color: green; font-size: 12px; margin-top: 4px;">
+                Debug: {{ debugModels.length }} models loaded
+              </div>
               <p v-if="generateErrors.model_id" class="help is-danger">
                 {{ generateErrors.model_id }}
+              </p>
+            </VControl>
+          </VField>
+
+          <VField>
+            <VLabel>Generate Mode *</VLabel>
+            <VControl>
+              <div class="radio-group">
+                <VRadio 
+                  v-model="generateForm.mode" 
+                  value="auto"
+                  name="generate_mode"
+                  color="primary"
+                  @change="onModeChange"
+                >
+                  Auto Generate
+                </VRadio>
+                <VRadio 
+                  v-model="generateForm.mode" 
+                  value="custom"
+                  name="generate_mode"
+                  color="primary"
+                  @change="onModeChange"
+                >
+                  Custom Start Serial
+                </VRadio>
+              </div>
+              <div class="help-text">
+                <small class="has-text-info">
+                  Auto: EZ + ModelID(2位) + YYYYMM + 6位递增号<br>
+                  Custom: 自定义起始序列号，最后6位递增
+                </small>
+              </div>
+              <p v-if="generateErrors.mode" class="help is-danger">
+                {{ generateErrors.mode }}
+              </p>
+            </VControl>
+          </VField>
+
+          <VField v-if="generateForm.mode === 'custom'">
+            <VLabel>Custom Start Serial *</VLabel>
+            <VControl>
+              <VInput
+                v-model="generateForm.custom_start_serial"
+                placeholder="Enter custom start serial (must end with 6 digits)"
+                :class="{ 'is-danger': generateErrors.custom_start_serial }"
+                @blur="validateCustomSerial"
+              />
+              <div class="help-text">
+                <small class="has-text-info">Format: Any prefix + 6 digits (e.g., ABC123456789)</small>
+              </div>
+              <p v-if="generateErrors.custom_start_serial" class="help is-danger">
+                {{ generateErrors.custom_start_serial }}
               </p>
             </VControl>
           </VField>
@@ -1072,6 +1230,21 @@ useHead({
       width: 100%;
       margin-bottom: 1rem;
     }
+  }
+}
+
+.radio-group {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.help-text {
+  margin-top: 0.5rem;
+  
+  small {
+    display: block;
+    line-height: 1.4;
   }
 }
 </style>
