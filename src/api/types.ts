@@ -295,6 +295,36 @@ export interface ModemStatus {
   last_update: string
 }
 
+// 设备托管相关类型
+export interface DeviceTrusted {
+  id: number
+  device_id: number
+  owner_id: number
+  trustee_id: number
+  status: 'active' | 'inactive' | 'expired'
+  trusted_at: string
+  expires_at?: string
+  notes?: string
+  created_by: number
+  created_at: string
+  updated_at: string
+  // 关联数据
+  device?: Device
+  owner?: User
+  trustee?: User
+  creator?: User
+}
+
+export interface DeviceTrusteeInfo {
+  id: number
+  username: string
+  email: string
+  trusted_at: string
+  expires_at?: string
+  notes?: string
+  status: 'active' | 'inactive' | 'expired'
+}
+
 // 设备相关类型
 export interface Device {
   id: number
@@ -336,6 +366,22 @@ export interface Device {
     mac_interval: number
     status: string
   }
+  // 托管相关信息
+  ownership?: {
+    isOwner: boolean
+    isTrusted: boolean
+    ownerInfo?: {
+      id: number
+      username: string
+      email: string
+    }
+    trustedInfo?: {
+      trusted_at: string
+      expires_at?: string
+      notes?: string
+    }
+  }
+  trustees?: DeviceTrusteeInfo[]
   // 5G设备状态
   wifiStatus?: WiFiStatus[]
   modemStatus?: ModemStatus
@@ -343,6 +389,27 @@ export interface Device {
 
 export interface DeviceBindParams {
   serial: string
+}
+
+// 设备托管相关API参数类型
+export interface DeviceTrustParams {
+  trustee_id: number
+  expires_at?: string
+  notes?: string
+}
+
+export interface DeviceTrustUpdateParams {
+  status?: 'active' | 'inactive' | 'expired'
+  expires_at?: string
+  notes?: string
+}
+
+export interface DeviceTrusteesResponse {
+  trustees: DeviceTrusteeInfo[]
+}
+
+export interface CreateDeviceTrustResponse {
+  trust: DeviceTrusted
 }
 
 export interface DeviceQuery {
@@ -355,6 +422,7 @@ export interface DeviceQuery {
   stdname?: string
   serial?: string
   name?: string
+  include_trusted?: boolean  // 是否包含托管设备
 }
 
 // 设备状态相关类型

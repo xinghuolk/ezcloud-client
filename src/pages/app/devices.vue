@@ -4,6 +4,7 @@ import { useDeviceStore } from '/@src/stores/devices'
 import { useUserSession } from '/@src/stores/user-session'
 import type { Device, DeviceQuery } from '/@src/api/types'
 import RemoteAccessButton from '/@src/components/RemoteAccessButton.vue'
+import DeviceTrustManager from '/@src/components/DeviceTrustManager.vue'
 import { Notyf } from 'notyf'
 
 definePage({
@@ -21,6 +22,7 @@ const loading = ref(false)
 const bindDialogOpen = ref(false)
 const detailsDialogOpen = ref(false)
 const batchDialogOpen = ref(false)
+const trustDialogOpen = ref(false)
 const selectedDevices = ref<Device[]>([])
 const selectedDevice = ref<Device | null>(null)
 const activeTab = ref('basic')
@@ -55,12 +57,16 @@ const pagination = computed(() => deviceStore.pagination)
 const deviceCount = computed(() => deviceStore.deviceCount)
 const onlineCount = computed(() => deviceStore.onlineCount)
 const offlineCount = computed(() => deviceStore.offlineCount)
+// 托管设备相关计算属性
+const ownedCount = computed(() => deviceStore.ownedCount)
+const trustedCount = computed(() => deviceStore.trustedCount)
 
 // Methods
 const fetchDevices = async () => {
   loading.value = true
   try {
-    await deviceStore.fetchDevices(filterForm)
+    // 获取包含托管设备的设备列表
+    await deviceStore.fetchDevicesWithTrusted(filterForm)
   } finally {
     loading.value = false
   }
@@ -175,6 +181,16 @@ const handleRemoteAccessStatusChange = (device: Device, status: any) => {
   // 这里可以添加额外的状态处理逻辑，如通知、日志记录等
 }
 
+const handleManageTrust = (device: Device) => {
+  selectedDevice.value = device
+  trustDialogOpen.value = true
+}
+
+const handleTrustUpdated = () => {
+  // 托管关系更新后，刷新设备列表
+  fetchDevices()
+}
+
 const formatDate = (dateString: string) => {
   const date = new Date(dateString)
   return date.toLocaleDateString('en-US', {
@@ -196,6 +212,26 @@ const getStatusText = (isOnline: boolean, isActivated: boolean) => {
   if (isOnline && isActivated) return 'Active'
   if (isOnline && !isActivated) return 'Online'
   return 'Offline'
+}
+
+// 托管相关辅助方法
+const getOwnershipType = (device: Device) => {
+  if (device.ownership?.isOwner) {
+    return { type: 'owned', text: '拥有', color: 'primary' }
+  } else if (device.ownership?.isTrusted) {
+    return { type: 'trusted', text: '托管', color: 'info' }
+  }
+  return { type: 'unknown', text: '未知', color: 'light' }
+}
+
+const getOwnershipTooltip = (device: Device) => {
+  if (device.ownership?.isOwner) {
+    return '您拥有此设备'
+  } else if (device.ownership?.isTrusted) {
+    const ownerName = device.ownership.ownerInfo?.username || '未知用户'
+    return `此设备由 ${ownerName} 托管给您`
+  }
+  return '设备归属不明'
 }
 
 // Watch for filter changes
@@ -243,22 +279,28 @@ useHead({
 
     <!-- Stats Cards -->
     <div class="columns is-multiline mb-6">
-      <div class="column is-4">
+      <div class="column is-3">
         <VCard class="has-text-centered">
           <h3 class="title is-4 common-text-primary">{{ deviceCount }}</h3>
           <p class="subtitle is-6">Total Devices</p>
         </VCard>
       </div>
-      <div class="column is-4">
+      <div class="column is-3">
         <VCard class="has-text-centered">
           <h3 class="title is-4 common-text-success">{{ onlineCount }}</h3>
           <p class="subtitle is-6">Online Devices</p>
         </VCard>
       </div>
-      <div class="column is-4">
+      <div class="column is-3">
         <VCard class="has-text-centered">
-          <h3 class="title is-4 common-text-danger">{{ offlineCount }}</h3>
-          <p class="subtitle is-6">Offline Devices</p>
+          <h3 class="title is-4 common-text-info">{{ ownedCount }}</h3>
+          <p class="subtitle is-6">Owned Devices</p>
+        </VCard>
+      </div>
+      <div class="column is-3">
+        <VCard class="has-text-centered">
+          <h3 class="title is-4 common-text-warning">{{ trustedCount }}</h3>
+          <p class="subtitle is-6">Trusted Devices</p>
         </VCard>
       </div>
     </div>
@@ -372,6 +414,10 @@ useHead({
             searchable: true,
             grow: true
           },
+          ownership: { 
+            label: 'Ownership',
+            align: 'center'
+          },
           status: { 
             label: 'Status',
             searchable: true,
@@ -430,6 +476,9 @@ useHead({
                   <VFlexTableCell>
                     <VPlaceload width="60px" />
                   </VFlexTableCell>
+                  <VFlexTableCell>
+                    <VPlaceload width="60px" />
+                  </VFlexTableCell>
                   <VFlexTableCell :column="{ grow: 'lg' }">
                     <VPlaceload />
                   </VFlexTableCell>
@@ -478,6 +527,22 @@ useHead({
                   </VTextEllipsis>
                 </div>
                 <span v-else class="common-text-light">-</span>
+              </template>
+
+              <template v-if="column.key === 'ownership'">
+                <VTooltip>
+                  <VTag 
+                    :color="getOwnershipType(device).color"
+                    outlined
+                    rounded
+                    size="small"
+                  >
+                    {{ getOwnershipType(device).text }}
+                  </VTag>
+                  <template #content>
+                    {{ getOwnershipTooltip(device) }}
+                  </template>
+                </VTooltip>
               </template>
 
               <template v-if="column.key === 'status'">
@@ -536,6 +601,20 @@ useHead({
                         <span>View Details</span>
                       </div>
                     </a>
+                    <!-- 托管管理选项（仅设备拥有者可见） -->
+                    <a 
+                      v-if="device.ownership?.isOwner" 
+                      class="dropdown-item is-media" 
+                      @click="handleManageTrust(device)"
+                    >
+                      <div class="icon">
+                        <iconify-icon icon="lucide:users" />
+                      </div>
+                      <div class="meta">
+                        <span>Manage Trust</span>
+                      </div>
+                    </a>
+                    <hr class="dropdown-divider">
                     <a class="dropdown-item is-media" @click="handleReboot(device)">
                       <div class="icon">
                         <iconify-icon icon="lucide:refresh-cw" />
@@ -752,6 +831,15 @@ useHead({
         <VButton @click="detailsDialogOpen = false">Close</VButton>
       </template>
     </VModal>
+
+    <!-- Device Trust Manager Modal -->
+    <DeviceTrustManager
+      v-if="selectedDevice"
+      :device="selectedDevice"
+      :open="trustDialogOpen"
+      @close="trustDialogOpen = false"
+      @updated="handleTrustUpdated"
+    />
   </div>
 </template>
 

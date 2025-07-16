@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import type { Device, DeviceQuery } from '/@src/api/types'
+import type { Device, DeviceQuery, DeviceTrustParams, DeviceTrustUpdateParams, DeviceTrusted } from '/@src/api/types'
 import { Notyf } from 'notyf'
 import { deviceApi } from '/@src/api'
 
@@ -26,6 +26,12 @@ export const useDeviceStore = defineStore('devices', () => {
   const onlineCount = computed(() => onlineDevices.value.length)
   const offlineCount = computed(() => offlineDevices.value.length)
   const activatedCount = computed(() => activatedDevices.value.length)
+  
+  // 托管设备相关的计算属性
+  const ownedDevices = computed(() => devices.value.filter(device => device.ownership?.isOwner))
+  const trustedDevices = computed(() => devices.value.filter(device => device.ownership?.isTrusted))
+  const ownedCount = computed(() => ownedDevices.value.length)
+  const trustedCount = computed(() => trustedDevices.value.length)
 
   // Actions
   const fetchDevices = async (query: DeviceQuery = {}) => {
@@ -222,6 +228,85 @@ export const useDeviceStore = defineStore('devices', () => {
     }
   }
 
+  // 设备托管相关Actions
+  const trustDevice = async (deviceId: number, params: DeviceTrustParams) => {
+    try {
+      const response = await deviceApi.trustDevice(deviceId, params)
+      if (response.success) {
+        notyf.success('设备托管成功')
+        // 可选择刷新设备列表或更新本地数据
+        await fetchDeviceDetails(deviceId)
+        return true
+      } else {
+        notyf.error(response.message || '设备托管失败')
+        return false
+      }
+    } catch (error) {
+      console.error('Failed to trust device:', error)
+      notyf.error('设备托管失败')
+      return false
+    }
+  }
+
+  const untrustDevice = async (deviceId: number, userId: number) => {
+    try {
+      const response = await deviceApi.untrustDevice(deviceId, userId)
+      if (response.success) {
+        notyf.success('取消设备托管成功')
+        // 刷新设备详情
+        await fetchDeviceDetails(deviceId)
+        return true
+      } else {
+        notyf.error(response.message || '取消设备托管失败')
+        return false
+      }
+    } catch (error) {
+      console.error('Failed to untrust device:', error)
+      notyf.error('取消设备托管失败')
+      return false
+    }
+  }
+
+  const getDeviceTrustees = async (deviceId: number) => {
+    try {
+      const response = await deviceApi.getDeviceTrustees(deviceId)
+      if (response.success) {
+        return response.data.trustees
+      } else {
+        notyf.error(response.message || '获取托管列表失败')
+        return []
+      }
+    } catch (error) {
+      console.error('Failed to get device trustees:', error)
+      notyf.error('获取托管列表失败')
+      return []
+    }
+  }
+
+  const updateDeviceTrust = async (deviceId: number, userId: number, params: DeviceTrustUpdateParams) => {
+    try {
+      const response = await deviceApi.updateDeviceTrust(deviceId, userId, params)
+      if (response.success) {
+        notyf.success('更新托管关系成功')
+        // 刷新设备详情
+        await fetchDeviceDetails(deviceId)
+        return response.data
+      } else {
+        notyf.error(response.message || '更新托管关系失败')
+        return null
+      }
+    } catch (error) {
+      console.error('Failed to update device trust:', error)
+      notyf.error('更新托管关系失败')
+      return null
+    }
+  }
+
+  // 获取包含托管设备的设备列表
+  const fetchDevicesWithTrusted = async (query: DeviceQuery = {}) => {
+    return fetchDevices({ ...query, include_trusted: true })
+  }
+
   return {
     // State
     devices,
@@ -237,6 +322,10 @@ export const useDeviceStore = defineStore('devices', () => {
     onlineCount,
     offlineCount,
     activatedCount,
+    ownedDevices,
+    trustedDevices,
+    ownedCount,
+    trustedCount,
     
     // Actions
     fetchDevices,
@@ -250,6 +339,12 @@ export const useDeviceStore = defineStore('devices', () => {
     batchOperation,
     clearDevices,
     setCurrentDevice,
-    updateDeviceInList
+    updateDeviceInList,
+    // 托管相关Actions
+    trustDevice,
+    untrustDevice,
+    getDeviceTrustees,
+    updateDeviceTrust,
+    fetchDevicesWithTrusted
   }
 })

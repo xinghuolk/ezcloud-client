@@ -14,6 +14,11 @@ import type {
   DeviceBindParams,
   DeviceQuery,
   DeviceStatus,
+  DeviceTrusted,
+  DeviceTrustParams,
+  DeviceTrustUpdateParams,
+  DeviceTrusteesResponse,
+  CreateDeviceTrustResponse,
   Plugin,
   WiFiStatus,
   WiFiData,
@@ -241,6 +246,27 @@ export const deviceApi = {
   // 获取设备命令状态
   getDeviceCommands: (id: number, params?: { status?: string; type?: string }): Promise<ApiResponse<DeviceCommand[]>> => {
     return request.get(`/devices/${id}/commands`, { params })
+  },
+
+  // 设备托管相关API
+  // 创建设备托管关系
+  trustDevice: (id: number, params: DeviceTrustParams): Promise<ApiResponse<CreateDeviceTrustResponse>> => {
+    return request.post(`/devices/${id}/trust`, params)
+  },
+
+  // 取消设备托管关系
+  untrustDevice: (id: number, userId: number): Promise<ApiResponse<null>> => {
+    return request.delete(`/devices/${id}/trust/${userId}`)
+  },
+
+  // 获取设备托管关系列表
+  getDeviceTrustees: (id: number): Promise<ApiResponse<DeviceTrusteesResponse>> => {
+    return request.get(`/devices/${id}/trustees`)
+  },
+
+  // 更新托管关系
+  updateDeviceTrust: (id: number, userId: number, params: DeviceTrustUpdateParams): Promise<ApiResponse<DeviceTrusted>> => {
+    return request.put(`/devices/${id}/trust/${userId}`, params)
   }
 }
 
