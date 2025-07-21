@@ -135,6 +135,11 @@ request.interceptors.response.use(
           errorMessage = 'Too many requests, please try again later'
           notyf.error(errorMessage)
           break
+        case 409:
+          // 冲突错误（如设备已绑定），让上层页面处理错误显示
+          errorMessage = errorMessage || 'Resource conflict'
+          // 不显示通知，让上层处理
+          break
         case 500:
           // 使用后端返回的具体错误信息
           errorMessage = errorMessage || 'Internal server error'

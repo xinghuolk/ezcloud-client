@@ -35,5 +35,6 @@ declare module 'vue-router/auto-routes' {
     '/auth': RouteRecordInfo<'/auth', '/auth', Record<never, never>, Record<never, never>>,
     '/auth/': RouteRecordInfo<'/auth/', '/auth', Record<never, never>, Record<never, never>>,
     '/auth/signup': RouteRecordInfo<'/auth/signup', '/auth/signup', Record<never, never>, Record<never, never>>,
+    '/bind-device': RouteRecordInfo<'/bind-device', '/bind-device', Record<never, never>, Record<never, never>>,
   }
 }

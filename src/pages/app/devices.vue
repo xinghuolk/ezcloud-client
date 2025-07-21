@@ -57,7 +57,7 @@ const pagination = computed(() => deviceStore.pagination)
 const deviceCount = computed(() => deviceStore.deviceCount)
 const onlineCount = computed(() => deviceStore.onlineCount)
 const offlineCount = computed(() => deviceStore.offlineCount)
-// 托管设备相关计算属性
+// Trust device related computed properties
 const ownedCount = computed(() => deviceStore.ownedCount)
 const trustedCount = computed(() => deviceStore.trustedCount)
 
@@ -65,7 +65,7 @@ const trustedCount = computed(() => deviceStore.trustedCount)
 const fetchDevices = async () => {
   loading.value = true
   try {
-    // 获取包含托管设备的设备列表
+    // Fetch device list including trusted devices
     await deviceStore.fetchDevicesWithTrusted(filterForm)
   } finally {
     loading.value = false
@@ -176,9 +176,9 @@ const handleSIMSwitch = async (device: Device, slot: number) => {
 }
 
 const handleRemoteAccessStatusChange = (device: Device, status: any) => {
-  // 远程访问状态变化处理
-  console.log(`设备 ${device.serial} 远程访问状态更新:`, status)
-  // 这里可以添加额外的状态处理逻辑，如通知、日志记录等
+  // Handle remote access status changes
+  console.log(`Device ${device.serial} remote access status updated:`, status)
+  // Additional status handling logic can be added here, such as notifications, logging, etc.
 }
 
 const handleManageTrust = (device: Device) => {
@@ -187,7 +187,7 @@ const handleManageTrust = (device: Device) => {
 }
 
 const handleTrustUpdated = () => {
-  // 托管关系更新后，刷新设备列表
+  // Refresh device list after trust relationship update
   fetchDevices()
 }
 
@@ -214,29 +214,29 @@ const getStatusText = (isOnline: boolean, isActivated: boolean) => {
   return 'Offline'
 }
 
-// 托管相关辅助方法
+// Trust relationship helper methods
 const getOwnershipType = (device: Device) => {
   if (device.ownership?.isOwner) {
-    return { type: 'owned', text: '拥有', color: 'primary' }
+    return { type: 'owned', text: 'Owned', color: 'primary' }
   } else if (device.ownership?.isTrusted) {
-    return { type: 'trusted', text: '托管', color: 'info' }
+    return { type: 'trusted', text: 'Trusted', color: 'info' }
   }
-  return { type: 'unknown', text: '未知', color: 'light' }
+  return { type: 'unknown', text: 'Unknown', color: 'light' }
 }
 
 const getOwnershipTooltip = (device: Device) => {
   if (device.ownership?.isOwner) {
-    return '您拥有此设备'
+    return 'You own this device'
   } else if (device.ownership?.isTrusted) {
-    const ownerName = device.ownership.ownerInfo?.username || '未知用户'
-    return `此设备由 ${ownerName} 托管给您`
+    const ownerName = device.ownership.ownerInfo?.username || 'Unknown user'
+    return `This device is trusted to you by ${ownerName}`
   }
-  return '设备归属不明'
+  return 'Device ownership unknown'
 }
 
-// 权限控制方法
+// Permission control method
 const canOperateDevice = (device: Device) => {
-  // 只有设备拥有者和被委托者可以操作设备
+  // Only device owners and trustees can operate devices
   return device.ownership?.isOwner || device.ownership?.isTrusted
 }
 
@@ -455,10 +455,10 @@ useHead({
               <VField>
                 <VControl>
                   <VSelect v-model="wrapperState.limit" class="is-rounded">
-                    <VOption :value="10">10 条/页</VOption>
-                    <VOption :value="20">20 条/页</VOption>
-                    <VOption :value="50">50 条/页</VOption>
-                    <VOption :value="100">100 条/页</VOption>
+                    <VOption :value="10">10 per page</VOption>
+                    <VOption :value="20">20 per page</VOption>
+                    <VOption :value="50">50 per page</VOption>
+                    <VOption :value="100">100 per page</VOption>
                   </VSelect>
                 </VControl>
               </VField>
@@ -503,8 +503,8 @@ useHead({
               <!-- 空状态 -->
               <div v-else-if="wrapperState.data?.length === 0" class="flex-list-inner">
                 <VPlaceholderSection
-                  title="暂无设备"
-                  subtitle="请先绑定设备或检查搜索条件"
+                  title="No Devices"
+                  subtitle="Please bind a device first or check search criteria"
                   class="my-6"
                 />
               </div>
@@ -595,7 +595,7 @@ useHead({
                     </template>
                   </VButton>
                   <template #content>
-                    仅设备拥有者和被委托者可操作
+                    Only device owners and trustees can operate
                   </template>
                 </VTooltip>
               </template>
@@ -618,7 +618,7 @@ useHead({
                         <span>View Details</span>
                       </div>
                     </a>
-                    <!-- 托管管理选项（仅设备拥有者可见） -->
+                    <!-- Trust management options (only visible to device owners) -->
                     <a 
                       v-if="device.ownership?.isOwner" 
                       class="dropdown-item is-media" 

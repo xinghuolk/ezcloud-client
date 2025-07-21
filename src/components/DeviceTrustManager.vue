@@ -24,15 +24,17 @@ const deviceStore = useDeviceStore()
 // State
 const loading = ref(false)
 const trustees = ref<DeviceTrusteeInfo[]>([])
-const availableUsers = ref<User[]>([])
 const activeTab = ref('current')
+const emailValidating = ref(false)
+const emailExists = ref<boolean | null>(null)
+const emailCheckTimeout = ref<NodeJS.Timeout | null>(null)
 
 // Form data
-const trustForm = reactive<DeviceTrustParams & { username: string }>({
-  trustee_id: 0,
-  username: '',
+const trustForm = reactive({
+  email: '',
   expires_at: '',
-  notes: ''
+  notes: '',
+  trustee_id: 0
 })
 
 // Computed
@@ -54,20 +56,45 @@ const fetchTrustees = async () => {
   }
 }
 
-const fetchAvailableUsers = async () => {
+// 防抖检查邮箱是否存在
+const checkEmailExists = async (email: string) => {
+  if (!email || !email.includes('@')) {
+    emailExists.value = null
+    return
+  }
+
+  emailValidating.value = true
   try {
-    // 这里需要一个获取用户列表的API，暂时使用空数组
-    // const response = await authApi.getUsers()
-    // availableUsers.value = response.data || []
-    availableUsers.value = []
+    // 检查用户邮箱是否存在的API调用
+    // const response = await authApi.checkUserExists({ email })
+    // emailExists.value = response.data.exists
+    // trustForm.trustee_id = response.data.user_id || 0
+    
+    // 临时模拟逻辑
+    await new Promise(resolve => setTimeout(resolve, 500))
+    emailExists.value = email.endsWith('@example.com') // 简单的模拟逻辑
   } catch (error) {
-    console.error('Failed to fetch users:', error)
+    console.error('Failed to check email:', error)
+    emailExists.value = false
+  } finally {
+    emailValidating.value = false
   }
 }
 
+// 防抖邮箱验证
+const debouncedEmailCheck = (email: string) => {
+  if (emailCheckTimeout.value) {
+    clearTimeout(emailCheckTimeout.value)
+  }
+  
+  emailCheckTimeout.value = setTimeout(() => {
+    checkEmailExists(email)
+  }, 800)
+}
+
 const handleAddTrustee = async () => {
-  if (!trustForm.trustee_id || !props.device?.id) {
-    notyf.error('请选择要托管的用户')
+  if (!trustForm.email || !emailExists.value || !props.device?.id) {
+    notyf.error('Please enter a valid email address')
     return
   }
 
@@ -83,11 +110,12 @@ const handleAddTrustee = async () => {
     if (success) {
       // 重置表单
       Object.assign(trustForm, {
-        trustee_id: 0,
-        username: '',
+        email: '',
         expires_at: '',
-        notes: ''
+        notes: '',
+        trustee_id: 0
       })
+      emailExists.value = null
       // 刷新托管列表
       await fetchTrustees()
       emit('updated')
@@ -118,7 +146,7 @@ const handleRemoveTrustee = async (trustee: DeviceTrusteeInfo) => {
 
 const formatDate = (dateString: string) => {
   const date = new Date(dateString)
-  return date.toLocaleDateString('zh-CN', {
+  return date.toLocaleDateString('en-US', {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
@@ -143,28 +171,55 @@ const getStatusColor = (status: string) => {
 const getStatusText = (status: string) => {
   switch (status) {
     case 'active':
-      return '生效中'
+      return 'Active'
     case 'inactive':
-      return '已停用'
+      return 'Inactive'
     case 'expired':
-      return '已过期'
+      return 'Expired'
     default:
-      return '未知'
+      return 'Unknown'
   }
 }
 
-// 当设备信息更新时重新获取托管列表
+// Computed for email validation state
+const emailValidationIcon = computed(() => {
+  if (emailValidating.value) return 'lucide:loader-2'
+  if (emailExists.value === true) return 'lucide:check'
+  if (emailExists.value === false) return 'lucide:x'
+  return null
+})
+
+const emailValidationColor = computed(() => {
+  if (emailValidating.value) return 'info'
+  if (emailExists.value === true) return 'success'
+  if (emailExists.value === false) return 'danger'
+  return null
+})
+
+// Watch for email input changes
+watch(() => trustForm.email, (newEmail) => {
+  if (newEmail !== '') {
+    emailExists.value = null
+    debouncedEmailCheck(newEmail)
+  } else {
+    emailExists.value = null
+    if (emailCheckTimeout.value) {
+      clearTimeout(emailCheckTimeout.value)
+    }
+  }
+})
+
+// Refresh trustees when device changes
 watch(() => props.device?.id, (newId) => {
   if (newId && props.open) {
     fetchTrustees()
   }
 })
 
-// 当对话框打开时获取数据
+// Fetch data when dialog opens
 watch(() => props.open, (isOpen) => {
   if (isOpen && props.device?.id) {
     fetchTrustees()
-    fetchAvailableUsers()
   }
 })
 </script>
@@ -172,7 +227,7 @@ watch(() => props.open, (isOpen) => {
 <template>
   <VModal 
     :open="open" 
-    title="设备托管管理" 
+    title="Device Trust Management" 
     size="large"
     @close="emit('close')"
   >
@@ -182,23 +237,31 @@ watch(() => props.open, (isOpen) => {
           <span class="icon">
             <iconify-icon icon="lucide:alert-triangle" />
           </span>
-          <span>只有设备拥有者才能管理托管关系</span>
+          <span>Only device owners can manage trust relationships</span>
         </div>
       </div>
 
       <div v-else>
-        <VTabs v-model="activeTab" type="boxed">
-          <VTab id="current" label="当前托管">
+        <VTabs 
+          :selected="activeTab"
+          :tabs="[
+            { label: 'Current Trustees', value: 'current' },
+            { label: 'Add New Trust', value: 'add' }
+          ]"
+          @update:selected="activeTab = $event"
+        >
+          <template #tab="{ activeValue }">
+            <div v-if="activeValue === 'current'">
             <div class="tab-content">
-              <!-- 托管列表 -->
+              <!-- Trustees list -->
               <div v-if="loading" class="has-text-centered py-6">
                 <VLoader size="medium" />
               </div>
               
               <div v-else-if="trustees.length === 0" class="has-text-centered py-6">
                 <VPlaceholderSection
-                  title="暂无托管关系"
-                  subtitle="此设备尚未托管给任何用户"
+                  title="No Trust Relationships"
+                  subtitle="This device has not been trusted to any users yet"
                   size="medium"
                 />
               </div>
@@ -222,18 +285,18 @@ watch(() => props.open, (isOpen) => {
                               {{ getStatusText(trustee.status) }}
                             </VTag>
                             <VTag size="small" color="light">
-                              托管时间：{{ formatDate(trustee.trusted_at) }}
+                              Trusted: {{ formatDate(trustee.trusted_at) }}
                             </VTag>
                             <VTag 
                               v-if="trustee.expires_at" 
                               size="small" 
                               color="light"
                             >
-                              过期时间：{{ formatDate(trustee.expires_at) }}
+                              Expires: {{ formatDate(trustee.expires_at) }}
                             </VTag>
                           </div>
                           <p v-if="trustee.notes" class="help">
-                            备注：{{ trustee.notes }}
+                            Notes: {{ trustee.notes }}
                           </p>
                         </div>
                       </div>
@@ -245,7 +308,7 @@ watch(() => props.open, (isOpen) => {
                           @click="handleRemoveTrustee(trustee)"
                           :loading="loading"
                         >
-                          取消托管
+                          Remove Trust
                         </VButton>
                       </div>
                     </div>
@@ -253,25 +316,44 @@ watch(() => props.open, (isOpen) => {
                 </VCard>
               </div>
             </div>
-          </VTab>
+            </div>
 
-          <VTab id="add" label="新增托管">
+            <div v-else-if="activeValue === 'add'">
             <div class="tab-content">
               <form @submit.prevent="handleAddTrustee">
                 <VField>
-                  <VLabel>托管用户 *</VLabel>
+                  <VLabel>User Email *</VLabel>
                   <VControl>
                     <VInput
-                      v-model="trustForm.username"
-                      placeholder="输入用户名或邮箱搜索用户"
-                      icon="lucide:user"
+                      v-model="trustForm.email"
+                      type="email"
+                      placeholder="Enter user email address"
+                      icon="lucide:mail"
                     />
+                    <!-- Email validation icon -->
+                    <span v-if="emailValidationIcon" class="email-validation-icon">
+                      <iconify-icon 
+                        :icon="emailValidationIcon" 
+                        :class="{
+                          'spin': emailValidating,
+                          [`text-${emailValidationColor}`]: emailValidationColor
+                        }"
+                      />
+                    </span>
                   </VControl>
-                  <p class="help">请输入要托管给的用户的用户名或邮箱地址</p>
+                  <p v-if="emailExists === false" class="help is-danger">
+                    User with this email does not exist
+                  </p>
+                  <p v-else-if="emailExists === true" class="help is-success">
+                    User found and can be trusted
+                  </p>
+                  <p v-else class="help">
+                    Please enter the email address of the user you want to trust
+                  </p>
                 </VField>
 
                 <VField>
-                  <VLabel>过期时间</VLabel>
+                  <VLabel>Expiration Date</VLabel>
                   <VControl>
                     <VInput
                       v-model="trustForm.expires_at"
@@ -279,15 +361,15 @@ watch(() => props.open, (isOpen) => {
                       icon="lucide:calendar"
                     />
                   </VControl>
-                  <p class="help">留空表示永久托管，到期后自动失效</p>
+                  <p class="help">Leave empty for permanent trust, will expire automatically after the set time</p>
                 </VField>
 
                 <VField>
-                  <VLabel>备注</VLabel>
+                  <VLabel>Notes</VLabel>
                   <VControl>
                     <VTextarea
                       v-model="trustForm.notes"
-                      placeholder="托管原因或说明（可选）"
+                      placeholder="Trust reason or description (optional)"
                       rows="3"
                     />
                   </VControl>
@@ -299,25 +381,27 @@ watch(() => props.open, (isOpen) => {
                       type="submit" 
                       color="primary"
                       :loading="loading"
+                      :disabled="!emailExists"
                     >
-                      创建托管
+                      Create Trust
                     </VButton>
                   </VControl>
                   <VControl>
                     <VButton @click="activeTab = 'current'">
-                      取消
+                      Cancel
                     </VButton>
                   </VControl>
                 </VField>
               </form>
             </div>
-          </VTab>
+            </div>
+          </template>
         </VTabs>
       </div>
     </template>
 
     <template #action>
-      <VButton @click="emit('close')">关闭</VButton>
+      <VButton @click="emit('close')">Close</VButton>
     </template>
   </VModal>
 </template>
@@ -342,5 +426,39 @@ watch(() => props.open, (isOpen) => {
 
 .tab-content {
   padding: 1.5rem 0;
+}
+
+.email-validation-icon {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 1.2rem;
+  z-index: 4;
+  
+  .spin {
+    animation: spin 1s linear infinite;
+  }
+  
+  .text-success {
+    color: var(--success);
+  }
+  
+  .text-danger {
+    color: var(--danger);
+  }
+  
+  .text-info {
+    color: var(--info);
+  }
+}
+
+@keyframes spin {
+  from { transform: translateY(-50%) rotate(0deg); }
+  to { transform: translateY(-50%) rotate(360deg); }
+}
+
+:deep(.control) {
+  position: relative;
 }
 </style>
