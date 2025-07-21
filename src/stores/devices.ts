@@ -54,16 +54,21 @@ export const useDeviceStore = defineStore('devices', () => {
 
   const fetchDeviceDetails = async (deviceId: number) => {
     try {
+      console.log('Store: Fetching device details for ID:', deviceId)
       const response = await deviceApi.getDevice(deviceId)
+      console.log('Store: API response:', response)
+      
       if (response.success) {
         currentDevice.value = response.data
+        console.log('Store: Device set in currentDevice:', response.data)
         return response.data
       } else {
+        console.error('Store: API returned error:', response.message)
         notyf.error(response.message || 'Failed to fetch device details')
         return null
       }
     } catch (error) {
-      console.error('Failed to fetch device details:', error)
+      console.error('Store: Exception when fetching device details:', error)
       notyf.error('Failed to fetch device details')
       return null
     }

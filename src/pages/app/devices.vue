@@ -3,6 +3,7 @@ import { ref, reactive, onMounted, computed, watch } from 'vue'
 import { useDeviceStore } from '/@src/stores/devices'
 import { useUserSession } from '/@src/stores/user-session'
 import type { Device, DeviceQuery } from '/@src/api/types'
+import { deviceApi } from '/@src/api'
 import RemoteAccessButton from '/@src/components/RemoteAccessButton.vue'
 import DeviceTrustManager from '/@src/components/DeviceTrustManager.vue'
 import { Notyf } from 'notyf'
@@ -26,6 +27,10 @@ const trustDialogOpen = ref(false)
 const selectedDevices = ref<Device[]>([])
 const selectedDevice = ref<Device | null>(null)
 const activeTab = ref('basic')
+const wifiData = ref<any>(null)
+const modemData = ref<any>(null)
+const loadingWifi = ref(false)
+const loadingModem = ref(false)
 
 // Search debounce
 let searchTimeout: NodeJS.Timeout | null = null
@@ -119,6 +124,9 @@ const handleViewDetails = async (device: Device) => {
   if (details) {
     selectedDevice.value = details
     detailsDialogOpen.value = true
+    // Reset tab-specific data
+    wifiData.value = null
+    modemData.value = null
   }
 }
 
@@ -191,7 +199,169 @@ const handleTrustUpdated = () => {
   fetchDevices()
 }
 
+// Load WiFi data for selected device
+const loadWiFiData = async () => {
+  if (!selectedDevice.value) return
+  
+  loadingWifi.value = true
+  console.log('=== WiFi Data Debug ===')
+  console.log('Loading WiFi data for device:', selectedDevice.value.id, selectedDevice.value.serial)
+  
+  try {
+    const response = await deviceApi.getDeviceWiFi(selectedDevice.value.id)
+    console.log('Raw WiFi API response:', response)
+    console.log('Response success:', response.success)
+    console.log('Response data:', response.data)
+    console.log('Data type:', typeof response.data)
+    console.log('Data keys:', response.data ? Object.keys(response.data) : 'no data')
+    
+    if (response.success && response.data) {
+      console.log('Raw WiFi API response data:', response.data)
+      
+      // 转换新的数据结构 (radios数组) 为前端期待的结构
+      const rawData = response.data as any
+      let transformedData: any = {}
+      
+      if (rawData.wifi && rawData.wifi.radios) {
+        console.log('转换WiFi radios数据...', rawData.wifi.radios)
+        
+        // 将radios数组转换为wifi_2g和wifi_5g对象
+        const radios = rawData.wifi.radios
+        
+        // 找到2.4G和5G radio
+        const radio2g = radios.find((radio: any) => radio.band === '2.4G')
+        const radio5g = radios.find((radio: any) => radio.band === '5G')
+        
+        if (radio2g) {
+          transformedData.wifi_2g = {
+            enabled: radio2g.enabled,
+            channel: radio2g.channel,
+            txpower: radio2g.txpower,
+            connected_clients: radio2g.connected_clients || 0,
+            ssid: 'WiFi-2.4G', // 默认SSID，后续可能需要从其他地方获取
+            encryption: 'WPA2-PSK', // 默认加密，后续可能需要从其他地方获取
+            bandwidth: '20MHz' // 默认带宽，后续可能需要从其他地方获取
+          }
+        }
+        
+        if (radio5g) {
+          transformedData.wifi_5g = {
+            enabled: radio5g.enabled,
+            channel: radio5g.channel,
+            txpower: radio5g.txpower,
+            connected_clients: radio5g.connected_clients || 0,
+            ssid: 'WiFi-5G', // 默认SSID，后续可能需要从其他地方获取
+            encryption: 'WPA2-PSK', // 默认加密，后续可能需要从其他地方获取
+            bandwidth: '80MHz' // 默认带宽，后续可能需要从其他地方获取
+          }
+        }
+        
+        // 添加总体状态
+        transformedData.ap_enabled = rawData.wifi.ap_enabled
+        transformedData.total_rx_bytes = 0 // 暂时设为0，后续可能需要从其他地方获取
+        transformedData.total_tx_bytes = 0 // 暂时设为0，后续可能需要从其他地方获取
+      }
+      
+      wifiData.value = transformedData
+      
+      console.log('WiFi data transformed successfully:', wifiData.value)
+      
+      // Debug transformed fields
+      console.log('--- Transformed WiFi Data Fields ---')
+      console.log('wifi_2g:', transformedData.wifi_2g)
+      console.log('wifi_5g:', transformedData.wifi_5g)
+      console.log('ap_enabled:', transformedData.ap_enabled)
+    } else {
+      console.warn('Failed to load WiFi data - API returned error:', response.message)
+      console.warn('Or response.data is empty/null')
+      wifiData.value = null
+    }
+  } catch (error) {
+    console.error('Exception when loading WiFi data:', error)
+    console.error('Error details:', (error as Error).message)
+    console.error('Error stack:', (error as Error).stack)
+    wifiData.value = null
+  } finally {
+    loadingWifi.value = false
+    console.log('=== End WiFi Data Debug ===')
+  }
+}
+
+// Load Modem data for selected device
+const loadModemData = async () => {
+  if (!selectedDevice.value) return
+  
+  loadingModem.value = true
+  console.log('=== Modem Data Debug ===')
+  console.log('Loading modem data for device:', selectedDevice.value.id, selectedDevice.value.serial)
+  
+  try {
+    const response = await deviceApi.getDeviceModem(selectedDevice.value.id)
+    console.log('Raw modem API response:', response)
+    console.log('Response success:', response.success)
+    console.log('Response data:', response.data)
+    console.log('Data type:', typeof response.data)
+    console.log('Data keys:', response.data ? Object.keys(response.data) : 'no data')
+    
+    if (response.success && response.data) {
+      // Map API response fields to our expected structure
+      const rawData = response.data as any
+      const mappedData = {
+        sim_status: rawData.sim_status || (rawData.active_slot !== null ? 'ready' : 'no_sim'),
+        active_sim: rawData.active_slot || rawData.active_sim || 1,
+        iccid: rawData.iccid || rawData.sim_iccid || null,
+        imsi: rawData.imsi || rawData.sim_imsi || null,
+        phone_number: rawData.phone_number || rawData.msisdn || null,
+        operator: rawData.operator || rawData.carrier_name || null,
+        signal_strength: rawData.rssi || rawData.signal_strength || null,
+        network_type: rawData.network_type || rawData.net_type || null,
+        ip_address: rawData.ip_address || rawData.wan_ip || null,
+        data_uploaded: rawData.data_uploaded || rawData.tx_bytes || 0,
+        data_downloaded: rawData.data_downloaded || rawData.rx_bytes || 0,
+        connection_time: rawData.connection_time || rawData.uptime || null,
+        last_updated: rawData.last_update || rawData.updated_at || rawData.last_updated || null
+      }
+      
+      // Always use mapped API data, even if empty
+      modemData.value = mappedData
+      
+      console.log('Modem data set successfully:', modemData.value)
+      
+      // Debug both raw and mapped data
+      console.log('--- Raw API Data ---')
+      console.log('active_slot:', rawData.active_slot)
+      console.log('operator:', rawData.operator)
+      console.log('network_type:', rawData.network_type)
+      console.log('rssi:', rawData.rssi)
+      console.log('last_update:', rawData.last_update)
+      
+      console.log('--- Mapped Modem Data ---')
+      console.log('sim_status:', mappedData.sim_status)
+      console.log('active_sim:', mappedData.active_sim)
+      console.log('operator:', mappedData.operator)
+      console.log('signal_strength:', mappedData.signal_strength)
+      console.log('network_type:', mappedData.network_type)
+      console.log('ip_address:', mappedData.ip_address)
+      console.log('data_uploaded:', mappedData.data_uploaded)
+      console.log('data_downloaded:', mappedData.data_downloaded)
+    } else {
+      console.warn('Failed to load Modem data - API returned error:', response.message)
+      console.warn('Or response.data is empty/null')
+      modemData.value = null
+    }
+  } catch (error) {
+    console.error('Exception when loading Modem data:', error)
+    console.error('Error details:', (error as Error).message)
+    console.error('Error stack:', (error as Error).stack)
+    modemData.value = null
+  } finally {
+    loadingModem.value = false
+    console.log('=== End Modem Data Debug ===')
+  }
+}
+
 const formatDate = (dateString: string) => {
+  if (!dateString) return 'Never'
   const date = new Date(dateString)
   return date.toLocaleDateString('en-US', {
     year: 'numeric',
@@ -200,6 +370,17 @@ const formatDate = (dateString: string) => {
     hour: '2-digit',
     minute: '2-digit'
   })
+}
+
+// Format bytes to human readable format
+const formatBytes = (bytes: number) => {
+  if (!bytes || bytes === 0) return '0 B'
+  
+  const k = 1024
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`
 }
 
 const getStatusColor = (isOnline: boolean, isActivated: boolean) => {
@@ -239,6 +420,17 @@ const canOperateDevice = (device: Device) => {
   // Only device owners and trustees can operate devices
   return device.ownership?.isOwner || device.ownership?.isTrusted
 }
+
+// Watch for active tab changes to load data
+watch(() => activeTab.value, (newTab) => {
+  if (!selectedDevice.value) return
+  
+  if (newTab === 'wifi') {
+    loadWiFiData()
+  } else if (newTab === 'modem') {
+    loadModemData()
+  }
+})
 
 // Watch for filter changes
 watch(() => filterForm.is_online, () => {
@@ -538,10 +730,10 @@ useHead({
               <template v-if="column.key === 'ownership'">
                 <VTooltip>
                   <VTag 
-                    :color="getOwnershipType(device).color"
+                    :color="getOwnershipType(device).color as any"
                     outlined
                     rounded
-                    size="small"
+                    size="tiny"
                   >
                     {{ getOwnershipType(device).text }}
                   </VTag>
@@ -589,10 +781,8 @@ useHead({
                   @status-change="handleRemoteAccessStatusChange"
                 />
                 <VTooltip v-else>
-                  <VButton size="small" disabled>
-                    <template #icon>
-                      <iconify-icon icon="lucide:lock" />
-                    </template>
+                  <VButton size="medium" disabled>
+                    <iconify-icon icon="lucide:lock" class="mr-1" />
                   </VButton>
                   <template #content>
                     Only device owners and trustees can operate
@@ -781,75 +971,336 @@ useHead({
           >
             <template #tab="{ activeValue }">
               <div v-if="activeValue === 'basic'">
-                <div class="columns is-multiline">
-                  <div class="column is-6">
-                    <VField>
-                      <VLabel>Serial Number</VLabel>
-                      <VControl>
-                        <VInput :value="selectedDevice.serial" readonly />
-                      </VControl>
-                    </VField>
+                <div class="device-info-grid">
+                  <div class="device-info-item">
+                    <label>Serial Number</label>
+                    <span class="device-info-value">{{ selectedDevice.serial }}</span>
                   </div>
-                  <div class="column is-6">
-                    <VField>
-                      <VLabel>Device Name</VLabel>
-                      <VControl>
-                        <VInput :value="selectedDevice.name || 'Unnamed Device'" readonly />
-                      </VControl>
-                    </VField>
+                  <div class="device-info-item">
+                    <label>Device Name</label>
+                    <span class="device-info-value">{{ selectedDevice.name || 'Unnamed Device' }}</span>
                   </div>
-                  <div class="column is-6">
-                    <VField>
-                      <VLabel>Brand</VLabel>
-                      <VControl>
-                        <VInput :value="selectedDevice.deviceModel?.oemname || '-'" readonly />
-                      </VControl>
-                    </VField>
+                  <div class="device-info-item">
+                    <label>Brand</label>
+                    <span class="device-info-value">{{ selectedDevice.deviceModel?.oemname || '-' }}</span>
                   </div>
-                  <div class="column is-6">
-                    <VField>
-                      <VLabel>Model</VLabel>
-                      <VControl>
-                        <VInput :value="selectedDevice.deviceModel?.stdname || '-'" readonly />
-                      </VControl>
-                    </VField>
+                  <div class="device-info-item">
+                    <label>Model</label>
+                    <span class="device-info-value">{{ selectedDevice.deviceModel?.stdname || '-' }}</span>
                   </div>
-                  <div class="column is-6">
-                    <VField>
-                      <VLabel>MAC Address</VLabel>
-                      <VControl>
-                        <VInput :value="selectedDevice.primary_mac" readonly />
-                      </VControl>
-                    </VField>
+                  <div class="device-info-item">
+                    <label>MAC Address</label>
+                    <span class="device-info-value">{{ selectedDevice.primary_mac }}</span>
                   </div>
-                  <div class="column is-6">
-                    <VField>
-                      <VLabel>Status</VLabel>
-                      <VControl>
-                        <VTag 
-                          :color="getStatusColor(selectedDevice.is_online, selectedDevice.is_activate)"
-                          outlined
-                        >
-                          {{ getStatusText(selectedDevice.is_online, selectedDevice.is_activate) }}
-                        </VTag>
-                      </VControl>
-                    </VField>
+                  <div class="device-info-item">
+                    <label>WAN IP</label>
+                    <span class="device-info-value">{{ selectedDevice.wanip || 'Not Available' }}</span>
+                  </div>
+                  <div class="device-info-item">
+                    <label>Public IP</label>
+                    <span class="device-info-value">{{ selectedDevice.public_ip || 'Not Available' }}</span>
+                  </div>
+                  <div class="device-info-item">
+                    <label>Firmware Version</label>
+                    <span class="device-info-value">{{ selectedDevice.version || 'Unknown' }}</span>
+                  </div>
+                  <div class="device-info-item">
+                    <label>First Connection</label>
+                    <span class="device-info-value">{{ formatDate(selectedDevice.firsttime || '') }}</span>
+                  </div>
+                  <div class="device-info-item">
+                    <label>Last Seen</label>
+                    <span class="device-info-value">{{ formatDate(selectedDevice.last_seen || '') }}</span>
+                  </div>
+                  <div class="device-info-item">
+                    <label>Created At</label>
+                    <span class="device-info-value">{{ formatDate(selectedDevice.created_at || '') }}</span>
+                  </div>
+                  <div class="device-info-item">
+                    <label>Status</label>
+                    <div class="device-info-value">
+                      <VTag 
+                        :color="getStatusColor(selectedDevice.is_online, selectedDevice.is_activate)"
+                        outlined
+                        size="tiny"
+                      >
+                        {{ getStatusText(selectedDevice.is_online, selectedDevice.is_activate) }}
+                      </VTag>
+                    </div>
                   </div>
                 </div>
               </div>
               
               <div v-else-if="activeValue === 'wifi'">
-                <VPlaceholderSection
-                  title="WiFi Status"
-                  subtitle="WiFi status information will be displayed here"
-                />
+                <div v-if="loadingWifi" class="has-text-centered py-6">
+                  <VLoader />
+                  <p class="mt-4">Loading WiFi status...</p>
+                </div>
+                
+                <div v-else-if="wifiData" class="wifi-status-content">
+                  <div class="columns is-multiline">
+                    <!-- WiFi Basic Info -->
+                    <div class="column is-12">
+                      <h4 class="title is-6 mb-4">WiFi Configuration</h4>
+                    </div>
+                    
+                    <!-- 2.4G WiFi -->
+                    <div v-if="wifiData.wifi_2g" class="column is-6">
+                      <VCard>
+                        <template #header>
+                          <VFlex align-items="center" justify-content="space-between">
+                            <h5 class="title is-6">2.4GHz WiFi</h5>
+                            <VTag :color="wifiData.wifi_2g.enabled ? 'success' : 'danger'" size="tiny">
+                              {{ wifiData.wifi_2g.enabled ? 'Enabled' : 'Disabled' }}
+                            </VTag>
+                          </VFlex>
+                        </template>
+                        
+                        <div class="wifi-info">
+                          <div class="info-item">
+                            <label>SSID:</label>
+                            <span>{{ wifiData.wifi_2g.ssid || 'Not set' }}</span>
+                          </div>
+                          <div class="info-item">
+                            <label>Channel:</label>
+                            <span>{{ wifiData.wifi_2g.channel || 'Auto' }}</span>
+                          </div>
+                          <div class="info-item">
+                            <label>Security:</label>
+                            <span>{{ wifiData.wifi_2g.encryption || 'None' }}</span>
+                          </div>
+                          <div class="info-item">
+                            <label>Bandwidth:</label>
+                            <span>{{ wifiData.wifi_2g.bandwidth || 'Unknown' }}</span>
+                          </div>
+                          <div v-if="wifiData.wifi_2g.connected_clients !== undefined" class="info-item">
+                            <label>Connected Clients:</label>
+                            <span>{{ wifiData.wifi_2g.connected_clients }}</span>
+                          </div>
+                        </div>
+                      </VCard>
+                    </div>
+                    
+                    <!-- 5G WiFi -->
+                    <div v-if="wifiData.wifi_5g" class="column is-6">
+                      <VCard>
+                        <template #header>
+                          <VFlex align-items="center" justify-content="space-between">
+                            <h5 class="title is-6">5GHz WiFi</h5>
+                            <VTag :color="wifiData.wifi_5g.enabled ? 'success' : 'danger'" size="tiny">
+                              {{ wifiData.wifi_5g.enabled ? 'Enabled' : 'Disabled' }}
+                            </VTag>
+                          </VFlex>
+                        </template>
+                        
+                        <div class="wifi-info">
+                          <div class="info-item">
+                            <label>SSID:</label>
+                            <span>{{ wifiData.wifi_5g.ssid || 'Not set' }}</span>
+                          </div>
+                          <div class="info-item">
+                            <label>Channel:</label>
+                            <span>{{ wifiData.wifi_5g.channel || 'Auto' }}</span>
+                          </div>
+                          <div class="info-item">
+                            <label>Security:</label>
+                            <span>{{ wifiData.wifi_5g.encryption || 'None' }}</span>
+                          </div>
+                          <div class="info-item">
+                            <label>Bandwidth:</label>
+                            <span>{{ wifiData.wifi_5g.bandwidth || 'Unknown' }}</span>
+                          </div>
+                          <div v-if="wifiData.wifi_5g.connected_clients !== undefined" class="info-item">
+                            <label>Connected Clients:</label>
+                            <span>{{ wifiData.wifi_5g.connected_clients }}</span>
+                          </div>
+                        </div>
+                      </VCard>
+                    </div>
+                    
+                    <!-- WiFi Status Summary -->
+                    <div class="column is-12">
+                      <VCard>
+                        <template #header>
+                          <h5 class="title is-6">WiFi Statistics</h5>
+                        </template>
+                        
+                        <div class="columns">
+                          <div class="column is-3">
+                            <div class="stat-item">
+                              <span class="stat-value">{{ (wifiData.wifi_2g?.connected_clients || 0) + (wifiData.wifi_5g?.connected_clients || 0) }}</span>
+                              <span class="stat-label">Total Clients</span>
+                            </div>
+                          </div>
+                          <div class="column is-3">
+                            <div class="stat-item">
+                              <span class="stat-value">{{ wifiData.total_rx_bytes ? formatBytes(wifiData.total_rx_bytes) : 'N/A' }}</span>
+                              <span class="stat-label">Total Received</span>
+                            </div>
+                          </div>
+                          <div class="column is-3">
+                            <div class="stat-item">
+                              <span class="stat-value">{{ wifiData.total_tx_bytes ? formatBytes(wifiData.total_tx_bytes) : 'N/A' }}</span>
+                              <span class="stat-label">Total Transmitted</span>
+                            </div>
+                          </div>
+                          <div class="column is-3">
+                            <div class="stat-item">
+                              <span class="stat-value">{{ formatDate(wifiData.last_updated || selectedDevice?.last_seen || '') }}</span>
+                              <span class="stat-label">Last Updated</span>
+                            </div>
+                          </div>
+                        </div>
+                      </VCard>
+                    </div>
+                  </div>
+                </div>
+                
+                <div v-else class="has-text-centered py-6">
+                  <VPlaceholderSection
+                    title="WiFi Status Unavailable"
+                    subtitle="WiFi status information is not available for this device"
+                  >
+                    <template #action>
+                      <VButton @click="loadWiFiData" outlined>
+                        <iconify-icon icon="lucide:refresh-cw" class="mr-2" />
+                        Retry
+                      </VButton>
+                    </template>
+                  </VPlaceholderSection>
+                </div>
               </div>
               
               <div v-else-if="activeValue === 'modem'">
-                <VPlaceholderSection
-                  title="Modem Status"
-                  subtitle="Modem status information will be displayed here"
-                />
+                <div v-if="loadingModem" class="has-text-centered py-6">
+                  <VLoader />
+                  <p class="mt-4">Loading Modem status...</p>
+                </div>
+                
+                <div v-else-if="modemData" class="modem-status-content">
+                  <div class="columns is-multiline">
+                    <!-- Modem Basic Info -->
+                    <div class="column is-12">
+                      <h4 class="title is-6 mb-4">Modem Configuration</h4>
+                    </div>
+                    
+                    <!-- SIM Card Status -->
+                    <div class="column is-6">
+                      <VCard>
+                        <template #header>
+                          <VFlex align-items="center" justify-content="space-between">
+                            <h5 class="title is-6">SIM Card Status</h5>
+                            <VTag :color="modemData.sim_status === 'ready' ? 'success' : 'warning'" size="tiny">
+                              {{ modemData.sim_status || 'Unknown' }}
+                            </VTag>
+                          </VFlex>
+                        </template>
+                        
+                        <div class="wifi-info">
+                          <div class="info-item">
+                            <label>Active Slot:</label>
+                            <span>SIM {{ modemData.active_sim || '1' }}</span>
+                          </div>
+                          <div class="info-item">
+                            <label>ICCID:</label>
+                            <span>{{ modemData.iccid || 'Not available' }}</span>
+                          </div>
+                          <div class="info-item">
+                            <label>IMSI:</label>
+                            <span>{{ modemData.imsi || 'Not available' }}</span>
+                          </div>
+                          <div class="info-item">
+                            <label>Phone Number:</label>
+                            <span>{{ modemData.phone_number || 'Not available' }}</span>
+                          </div>
+                        </div>
+                      </VCard>
+                    </div>
+                    
+                    <!-- Network Info -->
+                    <div class="column is-6">
+                      <VCard>
+                        <template #header>
+                          <VFlex align-items="center" justify-content="space-between">
+                            <h5 class="title is-6">Network Information</h5>
+                            <VTag :color="modemData.network_type ? 'success' : 'danger'" size="tiny">
+                              {{ modemData.network_type || 'Disconnected' }}
+                            </VTag>
+                          </VFlex>
+                        </template>
+                        
+                        <div class="wifi-info">
+                          <div class="info-item">
+                            <label>Operator:</label>
+                            <span>{{ modemData.operator || 'Unknown' }}</span>
+                          </div>
+                          <div class="info-item">
+                            <label>Signal Strength:</label>
+                            <span>{{ modemData.signal_strength ? `${modemData.signal_strength} dBm` : 'N/A' }}</span>
+                          </div>
+                          <div class="info-item">
+                            <label>Network Type:</label>
+                            <span>{{ modemData.network_type || 'Unknown' }}</span>
+                          </div>
+                          <div class="info-item">
+                            <label>IP Address:</label>
+                            <span>{{ modemData.ip_address || 'Not assigned' }}</span>
+                          </div>
+                        </div>
+                      </VCard>
+                    </div>
+                    
+                    <!-- Data Usage -->
+                    <div class="column is-12">
+                      <VCard>
+                        <template #header>
+                          <h5 class="title is-6">Data Usage Statistics</h5>
+                        </template>
+                        
+                        <div class="columns">
+                          <div class="column is-3">
+                            <div class="stat-item">
+                              <span class="stat-value">{{ modemData.data_uploaded ? formatBytes(modemData.data_uploaded) : '0 B' }}</span>
+                              <span class="stat-label">Data Uploaded</span>
+                            </div>
+                          </div>
+                          <div class="column is-3">
+                            <div class="stat-item">
+                              <span class="stat-value">{{ modemData.data_downloaded ? formatBytes(modemData.data_downloaded) : '0 B' }}</span>
+                              <span class="stat-label">Data Downloaded</span>
+                            </div>
+                          </div>
+                          <div class="column is-3">
+                            <div class="stat-item">
+                              <span class="stat-value">{{ modemData.connection_time || '0h 0m' }}</span>
+                              <span class="stat-label">Connection Time</span>
+                            </div>
+                          </div>
+                          <div class="column is-3">
+                            <div class="stat-item">
+                              <span class="stat-value">{{ formatDate(modemData.last_updated || selectedDevice?.last_seen || '') }}</span>
+                              <span class="stat-label">Last Updated</span>
+                            </div>
+                          </div>
+                        </div>
+                      </VCard>
+                    </div>
+                  </div>
+                </div>
+                
+                <div v-else class="has-text-centered py-6">
+                  <VPlaceholderSection
+                    title="Modem Status Unavailable"
+                    subtitle="Modem status information is not available for this device"
+                  >
+                    <template #action>
+                      <VButton @click="loadModemData" outlined>
+                        <iconify-icon icon="lucide:refresh-cw" class="mr-2" />
+                        Retry
+                      </VButton>
+                    </template>
+                  </VPlaceholderSection>
+                </div>
               </div>
             </template>
           </VTabs>
@@ -889,7 +1340,105 @@ useHead({
   }
 }
 
+// Device Info Grid Styles
+.device-info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+  padding: 1rem 0;
+}
+
+.device-info-item {
+  padding: 1rem;
+  background: var(--fade-grey-light-6);
+  border-radius: var(--radius);
+  border: 1px solid var(--fade-grey-light-3);
+  
+  label {
+    display: block;
+    font-weight: 600;
+    color: var(--muted-grey);
+    font-size: 0.85rem;
+    margin-bottom: 0.5rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  
+  .device-info-value {
+    color: var(--dark-text);
+    font-weight: 500;
+    word-break: break-all;
+    font-size: 0.95rem;
+  }
+}
+
+// WiFi Status Styles
+.wifi-status-content {
+  .wifi-info {
+    padding: 1rem;
+    
+    .info-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.5rem 0;
+      border-bottom: 1px solid var(--fade-grey-light-3);
+      
+      &:last-child {
+        border-bottom: none;
+      }
+      
+      label {
+        font-weight: 600;
+        color: var(--dark-text);
+        font-size: 0.85rem;
+        min-width: 120px;
+      }
+      
+      span {
+        color: var(--muted-grey);
+        font-size: 0.9rem;
+      }
+    }
+  }
+  
+  .stat-item {
+    text-align: center;
+    padding: 1rem;
+    
+    .stat-value {
+      display: block;
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--primary);
+      margin-bottom: 0.25rem;
+    }
+    
+    .stat-label {
+      display: block;
+      font-size: 0.75rem;
+      color: var(--muted-grey);
+      text-transform: uppercase;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+    }
+  }
+}
+
 :deep(.dark) {
+  .device-info-item {
+    background: var(--dark-sidebar-light-6);
+    border-color: var(--dark-sidebar-light-12);
+    
+    label {
+      color: var(--dark-light-text);
+    }
+    
+    .device-info-value {
+      color: var(--dark-dark-text);
+    }
+  }
+  
   .model-info {
     .model-brand {
       color: var(--dark-dark-text);
@@ -897,6 +1446,20 @@ useHead({
     
     .model-name {
       color: var(--dark-light-text);
+    }
+  }
+  
+  .wifi-status-content {
+    .info-item {
+      border-bottom-color: var(--dark-sidebar-light-2);
+      
+      label {
+        color: var(--dark-dark-text);
+      }
+      
+      span {
+        color: var(--dark-light-text);
+      }
     }
   }
 }

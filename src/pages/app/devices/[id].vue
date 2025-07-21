@@ -27,9 +27,13 @@ const actionLoading = ref(false)
 
 // Computed MAC addresses
 const calculatedMacAddresses = computed(() => {
-  if (!device.value?.serialNumber) return []
+  if (!device.value?.serialNumber) {
+    console.log('No serialNumber data for MAC calculation')
+    return []
+  }
   
   const { mac_start, mac_count, mac_interval } = device.value.serialNumber
+  console.log('MAC calculation data:', { mac_start, mac_count, mac_interval })
   const addresses = []
   
   // Convert MAC address to number for calculation
@@ -96,19 +100,38 @@ const saveDeviceName = async () => {
   }
 }
 
+// Force reset editing state
+const resetEditingState = () => {
+  editingName.value = false
+  editName.value = ''
+  console.log('Editing state reset - editingName:', editingName.value)
+}
+
 // Load device details
 const loadDeviceDetails = async () => {
-  const deviceId = Number((route.params as { id: string }).id)
-  if (!deviceId) {
+  const rawId = String(route.params.id || '')
+  const deviceId = Number(rawId)
+  if (!rawId || !deviceId || isNaN(deviceId)) {
+    console.error('Invalid device ID:', rawId)
+    notyf.error('Invalid device ID')
     router.push('/app/devices')
     return
   }
 
   loading.value = true
+  console.log('Loading device details for ID:', deviceId)
+  
   try {
     device.value = await devicesStore.fetchDeviceDetails(deviceId)
+    console.log('Device details loaded:', device.value)
+    
+    // Force reset editing state after device loads
+    resetEditingState()
+    
     if (device.value) {
       await loadStatusHistory()
+    } else {
+      console.warn('No device data returned from store')
     }
   } catch (error) {
     console.error('Failed to load device details:', error)
@@ -123,12 +146,18 @@ const loadStatusHistory = async () => {
   if (!device.value) return
   
   try {
+    console.log('Loading status history for device ID:', device.value.id)
     const response = await devicesApi.getDeviceStatus(device.value.id, { limit: 10 })
+    console.log('Status history response:', response)
+    
     if (response.success) {
       statusHistory.value = response.data
+      console.log('Status history loaded:', statusHistory.value)
+    } else {
+      console.warn('Failed to load status history:', response.message)
     }
   } catch (error) {
-    console.error('Failed to load status history:', error)
+    console.error('Exception when loading status history:', error)
   }
 }
 
@@ -206,6 +235,18 @@ useHead({
       <VPlaceload class="mb-4" />
     </div>
 
+    <!-- Debug Info -->
+    <div v-if="!loading" class="debug-info" style="background: yellow; padding: 10px; margin: 10px; border: 2px solid red;">
+      <h4>DEBUG INFO:</h4>
+      <p>Device exists: {{ !!device }}</p>
+      <p>Device ID: {{ device?.id }}</p>
+      <p>Device Serial: {{ device?.serial }}</p>
+      <p>editingName: {{ editingName }} (type: {{ typeof editingName }})</p>
+      <p>editingName raw: {{ editingName }} (should be false)</p>
+      <p>Loading: {{ loading }}</p>
+      <p>Template render condition (!editingName): {{ !editingName }}</p>
+    </div>
+
     <!-- Device Content -->
     <div v-else-if="device" class="device-content">
       <!-- Basic Information -->
@@ -228,13 +269,14 @@ useHead({
           <div class="common-info-item">
             <label>Device Name</label>
             <div class="common-editable-field">
-              <span v-if="!editingName">{{ device.name || 'Unnamed Device' }}</span>
+              <span v-if="!editingName" :key="'span-' + device.id">{{ device.name || 'Unnamed Device' }}</span>
               <VInput 
                 v-else 
                 v-model="editName" 
                 size="small" 
                 @blur="saveDeviceName"
                 @keyup.enter="saveDeviceName"
+                :key="'input-' + device.id"
               />
               <VButton 
                 v-if="!editingName"
@@ -249,6 +291,9 @@ useHead({
 
           <div class="common-info-item">
             <label>Serial Number</label>
+            <div style="background: lightblue; padding: 5px; margin: 2px;">
+              <small>DEBUG: device.serial = {{ device.serial }} (type: {{ typeof device.serial }})</small>
+            </div>
             <span>{{ device.serial }}</span>
           </div>
 
