@@ -125,6 +125,8 @@ const handleLogin = async () => {
   }
 
   loading.value = true
+  // 清除之前的错误信息
+  errors.value = { email: '', password: '' }
 
   try {
     const success = await userSession.loginUser({
@@ -138,7 +140,22 @@ const handleLogin = async () => {
     }
   } catch (error: any) {
     console.error('Login failed:', error)
-    notyf.error(error.message || 'Login failed')
+    const errorMessage = error.message || 'Login failed'
+    
+    // 根据错误消息类型设置到相应的输入框下方
+    if (errorMessage.includes('Invalid email or password') || 
+        errorMessage.includes('password') || errorMessage.includes('Password') ||
+        errorMessage.includes('Invalid credentials') || errorMessage.includes('Authentication failed')) {
+      errors.value.password = errorMessage
+    } else if (errorMessage.includes('email') || errorMessage.includes('Email') || 
+               errorMessage.includes('user not found') || errorMessage.includes('User not found')) {
+      errors.value.email = errorMessage
+    } else {
+      // 对于其他错误，显示在密码框下方（通常是认证错误）
+      errors.value.password = errorMessage
+    }
+    
+    // 不再使用 notyf 弹窗，错误直接显示在输入框下方
   } finally {
     loading.value = false
   }

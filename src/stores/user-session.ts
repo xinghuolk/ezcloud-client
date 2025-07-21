@@ -63,8 +63,9 @@ export const useUserSession = defineStore('userSession', () => {
       return false
     } catch (error: any) {
       console.error('Login error:', error)
-      notyf.error(error.message || 'Login failed')
-      return false
+      // 不在这里显示错误消息，让上层组件处理
+      // 抛出包含具体错误信息的错误供上层使用
+      throw new Error(error.message || 'Login failed')
     } finally {
       loading.value = false
     }

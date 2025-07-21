@@ -71,10 +71,16 @@ request.interceptors.response.use(
     
     // 新的统一响应格式：{success, message, data}
     if (typeof data === 'object' && data !== null) {
-      // 如果响应不成功，显示错误消息
+      // 如果响应不成功，对于登录API不在这里显示错误消息
       if (data.success === false) {
-        notyf.error(data.message || 'Request failed')
-        return Promise.reject(new Error(data.message || 'Request failed'))
+        if (response.config.url?.includes('/auth/login')) {
+          // 登录API的错误由上层处理，这里只reject错误，不显示消息
+          return Promise.reject(new Error(data.message || 'Request failed'))
+        } else {
+          // 其他API的错误在这里显示消息
+          notyf.error(data.message || 'Request failed')
+          return Promise.reject(new Error(data.message || 'Request failed'))
+        }
       }
       
       // 响应成功，返回完整响应数据
@@ -103,7 +109,14 @@ request.interceptors.response.use(
           break
         case 401:
         case 403:
-          // 401和403都可能是token无效导致的，统一处理
+          // 对于登录API的401错误，不在这里显示错误消息（由上层处理）
+          if (error.config?.url?.includes('/auth/login')) {
+            // 登录失败的错误消息由登录逻辑处理，这里不显示重复消息
+            // 但需要传递具体的错误消息给上层
+            return Promise.reject(new Error(errorMessage))
+          }
+          
+          // 其他401和403都是token无效导致的，统一处理
           errorMessage = status === 401 ? 'Unauthorized, please login again' : 'Access denied, please login again'
           notyf.error(errorMessage)
           // 清除本地存储的认证信息

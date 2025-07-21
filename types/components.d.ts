@@ -11,6 +11,7 @@ declare module 'vue' {
     AuthLayout: typeof import('./../src/components/layouts/auth/AuthLayout.vue')['default']
     ClientOnly: typeof import('./../src/components/ClientOnly.vue')['default']
     DevicesRefactoredExample: typeof import('./../src/components/partials/table/DevicesRefactoredExample.vue')['default']
+    DeviceTrustManager: typeof import('./../src/components/DeviceTrustManager.vue')['default']
     LandingFooter: typeof import('./../src/components/layouts/landing/LandingFooter.vue')['default']
     LandingGrids: typeof import('./../src/components/layouts/landing/LandingGrids.vue')['default']
     LandingLayout: typeof import('./../src/components/layouts/landing/LandingLayout.vue')['default']

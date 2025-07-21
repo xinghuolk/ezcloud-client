@@ -234,6 +234,12 @@ const getOwnershipTooltip = (device: Device) => {
   return '设备归属不明'
 }
 
+// 权限控制方法
+const canOperateDevice = (device: Device) => {
+  // 只有设备拥有者和被委托者可以操作设备
+  return device.ownership?.isOwner || device.ownership?.isTrusted
+}
+
 // Watch for filter changes
 watch(() => filterForm.is_online, () => {
   handleImmediateSearch()
@@ -577,10 +583,21 @@ useHead({
 
               <template v-if="column.key === 'remoteAccess'">
                 <RemoteAccessButton
+                  v-if="canOperateDevice(device)"
                   :device="device"
                   :show-status-indicators="false"
                   @status-change="handleRemoteAccessStatusChange"
                 />
+                <VTooltip v-else>
+                  <VButton size="small" disabled>
+                    <template #icon>
+                      <iconify-icon icon="lucide:lock" />
+                    </template>
+                  </VButton>
+                  <template #content>
+                    仅设备拥有者和被委托者可操作
+                  </template>
+                </VTooltip>
               </template>
 
               <template v-if="column.key === 'lastSeen'">
@@ -614,8 +631,12 @@ useHead({
                         <span>Manage Trust</span>
                       </div>
                     </a>
-                    <hr class="dropdown-divider">
-                    <a class="dropdown-item is-media" @click="handleReboot(device)">
+                    <hr v-if="canOperateDevice(device)" class="dropdown-divider">
+                    <a 
+                      v-if="canOperateDevice(device)"
+                      class="dropdown-item is-media" 
+                      @click="handleReboot(device)"
+                    >
                       <div class="icon">
                         <iconify-icon icon="lucide:refresh-cw" />
                       </div>
@@ -623,7 +644,11 @@ useHead({
                         <span>Reboot</span>
                       </div>
                     </a>
-                    <a class="dropdown-item is-media" @click="handleSIMSwitch(device, 1)">
+                    <a 
+                      v-if="canOperateDevice(device)"
+                      class="dropdown-item is-media" 
+                      @click="handleSIMSwitch(device, 1)"
+                    >
                       <div class="icon">
                         <iconify-icon icon="lucide:sim-card" />
                       </div>
@@ -631,7 +656,11 @@ useHead({
                         <span>Switch to Slot 1</span>
                       </div>
                     </a>
-                    <a class="dropdown-item is-media" @click="handleSIMSwitch(device, 2)">
+                    <a 
+                      v-if="canOperateDevice(device)"
+                      class="dropdown-item is-media" 
+                      @click="handleSIMSwitch(device, 2)"
+                    >
                       <div class="icon">
                         <iconify-icon icon="lucide:sim-card" />
                       </div>
