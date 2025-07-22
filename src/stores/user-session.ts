@@ -4,6 +4,7 @@ import { authApi } from '/@src/api'
 import type { User, LoginParams, RegisterParams } from '/@src/api/types'
 import { useUserToken } from '/@src/composables/user-token'
 import { Notyf } from 'notyf'
+import { extractErrorMessage } from '/@src/utils/error-utils'
 
 // 创建通知实例
 const notyf = new Notyf()
@@ -83,7 +84,7 @@ export const useUserSession = defineStore('userSession', () => {
       return false
     } catch (error: any) {
       console.error('Register error:', error)
-      notyf.error(error.message || 'Registration failed')
+      notyf.error(extractErrorMessage(error, 'Registration failed'))
       return false
     } finally {
       loading.value = false
@@ -128,7 +129,7 @@ export const useUserSession = defineStore('userSession', () => {
       return false
     } catch (error: any) {
       console.error('Update profile error:', error)
-      notyf.error(error.message || 'Update failed')
+      notyf.error(extractErrorMessage(error, 'Profile update failed'))
       return false
     } finally {
       loading.value = false
@@ -147,7 +148,7 @@ export const useUserSession = defineStore('userSession', () => {
       return false
     } catch (error: any) {
       console.error('Change password error:', error)
-      notyf.error(error.message || 'Password change failed')
+      notyf.error(extractErrorMessage(error, 'Password change failed'))
       return false
     } finally {
       loading.value = false

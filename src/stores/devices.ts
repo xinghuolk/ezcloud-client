@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import type { Device, DeviceQuery, DeviceTrustParams, DeviceTrustUpdateParams, DeviceTrusted } from '/@src/api/types'
 import { Notyf } from 'notyf'
 import { deviceApi } from '/@src/api'
+import { extractErrorMessage } from '/@src/utils/error-utils'
 
 const notyf = new Notyf()
 
@@ -46,7 +47,7 @@ export const useDeviceStore = defineStore('devices', () => {
       }
     } catch (error) {
       console.error('Failed to fetch devices:', error)
-      notyf.error('Failed to fetch devices')
+      notyf.error(extractErrorMessage(error, 'Failed to fetch devices'))
     } finally {
       loading.value = false
     }
@@ -69,7 +70,7 @@ export const useDeviceStore = defineStore('devices', () => {
       }
     } catch (error) {
       console.error('Store: Exception when fetching device details:', error)
-      notyf.error('Failed to fetch device details')
+      notyf.error(extractErrorMessage(error, 'Failed to fetch device details'))
       return null
     }
   }
@@ -88,7 +89,7 @@ export const useDeviceStore = defineStore('devices', () => {
       }
     } catch (error) {
       console.error('Failed to bind device:', error)
-      notyf.error('Failed to bind device')
+      notyf.error(extractErrorMessage(error, 'Failed to bind device'))
       return false
     }
   }
@@ -107,7 +108,7 @@ export const useDeviceStore = defineStore('devices', () => {
       }
     } catch (error) {
       console.error('Failed to unbind device:', error)
-      notyf.error('Failed to unbind device')
+      notyf.error(extractErrorMessage(error, 'Failed to unbind device'))
       return false
     }
   }
@@ -132,7 +133,7 @@ export const useDeviceStore = defineStore('devices', () => {
       }
     } catch (error) {
       console.error('Failed to update device name:', error)
-      notyf.error('Failed to update device name')
+      notyf.error(extractErrorMessage(error, 'Failed to update device name'))
       return false
     }
   }
@@ -149,7 +150,7 @@ export const useDeviceStore = defineStore('devices', () => {
       }
     } catch (error) {
       console.error('Failed to reboot device:', error)
-      notyf.error('Failed to reboot device')
+      notyf.error(extractErrorMessage(error, 'Failed to reboot device'))
       return false
     }
   }
@@ -166,7 +167,7 @@ export const useDeviceStore = defineStore('devices', () => {
       }
     } catch (error) {
       console.error('Failed to switch SIM:', error)
-      notyf.error('Failed to switch SIM')
+      notyf.error(extractErrorMessage(error, 'Failed to switch SIM'))
       return false
     }
   }
@@ -183,7 +184,7 @@ export const useDeviceStore = defineStore('devices', () => {
       }
     } catch (error) {
       console.error('Failed to collect logs:', error)
-      notyf.error('Failed to collect logs')
+      notyf.error(extractErrorMessage(error, 'Failed to collect logs'))
       return false
     }
   }
@@ -203,7 +204,7 @@ export const useDeviceStore = defineStore('devices', () => {
       }
     } catch (error) {
       console.error(`Failed to perform batch ${operation}:`, error)
-      notyf.error(`Failed to perform batch ${operation}`)
+      notyf.error(extractErrorMessage(error, `Failed to perform batch ${operation}`))
       return false
     }
   }
@@ -238,17 +239,17 @@ export const useDeviceStore = defineStore('devices', () => {
     try {
       const response = await deviceApi.trustDevice(deviceId, params)
       if (response.success) {
-        notyf.success('设备托管成功')
+        notyf.success('Device trust granted successfully')
         // 可选择刷新设备列表或更新本地数据
         await fetchDeviceDetails(deviceId)
         return true
       } else {
-        notyf.error(response.message || '设备托管失败')
+        notyf.error(response.message || 'Failed to grant device trust')
         return false
       }
     } catch (error) {
       console.error('Failed to trust device:', error)
-      notyf.error('设备托管失败')
+      notyf.error(extractErrorMessage(error, 'Failed to grant device trust'))
       return false
     }
   }
@@ -257,17 +258,17 @@ export const useDeviceStore = defineStore('devices', () => {
     try {
       const response = await deviceApi.untrustDevice(deviceId, userId)
       if (response.success) {
-        notyf.success('取消设备托管成功')
+        notyf.success('Device trust revoked successfully')
         // 刷新设备详情
         await fetchDeviceDetails(deviceId)
         return true
       } else {
-        notyf.error(response.message || '取消设备托管失败')
+        notyf.error(response.message || 'Failed to revoke device trust')
         return false
       }
     } catch (error) {
       console.error('Failed to untrust device:', error)
-      notyf.error('取消设备托管失败')
+      notyf.error(extractErrorMessage(error, 'Failed to revoke device trust'))
       return false
     }
   }
@@ -278,12 +279,12 @@ export const useDeviceStore = defineStore('devices', () => {
       if (response.success) {
         return response.data.trustees
       } else {
-        notyf.error(response.message || '获取托管列表失败')
+        notyf.error(response.message || 'Failed to get trustees list')
         return []
       }
     } catch (error) {
       console.error('Failed to get device trustees:', error)
-      notyf.error('获取托管列表失败')
+      notyf.error(extractErrorMessage(error, 'Failed to get trustees list'))
       return []
     }
   }
@@ -292,17 +293,17 @@ export const useDeviceStore = defineStore('devices', () => {
     try {
       const response = await deviceApi.updateDeviceTrust(deviceId, userId, params)
       if (response.success) {
-        notyf.success('更新托管关系成功')
+        notyf.success('Device trust relationship updated successfully')
         // 刷新设备详情
         await fetchDeviceDetails(deviceId)
         return response.data
       } else {
-        notyf.error(response.message || '更新托管关系失败')
+        notyf.error(response.message || 'Failed to update device trust relationship')
         return null
       }
     } catch (error) {
       console.error('Failed to update device trust:', error)
-      notyf.error('更新托管关系失败')
+      notyf.error(extractErrorMessage(error, 'Failed to update device trust relationship'))
       return null
     }
   }

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { useUserSession } from '/@src/stores/user-session'
 import { useDeviceStore } from '/@src/stores/devices'
 import { statsApi } from '/@src/api'
@@ -46,27 +46,51 @@ const isAdmin = computed(() => userSession.isAdmin)
 const loadDashboardData = async () => {
   loading.value = true
   try {
-    // Load dashboard stats
-    const response = await statsApi.getDashboardStats()
-    if (response.success && response.data) {
-      stats.value = {
-        totalDevices: response.data.totalDevices,
-        onlineDevices: response.data.onlineDevices,
-        activatedDevices: response.data.activatedDevices,
-        totalModels: 0, // Will be updated when models API is ready
-        totalUsers: response.data.totalUsers
+    if (isAdmin.value) {
+      // Load system-wide stats for admins
+      const response = await statsApi.getDashboardStats()
+      if (response.success && response.data) {
+        stats.value = {
+          totalDevices: response.data.totalDevices,
+          onlineDevices: response.data.onlineDevices,
+          activatedDevices: response.data.activatedDevices,
+          totalModels: 0, // Will be updated when models API is ready
+          totalUsers: response.data.totalUsers
+        }
+        recentDevices.value = response.data.recentDevices || []
       }
-      recentDevices.value = response.data.recentDevices || []
+    } else {
+      // Load personal device stats for regular users
+      await deviceStore.fetchDevicesWithTrusted()
+      stats.value = {
+        totalDevices: deviceStore.deviceCount,
+        onlineDevices: deviceStore.onlineCount,
+        activatedDevices: deviceStore.activatedCount,
+        totalModels: 0, // Not relevant for regular users
+        totalUsers: deviceStore.trustedCount // Show trusted devices count instead
+      }
+      // Show recent devices from user's own devices
+      recentDevices.value = deviceStore.devices.slice(0, 5) // Show first 5 devices
     }
   } catch (error) {
     console.warn('Dashboard API not available, using fallback data:', error)
     // Use fallback data when API is not available
-    stats.value = {
-      totalDevices: 127,
-      onlineDevices: 89,
-      activatedDevices: 76,
-      totalModels: 12,
-      totalUsers: 24
+    if (isAdmin.value) {
+      stats.value = {
+        totalDevices: 127,
+        onlineDevices: 89,
+        activatedDevices: 76,
+        totalModels: 12,
+        totalUsers: 24
+      }
+    } else {
+      stats.value = {
+        totalDevices: 3,
+        onlineDevices: 2,
+        activatedDevices: 2,
+        totalModels: 0,
+        totalUsers: 1
+      }
     }
     recentDevices.value = []
   } finally {
@@ -106,8 +130,19 @@ const navigateTo = (path: string) => {
 }
 
 
+// Check for error query parameter
+const checkErrorMessage = () => {
+  const route = useRoute()
+  if (route.query.error === 'admin_required') {
+    notyf.error('Admin permission required to access that page')
+    // Clear the error query parameter
+    router.replace({ path: route.path })
+  }
+}
+
 // Lifecycle
 onMounted(() => {
+  checkErrorMessage()
   loadDashboardData()
 })
 
@@ -138,7 +173,7 @@ useHead({
             </div>
             <div class="dashboard-content">
               <span class="dark-inverted">{{ stats.onlineDevices }}</span>
-              <p>Online Devices</p>
+              <p>{{ isAdmin ? 'Online Devices' : 'My Online Devices' }}</p>
             </div>
           </div>
         </VCard>
@@ -152,7 +187,7 @@ useHead({
             </div>
             <div class="dashboard-content">
               <span class="dark-inverted">{{ stats.totalDevices }}</span>
-              <p>Total Devices</p>
+              <p>{{ isAdmin ? 'Total Devices' : 'My Devices' }}</p>
             </div>
           </div>
         </VCard>
@@ -166,7 +201,7 @@ useHead({
             </div>
             <div class="dashboard-content">
               <span class="dark-inverted">{{ stats.activatedDevices }}</span>
-              <p>Activated Devices</p>
+              <p>{{ isAdmin ? 'Activated Devices' : 'My Activated Devices' }}</p>
             </div>
           </div>
         </VCard>
@@ -176,11 +211,11 @@ useHead({
         <VCard radius="smooth" class="dashboard-card">
           <div class="dashboard-card-wrap">
             <div class="dashboard-icon is-info">
-              <iconify-icon icon="lucide:users" class="rem-30" />
+              <iconify-icon :icon="isAdmin ? 'lucide:users' : 'lucide:user-check'" class="rem-30" />
             </div>
             <div class="dashboard-content">
               <span class="dark-inverted">{{ stats.totalUsers }}</span>
-              <p>Total Users</p>
+              <p>{{ isAdmin ? 'Total Users' : 'Trusted Devices' }}</p>
             </div>
           </div>
         </VCard>

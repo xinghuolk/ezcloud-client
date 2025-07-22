@@ -19,10 +19,29 @@ export default definePlugin(async ({ router, pinia }) => {
 
   router.beforeEach((to) => {
     const token = useUserToken()
+    
+    // Check authentication requirement
     if (to.meta.requiresAuth && !token.value) {
       return {
         name: '/auth',
         query: { redirect: to.fullPath },
+      }
+    }
+    
+    // Check admin requirement
+    if (to.meta.requiresAdmin && !userSession.isAdmin) {
+      // If user is not logged in, redirect to login first
+      if (!token.value) {
+        return {
+          name: '/auth',
+          query: { redirect: to.fullPath },
+        }
+      }
+      
+      // If user is logged in but not admin, redirect to dashboard with error
+      return {
+        name: '/app',
+        query: { error: 'admin_required' },
       }
     }
   })

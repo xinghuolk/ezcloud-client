@@ -7,7 +7,8 @@ import { Notyf } from 'notyf'
 
 definePage({
   meta: {
-    requiresAuth: true
+    requiresAuth: true,
+    requiresAdmin: true
   }
 })
 
