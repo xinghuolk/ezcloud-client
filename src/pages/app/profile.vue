@@ -211,7 +211,7 @@ useHead({
       <div class="header-content">
         <div class="header-info">
           <h1 class="title is-3">User Profile</h1>
-          <p class="subtitle">Manage your account information and settings</p>
+          <p class="subtitle is-6">Manage your account information and settings</p>
         </div>
       </div>
     </div>
@@ -419,9 +419,7 @@ useHead({
 </template>
 
 <style lang="scss" scoped>
-.common-page-header .header-content .header-info {
-  text-align: center;
-}
+
 
 .tab-content {
   padding: 2rem 0;

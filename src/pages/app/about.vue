@@ -103,7 +103,7 @@ useHead({
       <div class="header-content">
         <div class="header-info">
           <h1 class="title is-3">{{ appInfo.name }}</h1>
-          <p class="subtitle">{{ appInfo.description }}</p>
+          <p class="subtitle is-6">{{ appInfo.description }}</p>
         </div>
       </div>
     </div>
@@ -441,9 +441,7 @@ useHead({
 </template>
 
 <style lang="scss" scoped>
-.common-page-header .header-content .header-info {
-  text-align: center;
-}
+
 
 .app-info-grid {
   display: grid;

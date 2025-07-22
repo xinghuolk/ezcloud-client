@@ -361,6 +361,22 @@ const formatDate = (dateString: string) => {
   })
 }
 
+const formatDateSplit = (dateString: string) => {
+  if (!dateString) return { date: 'Never', time: '' }
+  const date = new Date(dateString)
+  return {
+    date: date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }),
+    time: date.toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+  }
+}
+
 // Format bytes to human readable format
 const formatBytes = (bytes: number) => {
   if (!bytes || bytes === 0) return '0 B'
@@ -830,10 +846,15 @@ useHead({
               </template>
 
               <template v-if="column.key === 'lastSeen'">
-                <VTextEllipsis width="120px">
-                  <span v-if="device.last_seen">{{ formatDate(device.last_seen) }}</span>
-                  <span v-else class="common-text-light">Never</span>
-                </VTextEllipsis>
+                <div class="last-seen-info">
+                  <div v-if="device.last_seen" class="last-seen-content">
+                    <div class="last-seen-date">{{ formatDateSplit(device.last_seen).date }}</div>
+                    <div class="last-seen-time">{{ formatDateSplit(device.last_seen).time }}</div>
+                  </div>
+                  <div v-else class="last-seen-content">
+                    <div class="last-seen-date common-text-light">Never</div>
+                  </div>
+                </div>
               </template>
 
               <template v-if="column.key === 'actions'">
@@ -1734,6 +1755,28 @@ useHead({
   }
 }
 
+// Last Seen Info Styles
+.last-seen-info {
+  .last-seen-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    
+    .last-seen-date {
+      font-weight: 600;
+      color: var(--dark-text);
+      font-size: 0.85rem;
+      line-height: 1.2;
+    }
+    
+    .last-seen-time {
+      color: var(--muted-grey);
+      font-size: 0.75rem;
+      line-height: 1.2;
+    }
+  }
+}
+
 :deep(.dark) {
   .device-info-item {
     background: var(--dark-sidebar-light-6);
@@ -1787,6 +1830,18 @@ useHead({
       
       .interface-value {
         color: var(--dark-dark-text);
+      }
+    }
+  }
+  
+  .last-seen-info {
+    .last-seen-content {
+      .last-seen-date {
+        color: var(--dark-dark-text);
+      }
+      
+      .last-seen-time {
+        color: var(--dark-light-text);
       }
     }
   }
