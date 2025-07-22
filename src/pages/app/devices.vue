@@ -218,59 +218,35 @@ const loadWiFiData = async () => {
     if (response.success && response.data) {
       console.log('Raw WiFi API response data:', response.data)
       
-      // 转换新的数据结构 (radios数组) 为前端期待的结构
+      // 直接使用实际的radios数组结构
       const rawData = response.data as any
-      let transformedData: any = {}
       
       if (rawData.wifi && rawData.wifi.radios) {
-        console.log('转换WiFi radios数据...', rawData.wifi.radios)
+        console.log('使用实际WiFi radios数据...', rawData.wifi.radios)
         
-        // 将radios数组转换为wifi_2g和wifi_5g对象
-        const radios = rawData.wifi.radios
-        
-        // 找到2.4G和5G radio
-        const radio2g = radios.find((radio: any) => radio.band === '2.4G')
-        const radio5g = radios.find((radio: any) => radio.band === '5G')
-        
-        if (radio2g) {
-          transformedData.wifi_2g = {
-            enabled: radio2g.enabled,
-            channel: radio2g.channel,
-            txpower: radio2g.txpower,
-            connected_clients: radio2g.connected_clients || 0,
-            ssid: 'WiFi-2.4G', // 默认SSID，后续可能需要从其他地方获取
-            encryption: 'WPA2-PSK', // 默认加密，后续可能需要从其他地方获取
-            bandwidth: '20MHz' // 默认带宽，后续可能需要从其他地方获取
-          }
+        // 使用真实数据结构，添加统计信息
+        const transformedData = {
+          ...rawData.wifi,
+          // 统计信息
+          total_radios: rawData.wifi.radios.length,
+          enabled_radios: rawData.wifi.radios.filter((r: any) => r.enabled).length,
+          total_clients: rawData.wifi.radios.reduce((sum: number, r: any) => sum + (r.connected_clients || 0), 0),
+          bands_summary: [...new Set(rawData.wifi.radios.map((r: any) => r.band))].join(', ')
         }
         
-        if (radio5g) {
-          transformedData.wifi_5g = {
-            enabled: radio5g.enabled,
-            channel: radio5g.channel,
-            txpower: radio5g.txpower,
-            connected_clients: radio5g.connected_clients || 0,
-            ssid: 'WiFi-5G', // 默认SSID，后续可能需要从其他地方获取
-            encryption: 'WPA2-PSK', // 默认加密，后续可能需要从其他地方获取
-            bandwidth: '80MHz' // 默认带宽，后续可能需要从其他地方获取
-          }
-        }
-        
-        // 添加总体状态
-        transformedData.ap_enabled = rawData.wifi.ap_enabled
-        transformedData.total_rx_bytes = 0 // 暂时设为0，后续可能需要从其他地方获取
-        transformedData.total_tx_bytes = 0 // 暂时设为0，后续可能需要从其他地方获取
+        wifiData.value = transformedData
+      } else {
+        wifiData.value = { radios: [], ap_enabled: false }
       }
       
-      wifiData.value = transformedData
+      console.log('WiFi data set successfully:', wifiData.value)
       
-      console.log('WiFi data transformed successfully:', wifiData.value)
-      
-      // Debug transformed fields
-      console.log('--- Transformed WiFi Data Fields ---')
-      console.log('wifi_2g:', transformedData.wifi_2g)
-      console.log('wifi_5g:', transformedData.wifi_5g)
-      console.log('ap_enabled:', transformedData.ap_enabled)
+      // Debug actual data fields
+      console.log('--- Real WiFi Data Fields ---')
+      console.log('ap_enabled:', wifiData.value.ap_enabled)
+      console.log('radios count:', wifiData.value.radios?.length)
+      console.log('total_clients:', wifiData.value.total_clients)
+      console.log('bands_summary:', wifiData.value.bands_summary)
     } else {
       console.warn('Failed to load WiFi data - API returned error:', response.message)
       console.warn('Or response.data is empty/null')
@@ -319,7 +295,16 @@ const loadModemData = async () => {
         data_uploaded: rawData.data_uploaded || rawData.tx_bytes || 0,
         data_downloaded: rawData.data_downloaded || rawData.rx_bytes || 0,
         connection_time: rawData.connection_time || rawData.uptime || null,
-        last_updated: rawData.last_update || rawData.updated_at || rawData.last_updated || null
+        last_updated: rawData.last_update || rawData.updated_at || rawData.last_updated || null,
+        // 添加缺失的信号质量字段映射
+        rssi: rawData.rssi || null,
+        rsrp: rawData.rsrp || null,
+        rsrq: rawData.rsrq || null,
+        snr: rawData.snr !== undefined ? rawData.snr : null,
+        status: rawData.status || null,
+        imei: rawData.imei || null,
+        apn_name: rawData.apn_name || null,
+        last_update: rawData.last_update || null
       }
       
       // Always use mapped API data, even if empty
@@ -393,6 +378,56 @@ const getStatusText = (isOnline: boolean, isActivated: boolean) => {
   if (isOnline && isActivated) return 'Active'
   if (isOnline && !isActivated) return 'Online'
   return 'Offline'
+}
+
+// 获取信号质量等级的CSS类
+const getSignalQualityClass = (value: number, type: string) => {
+  if (value === null || value === undefined) return 'signal-unknown'
+  
+  switch (type) {
+    case 'rssi':
+      if (value >= -70) return 'signal-excellent'
+      if (value >= -85) return 'signal-good'
+      if (value >= -100) return 'signal-fair'
+      return 'signal-poor'
+    
+    case 'rsrp':
+      if (value >= -80) return 'signal-excellent'
+      if (value >= -90) return 'signal-good'
+      if (value >= -105) return 'signal-fair'
+      return 'signal-poor'
+    
+    case 'rsrq':
+      if (value >= -10) return 'signal-excellent'
+      if (value >= -15) return 'signal-good'
+      if (value >= -20) return 'signal-fair'
+      return 'signal-poor'
+    
+    case 'snr':
+      if (value >= 20) return 'signal-excellent'
+      if (value >= 13) return 'signal-good'
+      if (value >= 0) return 'signal-fair'
+      return 'signal-poor'
+    
+    default:
+      return 'signal-unknown'
+  }
+}
+
+// 获取运营商完整名称
+const getOperatorName = (operator: string) => {
+  if (!operator) return 'Unknown'
+  
+  const operatorMap: Record<string, string> = {
+    'CT': 'China Telecom',
+    'CM': 'China Mobile', 
+    'CU': 'China Unicom',
+    'CHINA TELECOM': 'China Telecom',
+    'CHINA MOBILE': 'China Mobile',
+    'CHINA UNICOM': 'China Unicom',
+  }
+  
+  return operatorMap[operator.toUpperCase()] || operator
 }
 
 // Trust relationship helper methods
@@ -1039,117 +1074,148 @@ useHead({
                 
                 <div v-else-if="wifiData" class="wifi-status-content">
                   <div class="columns is-multiline">
-                    <!-- WiFi Basic Info -->
+                    <!-- WiFi Overview -->
                     <div class="column is-12">
-                      <h4 class="title is-6 mb-4">WiFi Configuration</h4>
-                    </div>
-                    
-                    <!-- 2.4G WiFi -->
-                    <div v-if="wifiData.wifi_2g" class="column is-6">
                       <VCard>
                         <template #header>
                           <VFlex align-items="center" justify-content="space-between">
-                            <h5 class="title is-6">2.4GHz WiFi</h5>
-                            <VTag :color="wifiData.wifi_2g.enabled ? 'success' : 'danger'" size="tiny">
-                              {{ wifiData.wifi_2g.enabled ? 'Enabled' : 'Disabled' }}
+                            <h4 class="title is-6">WiFi Access Point Status</h4>
+                            <VTag :color="wifiData.ap_enabled ? 'success' : 'danger'" size="small">
+                              {{ wifiData.ap_enabled ? 'AP Enabled' : 'AP Disabled' }}
                             </VTag>
                           </VFlex>
                         </template>
                         
-                        <div class="wifi-info">
-                          <div class="info-item">
-                            <label>SSID:</label>
-                            <span>{{ wifiData.wifi_2g.ssid || 'Not set' }}</span>
-                          </div>
-                          <div class="info-item">
-                            <label>Channel:</label>
-                            <span>{{ wifiData.wifi_2g.channel || 'Auto' }}</span>
-                          </div>
-                          <div class="info-item">
-                            <label>Security:</label>
-                            <span>{{ wifiData.wifi_2g.encryption || 'None' }}</span>
-                          </div>
-                          <div class="info-item">
-                            <label>Bandwidth:</label>
-                            <span>{{ wifiData.wifi_2g.bandwidth || 'Unknown' }}</span>
-                          </div>
-                          <div v-if="wifiData.wifi_2g.connected_clients !== undefined" class="info-item">
-                            <label>Connected Clients:</label>
-                            <span>{{ wifiData.wifi_2g.connected_clients }}</span>
+                        <div class="wifi-overview">
+                          <div class="columns">
+                            <div class="column is-3">
+                              <div class="stat-item">
+                                <span class="stat-value">{{ wifiData.total_radios || 0 }}</span>
+                                <span class="stat-label">Total Radios</span>
+                              </div>
+                            </div>
+                            <div class="column is-3">
+                              <div class="stat-item">
+                                <span class="stat-value">{{ wifiData.enabled_radios || 0 }}</span>
+                                <span class="stat-label">Active Radios</span>
+                              </div>
+                            </div>
+                            <div class="column is-3">
+                              <div class="stat-item">
+                                <span class="stat-value">{{ wifiData.total_clients || 0 }}</span>
+                                <span class="stat-label">Connected Clients</span>
+                              </div>
+                            </div>
+                            <div class="column is-3">
+                              <div class="stat-item">
+                                <span class="stat-value">{{ wifiData.bands_summary || 'N/A' }}</span>
+                                <span class="stat-label">Supported Bands</span>
+                              </div>
+                            </div>
                           </div>
                         </div>
                       </VCard>
                     </div>
                     
-                    <!-- 5G WiFi -->
-                    <div v-if="wifiData.wifi_5g" class="column is-6">
+                    <!-- Radio Details -->
+                    <div class="column is-12">
+                      <h5 class="title is-6 mb-4">Radio Configuration Details</h5>
+                    </div>
+                    
+                    <!-- Individual Radio Cards -->
+                    <div 
+                      v-for="(radio, index) in wifiData.radios" 
+                      :key="`radio-${index}`" 
+                      class="column is-6"
+                    >
                       <VCard>
                         <template #header>
                           <VFlex align-items="center" justify-content="space-between">
-                            <h5 class="title is-6">5GHz WiFi</h5>
-                            <VTag :color="wifiData.wifi_5g.enabled ? 'success' : 'danger'" size="tiny">
-                              {{ wifiData.wifi_5g.enabled ? 'Enabled' : 'Disabled' }}
+                            <h6 class="title is-6">{{ radio.band }} Radio #{{ index + 1 }}</h6>
+                            <VTag :color="radio.enabled ? 'success' : 'danger'" size="tiny">
+                              {{ radio.enabled ? 'Enabled' : 'Disabled' }}
                             </VTag>
                           </VFlex>
                         </template>
                         
-                        <div class="wifi-info">
+                        <div class="radio-info">
                           <div class="info-item">
-                            <label>SSID:</label>
-                            <span>{{ wifiData.wifi_5g.ssid || 'Not set' }}</span>
+                            <label>Radio Name:</label>
+                            <span>{{ radio.name || `radio_${radio.band}` }}</span>
+                          </div>
+                          <div class="info-item">
+                            <label>Band:</label>
+                            <span>{{ radio.band }}</span>
                           </div>
                           <div class="info-item">
                             <label>Channel:</label>
-                            <span>{{ wifiData.wifi_5g.channel || 'Auto' }}</span>
+                            <span>{{ radio.channel }}</span>
                           </div>
                           <div class="info-item">
-                            <label>Security:</label>
-                            <span>{{ wifiData.wifi_5g.encryption || 'None' }}</span>
+                            <label>TX Power:</label>
+                            <span>{{ radio.txpower }} dBm</span>
                           </div>
                           <div class="info-item">
-                            <label>Bandwidth:</label>
-                            <span>{{ wifiData.wifi_5g.bandwidth || 'Unknown' }}</span>
+                            <label>Total Connected Clients:</label>
+                            <span>{{ radio.connected_clients || 0 }}</span>
                           </div>
-                          <div v-if="wifiData.wifi_5g.connected_clients !== undefined" class="info-item">
-                            <label>Connected Clients:</label>
-                            <span>{{ wifiData.wifi_5g.connected_clients }}</span>
+                          <div class="info-item">
+                            <label>Status:</label>
+                            <span>{{ radio.enabled ? 'Enabled' : 'Disabled' }}</span>
+                          </div>
+                        </div>
+                        
+                        <!-- WiFi SSIDs for this radio -->
+                        <div v-if="radio.ssids && radio.ssids.length > 0" class="mt-4">
+                          <h6 class="title is-7 mb-3">Network SSIDs</h6>
+                          <div class="interfaces-grid">
+                            <div 
+                              v-for="(ssid, ssidIndex) in radio.ssids" 
+                              :key="`ssid-${index}-${ssidIndex}`"
+                              class="interface-card"
+                            >
+                              <div class="interface-header">
+                                <strong>{{ ssid.ssid || 'Unnamed Network' }}</strong>
+                                <VTag :color="ssid.enabled ? 'success' : 'danger'" size="tiny">
+                                  {{ ssid.enabled ? 'Active' : 'Inactive' }}
+                                </VTag>
+                              </div>
+                              
+                              <div class="interface-details">
+                                <div class="interface-item">
+                                  <span class="interface-label">Index:</span>
+                                  <span class="interface-value">{{ ssid.ssid_index }}</span>
+                                </div>
+                                <div class="interface-item">
+                                  <span class="interface-label">Encryption:</span>
+                                  <span class="interface-value">{{ ssid.encryption || 'Open' }}</span>
+                                </div>
+                                <div class="interface-item">
+                                  <span class="interface-label">Status:</span>
+                                  <span class="interface-value">{{ ssid.status || 'down' }}</span>
+                                </div>
+                                <div class="interface-item">
+                                  <span class="interface-label">Clients:</span>
+                                  <span class="interface-value">{{ ssid.connected_clients || 0 }}</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div v-else class="mt-4">
+                          <div class="has-text-centered py-3" style="background: var(--fade-grey-light-6); border-radius: 6px;">
+                            <p class="has-text-grey-light" style="font-size: 0.85rem;">No SSIDs configured</p>
                           </div>
                         </div>
                       </VCard>
                     </div>
                     
-                    <!-- WiFi Status Summary -->
-                    <div class="column is-12">
+                    <!-- No Radios Message -->
+                    <div v-if="!wifiData.radios || wifiData.radios.length === 0" class="column is-12">
                       <VCard>
-                        <template #header>
-                          <h5 class="title is-6">WiFi Statistics</h5>
-                        </template>
-                        
-                        <div class="columns">
-                          <div class="column is-3">
-                            <div class="stat-item">
-                              <span class="stat-value">{{ (wifiData.wifi_2g?.connected_clients || 0) + (wifiData.wifi_5g?.connected_clients || 0) }}</span>
-                              <span class="stat-label">Total Clients</span>
-                            </div>
-                          </div>
-                          <div class="column is-3">
-                            <div class="stat-item">
-                              <span class="stat-value">{{ wifiData.total_rx_bytes ? formatBytes(wifiData.total_rx_bytes) : 'N/A' }}</span>
-                              <span class="stat-label">Total Received</span>
-                            </div>
-                          </div>
-                          <div class="column is-3">
-                            <div class="stat-item">
-                              <span class="stat-value">{{ wifiData.total_tx_bytes ? formatBytes(wifiData.total_tx_bytes) : 'N/A' }}</span>
-                              <span class="stat-label">Total Transmitted</span>
-                            </div>
-                          </div>
-                          <div class="column is-3">
-                            <div class="stat-item">
-                              <span class="stat-value">{{ formatDate(wifiData.last_updated || selectedDevice?.last_seen || '') }}</span>
-                              <span class="stat-label">Last Updated</span>
-                            </div>
-                          </div>
+                        <div class="has-text-centered py-6">
+                          <p class="has-text-grey">No WiFi radios configured</p>
                         </div>
                       </VCard>
                     </div>
@@ -1245,6 +1311,121 @@ useHead({
                           <div class="info-item">
                             <label>IP Address:</label>
                             <span>{{ modemData.ip_address || 'Not assigned' }}</span>
+                          </div>
+                        </div>
+                      </VCard>
+                    </div>
+                    
+                    <!-- Signal Quality Metrics -->
+                    <div class="column is-12">
+                      <VCard>
+                        <template #header>
+                          <VFlex align-items="center" justify-content="space-between">
+                            <h5 class="title is-6">Signal Quality Metrics</h5>
+                            <VTag :color="modemData.status === 'Connected' ? 'success' : 'warning'" size="tiny">
+                              {{ modemData.status || 'Unknown' }}
+                            </VTag>
+                          </VFlex>
+                        </template>
+                        
+                        <div class="columns">
+                          <div class="column is-3">
+                            <div class="signal-metric">
+                              <div class="metric-header">
+                                <span class="metric-label">RSSI</span>
+                                <span class="metric-unit">dBm</span>
+                              </div>
+                              <div class="metric-value" :class="getSignalQualityClass(modemData.rssi, 'rssi')">
+                                {{ modemData.rssi || 'N/A' }}
+                              </div>
+                              <div class="metric-description">Signal Strength</div>
+                            </div>
+                          </div>
+                          <div class="column is-3">
+                            <div class="signal-metric">
+                              <div class="metric-header">
+                                <span class="metric-label">RSRP</span>
+                                <span class="metric-unit">dBm</span>
+                              </div>
+                              <div class="metric-value" :class="getSignalQualityClass(modemData.rsrp, 'rsrp')">
+                                {{ modemData.rsrp || 'N/A' }}
+                              </div>
+                              <div class="metric-description">Reference Signal Power</div>
+                            </div>
+                          </div>
+                          <div class="column is-3">
+                            <div class="signal-metric">
+                              <div class="metric-header">
+                                <span class="metric-label">RSRQ</span>
+                                <span class="metric-unit">dB</span>
+                              </div>
+                              <div class="metric-value" :class="getSignalQualityClass(modemData.rsrq, 'rsrq')">
+                                {{ modemData.rsrq || 'N/A' }}
+                              </div>
+                              <div class="metric-description">Reference Signal Quality</div>
+                            </div>
+                          </div>
+                          <div class="column is-3">
+                            <div class="signal-metric">
+                              <div class="metric-header">
+                                <span class="metric-label">SNR</span>
+                                <span class="metric-unit">dB</span>
+                              </div>
+                              <div class="metric-value" :class="getSignalQualityClass(modemData.snr, 'snr')">
+                                {{ modemData.snr !== undefined ? modemData.snr : 'N/A' }}
+                              </div>
+                              <div class="metric-description">Signal-to-Noise Ratio</div>
+                            </div>
+                          </div>
+                        </div>
+                      </VCard>
+                    </div>
+
+                    <!-- Device Information -->
+                    <div class="column is-6">
+                      <VCard>
+                        <template #header>
+                          <h5 class="title is-6">Device Information</h5>
+                        </template>
+                        
+                        <div class="wifi-info">
+                          <div class="info-item">
+                            <label>IMEI:</label>
+                            <span>{{ modemData.imei || 'Not available' }}</span>
+                          </div>
+                          <div class="info-item">
+                            <label>APN Name:</label>
+                            <span>{{ modemData.apn_name || 'Not configured' }}</span>
+                          </div>
+                          <div class="info-item">
+                            <label>Last Update:</label>
+                            <span>{{ formatDate(modemData.last_update || selectedDevice?.last_seen || '') }}</span>
+                          </div>
+                        </div>
+                      </VCard>
+                    </div>
+                    
+                    <!-- Connection Status -->
+                    <div class="column is-6">
+                      <VCard>
+                        <template #header>
+                          <h5 class="title is-6">Connection Status</h5>
+                        </template>
+                        
+                        <div class="wifi-info">
+                          <div class="info-item">
+                            <label>Connection Status:</label>
+                            <VTag :color="modemData.status === 'Connected' ? 'success' : 'warning'" size="small">
+                              {{ modemData.status || 'Unknown' }}
+                            </VTag>
+                          </div>
+                          <div class="info-item">
+                            <label>Network Type:</label>
+                            <span>{{ (modemData.network_type || '').toUpperCase() || 'Unknown' }}</span>
+                          </div>
+                          <div class="info-item">
+                            <label>Operator:</label>
+                            <span>{{ getOperatorName(modemData.operator) || 'Unknown' }}</span>
                           </div>
                         </div>
                       </VCard>
@@ -1425,6 +1606,144 @@ useHead({
   }
 }
 
+// Signal Quality Metrics Styles
+.signal-metric {
+  text-align: center;
+  padding: 1rem;
+  border-radius: var(--radius);
+  background: var(--fade-grey-light-6);
+  
+  .metric-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+    
+    .metric-label {
+      font-weight: 700;
+      font-size: 0.85rem;
+      color: var(--dark-text);
+    }
+    
+    .metric-unit {
+      font-size: 0.75rem;
+      color: var(--muted-grey);
+      font-weight: 600;
+    }
+  }
+  
+  .metric-value {
+    font-size: 1.75rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    
+    &.signal-excellent {
+      color: #00b894; // Green
+    }
+    
+    &.signal-good {
+      color: #00cec9; // Teal  
+    }
+    
+    &.signal-fair {
+      color: #fdcb6e; // Yellow
+    }
+    
+    &.signal-poor {
+      color: #e17055; // Red
+    }
+    
+    &.signal-unknown {
+      color: var(--muted-grey);
+    }
+  }
+  
+  .metric-description {
+    font-size: 0.75rem;
+    color: var(--muted-grey);
+    font-weight: 500;
+  }
+}
+
+// Radio Info Styles
+.radio-info {
+  padding: 1rem;
+  
+  .info-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--fade-grey-light-3);
+    
+    &:last-child {
+      border-bottom: none;
+    }
+    
+    label {
+      font-weight: 600;
+      color: var(--dark-text);
+      font-size: 0.85rem;
+      min-width: 120px;
+    }
+    
+    span {
+      color: var(--muted-grey);
+      font-size: 0.9rem;
+    }
+  }
+}
+
+// SSID Cards Styles (formerly Interface Cards)
+.interfaces-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.interface-card {
+  background: var(--fade-grey-light-8);
+  border: 1px solid var(--fade-grey-light-4);
+  border-radius: 6px;
+  padding: 0.75rem;
+  
+  .interface-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+    
+    strong {
+      color: var(--dark-text);
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+  }
+  
+  .interface-details {
+    .interface-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.25rem 0;
+      
+      .interface-label {
+        font-size: 0.8rem;
+        font-weight: 500;
+        color: var(--muted-grey);
+        min-width: 80px;
+      }
+      
+      .interface-value {
+        font-size: 0.85rem;
+        color: var(--dark-text);
+        font-weight: 500;
+      }
+    }
+  }
+}
+
 :deep(.dark) {
   .device-info-item {
     background: var(--dark-sidebar-light-6);
@@ -1459,6 +1778,25 @@ useHead({
       
       span {
         color: var(--dark-light-text);
+      }
+    }
+  }
+  
+  .interface-card {
+    background: var(--dark-sidebar-light-8);
+    border-color: var(--dark-sidebar-light-4);
+    
+    .interface-header strong {
+      color: var(--dark-dark-text);
+    }
+    
+    .interface-details .interface-item {
+      .interface-label {
+        color: var(--dark-light-text);
+      }
+      
+      .interface-value {
+        color: var(--dark-dark-text);
       }
     }
   }
