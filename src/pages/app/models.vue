@@ -194,6 +194,10 @@ const handleView = (model: DeviceModel) => {
 }
 
 const handleDelete = async (model: DeviceModel) => {
+  if (!confirm(`Are you sure you want to delete model "${model.stdname}" by ${model.oemname}? This action cannot be undone.`)) {
+    return
+  }
+  
   try {
     const response = await modelApi.deleteModel(model.id)
     if (response.success) {
@@ -636,6 +640,7 @@ useHead({
       :title="dialogTitle"
       size="medium"
       actions="right"
+      cancelLabel="Cancel"
       @close="dialogVisible = false"
     >
       <template #content>
@@ -727,7 +732,6 @@ useHead({
       </template>
 
       <template #action>
-        <VButton @click="dialogVisible = false">Cancel</VButton>
         <VButton 
           color="primary" 
           :loading="submitting"
@@ -744,6 +748,7 @@ useHead({
       title="Model Details"
       size="big"
       actions="right"
+      cancelLabel="Close"
       @close="detailDialogVisible = false"
     >
       <template #content>
@@ -800,10 +805,6 @@ useHead({
             </div>
           </div>
         </div>
-      </template>
-
-      <template #action>
-        <VButton @click="detailDialogVisible = false">Close</VButton>
       </template>
     </VModal>
   </div>

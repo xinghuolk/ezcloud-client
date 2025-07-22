@@ -160,6 +160,10 @@ const handleBindDevice = async () => {
 }
 
 const handleUnbind = async (device: Device) => {
+  if (!confirm(`Are you sure you want to unbind device "${device.serial}"? This will remove the device from your account.`)) {
+    return
+  }
+  
   try {
     const success = await deviceStore.unbindDevice(device.id)
     if (success) {
@@ -490,6 +494,7 @@ useHead({
       title="Bind Device"
       size="small"
       actions="right"
+      cancelLabel="Cancel"
       @close="bindDialogVisible = false"
     >
       <template #content>
@@ -521,7 +526,6 @@ useHead({
       </template>
       
       <template #action>
-        <VButton @click="bindDialogVisible = false">Cancel</VButton>
         <VButton 
           color="primary" 
           :loading="bindLoading"
@@ -538,6 +542,7 @@ useHead({
       title="Batch Operations"
       size="small"
       actions="right"
+      cancelLabel="Cancel"
       @close="showBatchOperationDialog = false"
     >
       <template #content>
@@ -559,7 +564,6 @@ useHead({
       </template>
       
       <template #action>
-        <VButton @click="showBatchOperationDialog = false">Cancel</VButton>
         <VButton 
           color="primary" 
           :loading="batchLoading"
@@ -577,6 +581,7 @@ useHead({
       title="Device Details"
       size="big"
       actions="right"
+      cancelLabel="Close"
       @close="detailsDialogVisible = false"
     >
       <template #content>
@@ -715,10 +720,6 @@ useHead({
             </div>
           </VTabs>
         </div>
-      </template>
-      
-      <template #action>
-        <VButton @click="detailsDialogVisible = false">Close</VButton>
       </template>
     </VModal>
   </div>

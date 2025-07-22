@@ -357,7 +357,7 @@ useHead({
     </VCard>
 
     <!-- Create Vendor Modal -->
-    <VModal :open="createDialogOpen" title="Add New Vendor" @close="createDialogOpen = false">
+    <VModal :open="createDialogOpen" title="Add New Vendor" actions="right" cancelLabel="Cancel" @close="createDialogOpen = false">
       <template #content>
         <VField>
           <VLabel>Vendor Name *</VLabel>
@@ -382,7 +382,6 @@ useHead({
       </template>
       
       <template #action>
-        <VButton @click="createDialogOpen = false">Cancel</VButton>
         <VButton color="primary" @click="handleCreate">
           Create Vendor
         </VButton>
@@ -390,7 +389,7 @@ useHead({
     </VModal>
 
     <!-- Edit Vendor Modal -->
-    <VModal :open="editDialogOpen" title="Edit Vendor" @close="editDialogOpen = false">
+    <VModal :open="editDialogOpen" title="Edit Vendor" actions="right" cancelLabel="Cancel" @close="editDialogOpen = false">
       <template #content>
         <VField>
           <VLabel>Vendor Name *</VLabel>
@@ -415,7 +414,6 @@ useHead({
       </template>
       
       <template #action>
-        <VButton @click="editDialogOpen = false">Cancel</VButton>
         <VButton color="primary" @click="handleUpdate">
           Update Vendor
         </VButton>

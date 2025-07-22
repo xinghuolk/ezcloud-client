@@ -396,6 +396,10 @@ const handleExportBatch = async (batchId: string) => {
 }
 
 const handleDeleteBatch = async (batchId: string) => {
+  if (!confirm('Are you sure you want to delete this batch? This will permanently delete all serial numbers in this batch and cannot be undone.')) {
+    return
+  }
+  
   try {
     const response = await serialApi.deleteBatch(batchId)
     if (response.success) {

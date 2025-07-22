@@ -146,6 +146,10 @@ const handleBindDevice = async () => {
 }
 
 const handleUnbind = async (device: Device) => {
+  if (!confirm(`Are you sure you want to unbind device "${device.serial}"? This will remove the device from your account.`)) {
+    return
+  }
+  
   const success = await deviceStore.unbindDevice(device.id)
   if (success) {
     fetchDevices()
@@ -927,7 +931,7 @@ useHead({
     </VCard>
 
     <!-- Bind Device Modal -->
-    <VModal :open="bindDialogOpen" title="Bind Device" @close="bindDialogOpen = false">
+    <VModal :open="bindDialogOpen" title="Bind Device" actions="right" cancelLabel="Cancel" @close="bindDialogOpen = false">
       <template #content>
         <VField>
           <VLabel>Serial Number *</VLabel>
@@ -951,7 +955,6 @@ useHead({
       </template>
       
       <template #action>
-        <VButton @click="bindDialogOpen = false">Cancel</VButton>
         <VButton color="primary" @click="handleBindDevice">
           Bind Device
         </VButton>
@@ -959,7 +962,7 @@ useHead({
     </VModal>
 
     <!-- Batch Operations Modal -->
-    <VModal :open="batchDialogOpen" title="Batch Operations" @close="batchDialogOpen = false">
+    <VModal :open="batchDialogOpen" title="Batch Operations" actions="right" cancelLabel="Cancel" @close="batchDialogOpen = false">
       <template #content>
         <VMessage color="info">
           Selected {{ selectedDevices.length }} devices for batch operation
@@ -980,7 +983,6 @@ useHead({
       </template>
       
       <template #action>
-        <VButton @click="batchDialogOpen = false">Cancel</VButton>
         <VButton 
           color="primary" 
           :disabled="!batchForm.operation"
@@ -992,7 +994,7 @@ useHead({
     </VModal>
 
     <!-- Device Details Modal -->
-    <VModal :open="detailsDialogOpen" title="Device Details" size="large" @close="detailsDialogOpen = false">
+    <VModal :open="detailsDialogOpen" title="Device Details" size="large" actions="right" cancelLabel="Close" @close="detailsDialogOpen = false">
       <template #content>
         <div v-if="selectedDevice">
           <VTabs 
@@ -1332,49 +1334,41 @@ useHead({
                           <div class="column is-3">
                             <div class="signal-metric">
                               <div class="metric-header">
-                                <span class="metric-label">RSSI</span>
-                                <span class="metric-unit">dBm</span>
+                                <span class="metric-label">RSSI (dBm)</span>
                               </div>
                               <div class="metric-value" :class="getSignalQualityClass(modemData.rssi, 'rssi')">
                                 {{ modemData.rssi || 'N/A' }}
                               </div>
-                              <div class="metric-description">Signal Strength</div>
                             </div>
                           </div>
                           <div class="column is-3">
                             <div class="signal-metric">
                               <div class="metric-header">
-                                <span class="metric-label">RSRP</span>
-                                <span class="metric-unit">dBm</span>
+                                <span class="metric-label">RSRP (dBm)</span>
                               </div>
                               <div class="metric-value" :class="getSignalQualityClass(modemData.rsrp, 'rsrp')">
                                 {{ modemData.rsrp || 'N/A' }}
                               </div>
-                              <div class="metric-description">Reference Signal Power</div>
                             </div>
                           </div>
                           <div class="column is-3">
                             <div class="signal-metric">
                               <div class="metric-header">
-                                <span class="metric-label">RSRQ</span>
-                                <span class="metric-unit">dB</span>
+                                <span class="metric-label">RSRQ (dB)</span>
                               </div>
                               <div class="metric-value" :class="getSignalQualityClass(modemData.rsrq, 'rsrq')">
                                 {{ modemData.rsrq || 'N/A' }}
                               </div>
-                              <div class="metric-description">Reference Signal Quality</div>
                             </div>
                           </div>
                           <div class="column is-3">
                             <div class="signal-metric">
                               <div class="metric-header">
-                                <span class="metric-label">SNR</span>
-                                <span class="metric-unit">dB</span>
+                                <span class="metric-label">SNR (dB)</span>
                               </div>
                               <div class="metric-value" :class="getSignalQualityClass(modemData.snr, 'snr')">
                                 {{ modemData.snr !== undefined ? modemData.snr : 'N/A' }}
                               </div>
-                              <div class="metric-description">Signal-to-Noise Ratio</div>
                             </div>
                           </div>
                         </div>
@@ -1486,10 +1480,6 @@ useHead({
             </template>
           </VTabs>
         </div>
-      </template>
-      
-      <template #action>
-        <VButton @click="detailsDialogOpen = false">Close</VButton>
       </template>
     </VModal>
 

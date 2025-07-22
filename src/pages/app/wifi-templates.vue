@@ -123,6 +123,10 @@ const toggleTemplateStatus = async (template: WiFiTemplate) => {
 
 // Delete template
 const deleteTemplate = async (template: WiFiTemplate) => {
+  if (!confirm(`Are you sure you want to delete WiFi template "${template.name}"? This action cannot be undone.`)) {
+    return
+  }
+  
   try {
     const response = await wifiTemplatesApi.deleteTemplate(template.id!)
     if (response.success) {
@@ -447,6 +451,7 @@ useHead({
       :open="showDetailDialog"
       title="Template Details"
       size="large"
+      actions="right"
       @close="showDetailDialog = false"
     >
       <div v-if="viewingTemplate" class="template-details">

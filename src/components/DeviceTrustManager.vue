@@ -229,6 +229,7 @@ watch(() => props.open, (isOpen) => {
     :open="open" 
     title="Device Trust Management" 
     size="large"
+    actions="right"
     @close="emit('close')"
   >
     <template #content>
