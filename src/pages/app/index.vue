@@ -40,7 +40,7 @@ const systemInfo = ref({
 
 // Computed
 const userName = computed(() => userSession.user?.username || 'User')
-const isAdmin = computed(() => userSession.isAdmin)
+const isAdmin = computed(() => userSession.isAnyAdmin)
 
 // Methods
 const loadDashboardData = async () => {

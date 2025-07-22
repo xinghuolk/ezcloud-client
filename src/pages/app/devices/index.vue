@@ -59,7 +59,7 @@ const bindErrors = ref({
 })
 
 // Computed
-const isAdmin = computed(() => userSession.isAdmin)
+const isAdmin = computed(() => userSession.isAnyAdmin)
 const deviceList = computed(() => deviceStore.devices)
 const pagination = computed(() => deviceStore.pagination)
 

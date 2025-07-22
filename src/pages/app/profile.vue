@@ -276,12 +276,17 @@ useHead({
                   </VField>
                 </div>
 
-                <div class="column is-6">
+                <!-- 角色信息只对管理员显示 -->
+                <div class="column is-6" v-if="userSession.isAnyAdmin">
                   <VField>
                     <VLabel>Role</VLabel>
                     <VControl>
-                      <VTag :color="profileForm.role === 'admin' ? 'danger' : 'primary'">
-                        {{ profileForm.role === 'admin' ? 'Administrator' : 'User' }}
+                      <VTag :color="profileForm.role === 'super_admin' ? 'danger' : profileForm.role === 'admin' ? 'warning' : 'primary'">
+                        {{ 
+                          profileForm.role === 'super_admin' ? 'Super Administrator' : 
+                          profileForm.role === 'admin' ? 'Administrator' : 
+                          'User' 
+                        }}
                       </VTag>
                     </VControl>
                   </VField>

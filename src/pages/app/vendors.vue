@@ -38,7 +38,7 @@ const vendorForm = reactive<CreateVendorParams>({
 })
 
 // Computed
-const isAdmin = computed(() => userSession.isAdmin)
+const isAdmin = computed(() => userSession.isAnyAdmin)
 const vendors = computed(() => vendorStore.vendors)
 const pagination = computed(() => vendorStore.pagination)
 const vendorCount = computed(() => vendorStore.vendorCount)

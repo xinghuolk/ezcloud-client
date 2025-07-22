@@ -21,9 +21,13 @@ export const useUserSession = defineStore('userSession', () => {
   // 计算属性
   const isLoggedIn = computed(() => user.value !== undefined)
   const isAdmin = computed(() => user.value?.role === 'admin')
+  const isSuperAdmin = computed(() => user.value?.role === 'super_admin')
   const isUser = computed(() => user.value?.role === 'user')
   const isActive = computed(() => user.value?.is_active === true)
   const userRole = computed(() => user.value?.role || null)
+  
+  // 检查是否为任意级别的管理员
+  const isAnyAdmin = computed(() => isAdmin.value || isSuperAdmin.value)
 
   function setUser(newUser: Partial<UserData>) {
     user.value = newUser
@@ -159,20 +163,42 @@ export const useUserSession = defineStore('userSession', () => {
   function hasPermission(permission: string): boolean {
     if (!user.value || !isActive.value) return false
     
-    // 管理员拥有所有权限
-    if (isAdmin.value) return true
+    // 超级管理员拥有所有权限
+    if (isSuperAdmin.value) return true
+    
+    // 管理员权限
+    if (isAdmin.value) {
+      const adminPermissions = [
+        // 普通用户权限
+        'device:view',
+        'device:bind',
+        'device:unbind',
+        'wifi:view',
+        'wifi:configure',
+        'profile:edit',
+        // 管理员专用权限
+        'vendor:manage',
+        'model:manage',
+        'serial:manage',
+        'system:view'
+      ]
+      return adminPermissions.includes(permission)
+    }
     
     // 普通用户权限检查
-    const userPermissions = [
-      'device:view',
-      'device:bind',
-      'device:unbind',
-      'wifi:view',
-      'wifi:configure',
-      'profile:edit'
-    ]
+    if (isUser.value) {
+      const userPermissions = [
+        'device:view',
+        'device:bind',
+        'device:unbind',
+        'wifi:view',
+        'wifi:configure',
+        'profile:edit'
+      ]
+      return userPermissions.includes(permission)
+    }
     
-    return userPermissions.includes(permission)
+    return false
   }
 
   function hasRole(role: string): boolean {
@@ -181,9 +207,17 @@ export const useUserSession = defineStore('userSession', () => {
 
   // 检查管理员权限
   function requireAdmin(): void {
-    if (!isAdmin.value) {
+    if (!isAnyAdmin.value) {
       notyf.error('Admin permission required')
       throw new Error('Admin permission required')
+    }
+  }
+  
+  // 检查超级管理员权限
+  function requireSuperAdmin(): void {
+    if (!isSuperAdmin.value) {
+      notyf.error('Super admin permission required')
+      throw new Error('Super admin permission required')
     }
   }
 
@@ -204,7 +238,7 @@ export const useUserSession = defineStore('userSession', () => {
   // 初始化
   initializeAuth()
 
-  // 开发环境下添加全局退出函数
+  // 开发环境下添加全局调试函数
   if (import.meta.env.DEV) {
     (window as any).logout = () => {
       console.log('Executing logout...')
@@ -213,6 +247,7 @@ export const useUserSession = defineStore('userSession', () => {
         window.location.href = '/auth'
       })
     }
+    
     console.log('Dev mode: Use window.logout() to logout quickly')
   }
 
@@ -224,8 +259,10 @@ export const useUserSession = defineStore('userSession', () => {
     // 计算属性
     isLoggedIn,
     isAdmin,
+    isSuperAdmin,
     isUser,
     isActive,
+    isAnyAdmin,
     userRole,
     
     // 方法
@@ -239,6 +276,7 @@ export const useUserSession = defineStore('userSession', () => {
     hasPermission,
     hasRole,
     requireAdmin,
+    requireSuperAdmin,
     initializeAuth,
   } as const
 })

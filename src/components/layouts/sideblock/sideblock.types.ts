@@ -7,12 +7,14 @@ export interface SideblockItemCollapse {
   icon: string
   hideMobile?: boolean
   label?: string
+  permission?: string  // 权限检查
 
   children: {
     label: string
     to: string
     icon?: string
     tag?: string
+    permission?: string  // 子项权限检查
   }[]
 }
 export interface SideblockItemLink {
@@ -21,6 +23,7 @@ export interface SideblockItemLink {
   hideMobile?: boolean
   label?: string
   badge?: string | number
+  permission?: string  // 权限检查
 
   to: string
 }
@@ -31,6 +34,7 @@ export interface SideblockItemAction {
   hideMobile?: boolean
   label?: string
   badge?: string | number
+  permission?: string  // 权限检查
 
   onClick: (event: Event) => void
 }
@@ -39,6 +43,7 @@ export interface SideblockItemComponent {
   id: string
   hideMobile?: boolean
   label?: string
+  permission?: string  // 权限检查
 
   component: string | Component | (() => VNode)
 }

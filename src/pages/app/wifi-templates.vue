@@ -185,7 +185,6 @@ useHead({
         </div>
         <div class="header-actions">
           <VButton 
-            v-if="userSession.isAdmin"
             color="primary" 
             raised
             @click="createTemplate"
@@ -382,7 +381,6 @@ useHead({
                       </div>
                     </a>
                     <a 
-                      v-if="userSession.isAdmin"
                       class="dropdown-item is-media" 
                       @click="editTemplate(template)"
                     >
@@ -394,7 +392,6 @@ useHead({
                       </div>
                     </a>
                     <a 
-                      v-if="userSession.isAdmin"
                       class="dropdown-item is-media"
                       @click="toggleTemplateStatus(template)"
                     >
@@ -407,7 +404,6 @@ useHead({
                     </a>
                     <hr class="dropdown-divider">
                     <a 
-                      v-if="userSession.isAdmin"
                       class="dropdown-item is-media has-text-danger"
                       @click="deleteTemplate(template)"
                     >
@@ -431,7 +427,6 @@ useHead({
             >
               <template #action>
                 <VButton 
-                  v-if="userSession.isAdmin"
                   color="primary" 
                   raised
                   @click="createTemplate"

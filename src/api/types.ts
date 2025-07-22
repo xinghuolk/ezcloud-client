@@ -73,7 +73,7 @@ export interface User {
   username: string
   email: string
   phone?: string
-  role: 'user' | 'admin'
+  role: 'user' | 'admin' | 'super_admin'
   is_active: boolean
   created_at: string
   updated_at: string

@@ -29,7 +29,7 @@ export default definePlugin(async ({ router, pinia }) => {
     }
     
     // Check admin requirement
-    if (to.meta.requiresAdmin && !userSession.isAdmin) {
+    if (to.meta.requiresAdmin && !userSession.isAnyAdmin) {
       // If user is not logged in, redirect to login first
       if (!token.value) {
         return {

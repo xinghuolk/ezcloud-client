@@ -23,7 +23,15 @@ const getUserDisplayName = () => {
 // Get user role display
 const getUserRole = () => {
   const role = userSession.user?.role || 'user'
-  return role.charAt(0).toUpperCase() + role.slice(1)
+  switch (role) {
+    case 'super_admin':
+      return 'Super Administrator'
+    case 'admin':
+      return 'Administrator'
+    case 'user':
+    default:
+      return 'User'
+  }
 }
 </script>
 
@@ -92,7 +100,7 @@ const getUserRole = () => {
       </RouterLink>
 
       <RouterLink
-        v-if="userSession.isAdmin"
+        v-if="userSession.isAnyAdmin"
         to="/app/vendors"
         class="dropdown-item is-media"
       >

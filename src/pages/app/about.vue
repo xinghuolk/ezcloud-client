@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { Notyf } from 'notyf'
+import { useUserSession } from '/@src/stores/user-session'
 import request from '/@src/api/request'
 
 definePage({
@@ -8,6 +9,11 @@ definePage({
     requiresAuth: true
   }
 })
+
+const userSession = useUserSession()
+
+// 检查是否有系统查看权限
+const hasSystemAccess = computed(() => userSession.hasPermission('system:view'))
 
 const notyf = new Notyf()
 
@@ -107,6 +113,19 @@ useHead({
         </div>
       </div>
     </div>
+
+    <!-- 权限不足提示 -->
+    <VCard radius="smooth" v-if="!hasSystemAccess">
+      <div class="has-text-centered py-6">
+        <iconify-icon icon="lucide:shield-x" class="permission-denied-icon mb-4" />
+        <h3 class="title is-4 mb-2">Access Denied</h3>
+        <p class="subtitle is-6 mb-4">You don't have permission to view system information.</p>
+        <p class="has-text-muted">Please contact your administrator if you need access to this page.</p>
+      </div>
+    </VCard>
+
+    <!-- 系统信息内容（仅管理员可见） -->
+    <template v-else>
 
     <div class="columns">
       <!-- App Information -->
@@ -437,11 +456,17 @@ useHead({
         <p class="mt-4">Loading system configuration...</p>
       </div>
     </VCard>
+    
+    </template>
   </div>
 </template>
 
 <style lang="scss" scoped>
 
+.permission-denied-icon {
+  font-size: 4rem;
+  color: var(--danger);
+}
 
 .app-info-grid {
   display: grid;

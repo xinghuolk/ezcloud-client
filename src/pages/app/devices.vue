@@ -56,7 +56,7 @@ const batchForm = reactive({
 })
 
 // Computed
-const isAdmin = computed(() => userSession.isAdmin)
+const isAdmin = computed(() => userSession.isAnyAdmin)
 const devices = computed(() => deviceStore.devices)
 const pagination = computed(() => deviceStore.pagination)
 const deviceCount = computed(() => deviceStore.deviceCount)

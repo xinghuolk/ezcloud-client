@@ -461,7 +461,6 @@ useHead({
             label: 'Device Type',
             searchable: true,
             sortable: true,
-            align: 'center'
           },
           description: { 
             label: 'Description',
@@ -471,13 +470,11 @@ useHead({
           serial_count: { 
             label: 'Serial Count',
             sortable: true,
-            align: 'center'
           },
           is_active: { 
             label: 'Status',
             searchable: true,
             sortable: true,
-            align: 'center'
           },
           created_at: { 
             label: 'Created At',
@@ -485,7 +482,6 @@ useHead({
           },
           actions: { 
             label: 'Actions',
-            align: 'end'
           }
         }"
         :data="models"
