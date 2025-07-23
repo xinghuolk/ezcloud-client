@@ -51,7 +51,8 @@ const parseDeviceToken = () => {
     // Decode JWT token to get device information (without verification)
     const payload = JSON.parse(atob(token.split('.')[1]))
     
-    if (!payload.device) {
+    // 适配优化版token字段结构 (d 替代 device)
+    if (!payload.d) {
       step.value = 'error'
       errorMessage.value = 'Invalid token: Device information not found'
       return
@@ -64,7 +65,16 @@ const parseDeviceToken = () => {
       return
     }
 
-    deviceInfo.value = payload.device
+    // 转换优化版字段为前端期望的格式
+    deviceInfo.value = {
+      serial: payload.d.s,
+      mac: payload.d.m,
+      model: payload.d.md,
+      hardware_id: payload.d.hw,
+      firmware_version: payload.d.fw,
+      timestamp: payload.d.ts,
+      nonce: payload.d.n
+    }
     
     // Check if user is already logged in
     if (userSession.isLoggedIn) {
@@ -151,18 +161,49 @@ const handleBind = async () => {
       token: bindToken.value
     })
 
-    if (response.success) {
+    console.log('Full API response:', response)
+    
+    // 处理设备已绑定的特殊情况
+    // 如果response直接是设备对象（有id, serial等字段），说明是"设备已绑定"的情况
+    if (response && typeof response === 'object' && 'id' in response && 'serial' in response) {
+      console.log('Device already bound case - got device object directly')
+      step.value = 'error'
+      errorMessage.value = 'Device is already bound to your account'
+      notyf.error('Device is already bound to your account')
+    } else if (response && typeof response === 'object' && 'success' in response) {
+      // 标准响应格式：{success, message, data}
+      const serverMessage = (response as any).message || ''
+      console.log('Server message:', serverMessage)
+      console.log('Success status:', (response as any).success)
+      
+      if ((response as any).success) {
+        if (serverMessage.includes('already bound')) {
+          step.value = 'error'
+          errorMessage.value = serverMessage
+          notyf.error('Device is already bound to your account')
+          console.log('Device already bound case detected:', serverMessage)
+        } else {
+          step.value = 'success'
+          notyf.success('Device bound successfully!')
+          console.log('Device binding successful:', serverMessage)
+        }
+      } else {
+        step.value = 'error'
+        errorMessage.value = serverMessage || 'Binding failed'
+        notyf.error(serverMessage || 'Binding failed')
+      }
+    } else {
+      // 其他情况默认为成功
+      console.log('Device binding completed:', response)
       step.value = 'success'
       notyf.success('Device bound successfully!')
-    } else {
-      throw new Error(response.message || 'Binding failed')
     }
   } catch (error: any) {
-    console.error('Device binding failed:', error)
+    console.error('Device binding request failed:', error)
     step.value = 'error'
     
-    // 从axios异常中提取服务器返回的具体错误信息
-    let serverErrorMessage = 'Device binding failed'
+    // 从axios网络异常中提取服务器返回的具体错误信息
+    let serverErrorMessage = 'Network error or server unavailable'
     
     if (error.response && error.response.data) {
       // 服务器返回的错误信息
