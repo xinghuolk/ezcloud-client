@@ -1,6 +1,9 @@
 # 前端 Dockerfile - 多阶段构建优化镜像大小
 # Stage 1: Build stage
-FROM node:18-alpine AS builder
+FROM node:20-alpine AS builder
+
+# 配置Alpine镜像源（使用阿里云镜像加速）
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
 
 # 设置工作目录
 WORKDIR /app
@@ -31,6 +34,9 @@ RUN npm run build
 
 # Stage 2: Production stage
 FROM nginx:1.21-alpine AS production
+
+# 配置Alpine镜像源（使用阿里云镜像加速）
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
 
 # 安装必要工具（健康检查用）
 RUN apk add --no-cache curl
