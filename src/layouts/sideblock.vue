@@ -46,6 +46,13 @@ const allLinks = ref<SideblockItem[]>([
   },
   {
     type: 'link',
+    label: 'Firmware Management',
+    icon: 'lucide:download',
+    to: '/app/firmware',
+    permission: 'firmware:manage',
+  },
+  {
+    type: 'link',
     label: 'WiFi Templates',
     icon: 'lucide:wifi',
     to: '/app/wifi-templates',

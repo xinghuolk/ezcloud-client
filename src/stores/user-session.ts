@@ -180,6 +180,7 @@ export const useUserSession = defineStore('userSession', () => {
         'vendor:manage',
         'model:manage',
         'serial:manage',
+        'firmware:manage',
         'system:view'
       ]
       return adminPermissions.includes(permission)

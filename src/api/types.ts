@@ -500,3 +500,71 @@ export interface Plugin {
   created_at: string
   updated_at: string
 }
+
+// 固件版本相关类型
+export interface FirmwareVersion {
+  id: number
+  version: string
+  file_name: string
+  storage_path: string
+  file_size: number
+  checksum_md5: string
+  release_notes?: string
+  status: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED'
+  uploaded_by_id: number
+  created_at: string
+  updated_at: string
+  // 关联数据
+  uploader?: {
+    id: number
+    username: string
+    email: string
+  }
+  compatible_models?: DeviceModel[]
+}
+
+export interface FirmwareListResponse {
+  firmware: FirmwareVersion[]
+  pagination: {
+    page: number
+    limit: number
+    total: number
+    totalPages: number
+  }
+}
+
+export interface FirmwareQuery {
+  page?: number
+  limit?: number
+  search?: string
+  status?: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED'
+  device_model_id?: number
+  uploader_id?: number
+}
+
+export interface CreateFirmwareParams {
+  version: string
+  release_notes?: string
+  device_model_ids: number[]
+}
+
+export interface UpdateFirmwareParams {
+  version?: string
+  release_notes?: string
+  status?: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED'
+}
+
+export interface FirmwareCompatibility {
+  firmware_version_id: number
+  device_model_id: number
+  created_at: string
+}
+
+export interface SetCompatibilityParams {
+  device_model_ids: number[]
+}
+
+export interface FirmwareUploadResponse {
+  firmware: FirmwareVersion
+  upload_url?: string
+}

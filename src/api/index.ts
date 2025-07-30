@@ -33,7 +33,14 @@ import type {
   VendorListResponse,
   DeviceListResponse,
   SerialListResponse,
-  ModelListResponse
+  ModelListResponse,
+  FirmwareVersion,
+  FirmwareListResponse,
+  FirmwareQuery,
+  CreateFirmwareParams,
+  UpdateFirmwareParams,
+  SetCompatibilityParams,
+  FirmwareUploadResponse
 } from './types'
 
 // 认证相关API
@@ -469,6 +476,61 @@ export const wifiTemplatesApi = {
   }
 }
 
+// 固件管理API
+export const firmwareApi = {
+  // 获取固件列表
+  list: (params?: FirmwareQuery): Promise<ApiResponse<FirmwareListResponse>> => {
+    return request.get('/firmware', { params })
+  },
+
+  // 获取固件详情
+  get: (id: number): Promise<ApiResponse<FirmwareVersion>> => {
+    return request.get(`/firmware/${id}`)
+  },
+
+  // 上传固件
+  upload: (file: File, params: CreateFirmwareParams): Promise<ApiResponse<FirmwareUploadResponse>> => {
+    const formData = new FormData()
+    formData.append('firmware', file)
+    formData.append('version', params.version)
+    if (params.release_notes) {
+      formData.append('release_notes', params.release_notes)
+    }
+    formData.append('compatible_models', JSON.stringify(params.device_model_ids))
+    
+    return request.post('/firmware/upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    })
+  },
+
+  // 更新固件信息
+  update: (id: number, params: UpdateFirmwareParams): Promise<ApiResponse<FirmwareVersion>> => {
+    return request.put(`/firmware/${id}`, params)
+  },
+
+  // 更新固件状态
+  updateStatus: (id: number, status: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED'): Promise<ApiResponse<FirmwareVersion>> => {
+    return request.put(`/firmware/${id}/status`, { status })
+  },
+
+  // 删除固件（仅DRAFT状态）
+  delete: (id: number): Promise<ApiResponse<null>> => {
+    return request.delete(`/firmware/${id}`)
+  },
+
+  // 获取兼容性设置
+  getCompatibility: (id: number): Promise<ApiResponse<DeviceModel[]>> => {
+    return request.get(`/firmware/${id}/compatibility`)
+  },
+
+  // 设置兼容性
+  setCompatibility: (id: number, params: SetCompatibilityParams): Promise<ApiResponse<null>> => {
+    return request.post(`/firmware/${id}/compatibility`, params)
+  }
+}
+
 // 设备管理API（别名）
 export const devicesApi = deviceApi
 
@@ -489,5 +551,6 @@ export default {
   wifiTemplatesApi,
   vendorApi,
   vendorsApi,
-  remoteAccessApi
+  remoteAccessApi,
+  firmwareApi
 }

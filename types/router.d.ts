@@ -26,6 +26,7 @@ declare module 'vue-router/auto-routes' {
     '/app/devices': RouteRecordInfo<'/app/devices', '/app/devices', Record<never, never>, Record<never, never>>,
     '/app/devices/': RouteRecordInfo<'/app/devices/', '/app/devices', Record<never, never>, Record<never, never>>,
     '/app/devices/[id]': RouteRecordInfo<'/app/devices/[id]', '/app/devices/:id', { id: ParamValue<true> }, { id: ParamValue<false> }>,
+    '/app/firmware': RouteRecordInfo<'/app/firmware', '/app/firmware', Record<never, never>, Record<never, never>>,
     '/app/models': RouteRecordInfo<'/app/models', '/app/models', Record<never, never>, Record<never, never>>,
     '/app/profile': RouteRecordInfo<'/app/profile', '/app/profile', Record<never, never>, Record<never, never>>,
     '/app/serials': RouteRecordInfo<'/app/serials', '/app/serials', Record<never, never>, Record<never, never>>,
