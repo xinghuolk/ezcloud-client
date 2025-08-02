@@ -528,6 +528,41 @@ export const firmwareApi = {
   // 设置兼容性
   setCompatibility: (id: number, params: SetCompatibilityParams): Promise<ApiResponse<null>> => {
     return request.post(`/firmware/${id}/compatibility`, params)
+  },
+
+  // 获取测试设备列表
+  getTestDevices: (id: number): Promise<ApiResponse<FirmwareTestDevice[]>> => {
+    return request.get(`/firmware/${id}/test-devices`)
+  },
+
+  // 添加测试设备
+  addTestDevices: (id: number, params: AddTestDevicesParams): Promise<ApiResponse<{ added: number; serials: string[] }>> => {
+    return request.post(`/firmware/${id}/test-devices`, params)
+  },
+
+  // 删除测试设备
+  deleteTestDevice: (id: number, serial: string): Promise<ApiResponse<null>> => {
+    return request.delete(`/firmware/${id}/test-devices/${serial}`)
+  },
+
+  // 获取测试进度
+  getTestProgress: (id: number): Promise<ApiResponse<FirmwareTestProgress>> => {
+    return request.get(`/firmware/${id}/test-status`)
+  },
+
+  // 开始测试
+  startTesting: (id: number): Promise<ApiResponse<{ id: number; status: string; test_devices: number }>> => {
+    return request.put(`/firmware/${id}/start-testing`)
+  },
+
+  // 完成测试并发布
+  finishTesting: (id: number, force?: boolean): Promise<ApiResponse<{ id: number; status: string; test_summary: { total: number; success: number; failed: number; success_rate: number } }>> => {
+    return request.put(`/firmware/${id}/finish-testing`, { force })
+  },
+
+  // 直接发布（跳过测试）
+  publishDirectly: (id: number): Promise<ApiResponse<{ id: number; status: string }>> => {
+    return request.put(`/firmware/${id}/publish-directly`)
   }
 }
 

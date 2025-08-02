@@ -6,7 +6,10 @@ import type {
   CreateFirmwareParams, 
   UpdateFirmwareParams,
   SetCompatibilityParams,
-  DeviceModel 
+  DeviceModel,
+  FirmwareTestDevice,
+  FirmwareTestProgress,
+  AddTestDevicesParams
 } from '/@src/api/types'
 import { Notyf } from 'notyf'
 import { firmwareApi } from '/@src/api'
@@ -26,13 +29,20 @@ export const useFirmwareStore = defineStore('firmware', () => {
     total: 0,
     totalPages: 0
   })
+  
+  // 测试相关状态
+  const testDevices = ref<Map<number, FirmwareTestDevice[]>>(new Map())
+  const testProgress = ref<Map<number, FirmwareTestProgress>>(new Map())
+  const testLoading = ref(false)
 
   // Getters
   const firmwareCount = computed(() => firmwareList.value.length)
   const draftFirmware = computed(() => firmwareList.value.filter(f => f.status === 'DRAFT'))
+  const testingFirmware = computed(() => firmwareList.value.filter(f => f.status === 'TESTING'))
   const publishedFirmware = computed(() => firmwareList.value.filter(f => f.status === 'PUBLISHED'))
   const archivedFirmware = computed(() => firmwareList.value.filter(f => f.status === 'ARCHIVED'))
   const draftCount = computed(() => draftFirmware.value.length)
+  const testingCount = computed(() => testingFirmware.value.length)
   const publishedCount = computed(() => publishedFirmware.value.length)
   const archivedCount = computed(() => archivedFirmware.value.length)
 
@@ -145,7 +155,7 @@ export const useFirmwareStore = defineStore('firmware', () => {
     }
   }
 
-  const updateFirmwareStatus = async (id: number, status: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED') => {
+  const updateFirmwareStatus = async (id: number, status: 'DRAFT' | 'TESTING' | 'PUBLISHED' | 'ARCHIVED') => {
     loading.value = true
     try {
       const response = await firmwareApi.updateStatus(id, status)
@@ -262,7 +272,7 @@ export const useFirmwareStore = defineStore('firmware', () => {
     return firmwareList.value.find(f => f.id === id) || null
   }
 
-  const getFirmwareByStatus = (status: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED') => {
+  const getFirmwareByStatus = (status: 'DRAFT' | 'TESTING' | 'PUBLISHED' | 'ARCHIVED') => {
     return firmwareList.value.filter(f => f.status === status)
   }
 
@@ -292,6 +302,172 @@ export const useFirmwareStore = defineStore('firmware', () => {
     })
   }
 
+  // 测试相关方法
+  const fetchTestDevices = async (firmwareId: number) => {
+    testLoading.value = true
+    try {
+      const response = await firmwareApi.getTestDevices(firmwareId)
+      if (response.success) {
+        testDevices.value.set(firmwareId, response.data)
+        return response.data
+      } else {
+        notyf.error(response.message || 'Failed to get test devices')
+        return []
+      }
+    } catch (error) {
+      console.error('Failed to get test devices:', error)
+      notyf.error(extractErrorMessage(error, 'Failed to get test devices'))
+      return []
+    } finally {
+      testLoading.value = false
+    }
+  }
+
+  const addTestDevices = async (firmwareId: number, params: AddTestDevicesParams) => {
+    testLoading.value = true
+    try {
+      const response = await firmwareApi.addTestDevices(firmwareId, params)
+      if (response.success) {
+        notyf.success(`Added ${response.data.added} test devices`)
+        // 刷新测试设备列表
+        await fetchTestDevices(firmwareId)
+        return response.data
+      } else {
+        notyf.error(response.message || 'Failed to add test devices')
+        return null
+      }
+    } catch (error) {
+      console.error('Failed to add test devices:', error)
+      notyf.error(extractErrorMessage(error, 'Failed to add test devices'))
+      return null
+    } finally {
+      testLoading.value = false
+    }
+  }
+
+  const deleteTestDevice = async (firmwareId: number, serial: string) => {
+    testLoading.value = true
+    try {
+      const response = await firmwareApi.deleteTestDevice(firmwareId, serial)
+      if (response.success) {
+        notyf.success('Test device removed')
+        // 刷新测试设备列表
+        await fetchTestDevices(firmwareId)
+        return true
+      } else {
+        notyf.error(response.message || 'Failed to remove test device')
+        return false
+      }
+    } catch (error) {
+      console.error('Failed to remove test device:', error)
+      notyf.error(extractErrorMessage(error, 'Failed to remove test device'))
+      return false
+    } finally {
+      testLoading.value = false
+    }
+  }
+
+  const fetchTestProgress = async (firmwareId: number) => {
+    try {
+      const response = await firmwareApi.getTestProgress(firmwareId)
+      if (response.success) {
+        testProgress.value.set(firmwareId, response.data)
+        return response.data
+      } else {
+        return null
+      }
+    } catch (error) {
+      console.error('Failed to get test progress:', error)
+      return null
+    }
+  }
+
+  const startTesting = async (firmwareId: number) => {
+    loading.value = true
+    try {
+      const response = await firmwareApi.startTesting(firmwareId)
+      if (response.success) {
+        notyf.success('Testing started')
+        // 更新固件状态
+        const index = firmwareList.value.findIndex(f => f.id === firmwareId)
+        if (index !== -1) {
+          firmwareList.value[index].status = 'TESTING'
+        }
+        if (currentFirmware.value?.id === firmwareId) {
+          currentFirmware.value.status = 'TESTING'
+        }
+        return response.data
+      } else {
+        notyf.error(response.message || 'Failed to start testing')
+        return null
+      }
+    } catch (error) {
+      console.error('Failed to start testing:', error)
+      notyf.error(extractErrorMessage(error, 'Failed to start testing'))
+      return null
+    } finally {
+      loading.value = false
+    }
+  }
+
+  const finishTesting = async (firmwareId: number, force = false) => {
+    loading.value = true
+    try {
+      const response = await firmwareApi.finishTesting(firmwareId, force)
+      if (response.success) {
+        notyf.success('Testing completed and firmware published')
+        // 更新固件状态
+        const index = firmwareList.value.findIndex(f => f.id === firmwareId)
+        if (index !== -1) {
+          firmwareList.value[index].status = 'PUBLISHED'
+        }
+        if (currentFirmware.value?.id === firmwareId) {
+          currentFirmware.value.status = 'PUBLISHED'
+        }
+        return response.data
+      } else {
+        notyf.error(response.message || 'Failed to finish testing')
+        return null
+      }
+    } catch (error) {
+      console.error('Failed to finish testing:', error)
+      notyf.error(extractErrorMessage(error, 'Failed to finish testing'))
+      return null
+    } finally {
+      loading.value = false
+    }
+  }
+
+  const publishDirectly = async (firmwareId: number) => {
+    loading.value = true
+    try {
+      const response = await firmwareApi.publishDirectly(firmwareId)
+      if (response.success) {
+        notyf.success('Firmware published directly')
+        // 更新固件状态
+        const index = firmwareList.value.findIndex(f => f.id === firmwareId)
+        if (index !== -1) {
+          firmwareList.value[index].status = 'PUBLISHED'
+        }
+        if (currentFirmware.value?.id === firmwareId) {
+          currentFirmware.value.status = 'PUBLISHED'
+        }
+        return response.data
+      } else {
+        notyf.error(response.message || 'Failed to publish firmware')
+        return null
+      }
+    } catch (error) {
+      console.error('Failed to publish firmware:', error)
+      notyf.error(extractErrorMessage(error, 'Failed to publish firmware'))
+      return null
+    } finally {
+      loading.value = false
+    }
+  }
+
+  // 删除了WebSocket事件处理方法，改为使用轮询获取状态
+
   return {
     // State
     firmwareList,
@@ -299,13 +475,18 @@ export const useFirmwareStore = defineStore('firmware', () => {
     loading,
     uploading,
     pagination,
+    testDevices,
+    testProgress,
+    testLoading,
     
     // Getters
     firmwareCount,
     draftFirmware,
+    testingFirmware,
     publishedFirmware,
     archivedFirmware,
     draftCount,
+    testingCount,
     publishedCount,
     archivedCount,
     sortedFirmware,
@@ -320,6 +501,15 @@ export const useFirmwareStore = defineStore('firmware', () => {
     getCompatibility,
     setCompatibility,
     resetState,
+    
+    // Test Actions
+    fetchTestDevices,
+    addTestDevices,
+    deleteTestDevice,
+    fetchTestProgress,
+    startTesting,
+    finishTesting,
+    publishDirectly,
     
     // Utilities
     findFirmwareById,

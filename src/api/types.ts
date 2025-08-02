@@ -510,7 +510,7 @@ export interface FirmwareVersion {
   file_size: number
   checksum_md5: string
   release_notes?: string
-  status: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED'
+  status: 'DRAFT' | 'TESTING' | 'PUBLISHED' | 'ARCHIVED'
   uploaded_by_id: number
   created_at: string
   updated_at: string
@@ -567,4 +567,40 @@ export interface SetCompatibilityParams {
 export interface FirmwareUploadResponse {
   firmware: FirmwareVersion
   upload_url?: string
+}
+
+// 固件测试相关类型
+export interface FirmwareTestDevice {
+  firmware_version_id: number
+  device_serial: string
+  test_status: 'pending' | 'downloading' | 'installing' | 'testing' | 'success' | 'failed'
+  test_result?: Record<string, any>
+  test_started_at?: string
+  test_completed_at?: string
+  created_at: string
+  updated_at: string
+  added_by_id: number
+  // 关联数据
+  device?: Device
+  addedBy?: {
+    id: number
+    username: string
+  }
+}
+
+export interface FirmwareTestProgress {
+  total: number
+  pending: number
+  downloading: number
+  installing: number
+  testing: number
+  success: number
+  failed: number
+  inProgress: number
+  completed: number
+  successRate: number
+}
+
+export interface AddTestDevicesParams {
+  device_serials: string[]
 }

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed, watch } from 'vue'
+import { ref, reactive, onMounted, onUnmounted, computed, watch } from 'vue'
 import { useFirmwareStore } from '/@src/stores/firmware'
 import { modelApi } from '/@src/api'
 import type { FirmwareVersion, FirmwareQuery, DeviceModel, CreateFirmwareParams } from '/@src/api/types'
@@ -30,6 +30,19 @@ const archiveConfirmOpen = ref(false)
 const selectedFirmwareForPublish = ref<FirmwareVersion | null>(null)
 const selectedFirmwareForArchive = ref<FirmwareVersion | null>(null)
 
+// 测试相关状态
+const testManageDialogOpen = ref(false)
+const testProgressDialogOpen = ref(false)
+const selectedFirmwareForTest = ref<FirmwareVersion | null>(null)
+const addTestDevicesDialogOpen = ref(false)
+const testDeviceSerials = ref('')
+const startTestConfirmOpen = ref(false)
+const finishTestConfirmOpen = ref(false)
+
+// 测试进度轮询
+let testProgressPollInterval: number | null = null
+let testDevicesPollInterval: number | null = null
+
 // 搜索表单
 const searchForm = reactive<FirmwareQuery>({
   page: 1,
@@ -57,12 +70,14 @@ let searchTimeout: NodeJS.Timeout | null = null
 // 计算属性
 const statusColorMap: Record<string, VTagColor> = {
   'DRAFT': 'warning',
+  'TESTING': 'info',
   'PUBLISHED': 'success',
   'ARCHIVED': 'light'
 }
 
 const statusTextMap: Record<string, string> = {
   'DRAFT': 'Draft',
+  'TESTING': 'Testing',
   'PUBLISHED': 'Published', 
   'ARCHIVED': 'Archived'
 }
@@ -317,6 +332,155 @@ const handlePageChange = (page: number) => {
   fetchFirmwareList()
 }
 
+// 测试管理方法
+const manageTestDevices = async (firmware: FirmwareVersion) => {
+  selectedFirmwareForTest.value = firmware
+  testManageDialogOpen.value = true
+  
+  // 加载测试设备列表
+  await firmwareStore.fetchTestDevices(firmware.id)
+  
+  // 如果固件在测试中，启动轮询
+  if (firmware.status === 'TESTING') {
+    startTestDevicesPolling(firmware.id)
+  }
+}
+
+// 开始轮询测试设备状态
+const startTestDevicesPolling = (firmwareId: number) => {
+  // 清理之前的轮询
+  stopTestDevicesPolling()
+  
+  // 立即轮询设备状态，每10秒更新一次
+  testDevicesPollInterval = window.setInterval(async () => {
+    if (testManageDialogOpen.value && selectedFirmwareForTest.value?.id === firmwareId) {
+      await firmwareStore.fetchTestDevices(firmwareId)
+    } else {
+      // 对话框已关闭，停止轮询
+      stopTestDevicesPolling()
+    }
+  }, 10000) // 每10秒轮询一次
+}
+
+// 停止轮询测试设备状态
+const stopTestDevicesPolling = () => {
+  if (testDevicesPollInterval !== null) {
+    window.clearInterval(testDevicesPollInterval)
+    testDevicesPollInterval = null
+  }
+}
+
+const viewTestProgress = async (firmware: FirmwareVersion) => {
+  selectedFirmwareForTest.value = firmware
+  testProgressDialogOpen.value = true
+  
+  // 加载测试进度
+  await firmwareStore.fetchTestProgress(firmware.id)
+  
+  // 开始轮询测试进度
+  startTestProgressPolling(firmware.id)
+}
+
+// 开始轮询测试进度
+const startTestProgressPolling = (firmwareId: number) => {
+  // 清理之前的轮询
+  stopTestProgressPolling()
+  
+  // 60秒后开始，每10秒轮询一次
+  setTimeout(() => {
+    testProgressPollInterval = window.setInterval(async () => {
+      if (testProgressDialogOpen.value && selectedFirmwareForTest.value?.id === firmwareId) {
+        await firmwareStore.fetchTestProgress(firmwareId)
+        
+        // 如果测试已完成（所有设备都完成测试），停止轮询
+        const progress = firmwareStore.testProgress.get(firmwareId)
+        if (progress && progress.completed === progress.total && progress.total > 0) {
+          stopTestProgressPolling()
+        }
+      } else {
+        // 对话框已关闭，停止轮询
+        stopTestProgressPolling()
+      }
+    }, 10000) // 每10秒轮询一次
+  }, 60000) // 60秒后开始
+}
+
+// 停止轮询测试进度
+const stopTestProgressPolling = () => {
+  if (testProgressPollInterval !== null) {
+    window.clearInterval(testProgressPollInterval)
+    testProgressPollInterval = null
+  }
+}
+
+const showStartTestConfirm = (firmware: FirmwareVersion) => {
+  selectedFirmwareForTest.value = firmware
+  startTestConfirmOpen.value = true
+}
+
+const showFinishTestConfirm = (firmware: FirmwareVersion) => {
+  selectedFirmwareForTest.value = firmware
+  finishTestConfirmOpen.value = true
+}
+
+const openAddTestDevicesDialog = () => {
+  testDeviceSerials.value = ''
+  addTestDevicesDialogOpen.value = true
+}
+
+const addTestDevices = async () => {
+  if (!selectedFirmwareForTest.value || !testDeviceSerials.value.trim()) return
+  
+  const serials = testDeviceSerials.value
+    .split('\n')
+    .map(s => s.trim())
+    .filter(s => s.length > 0)
+  
+  if (serials.length === 0) {
+    notyf.error('Please enter at least one device serial')
+    return
+  }
+  
+  const result = await firmwareStore.addTestDevices(selectedFirmwareForTest.value.id, {
+    device_serials: serials
+  })
+  
+  if (result) {
+    addTestDevicesDialogOpen.value = false
+    testDeviceSerials.value = ''
+  }
+}
+
+const removeTestDevice = async (serial: string) => {
+  if (!selectedFirmwareForTest.value) return
+  
+  if (confirm(`Are you sure you want to remove test device ${serial}?`)) {
+    await firmwareStore.deleteTestDevice(selectedFirmwareForTest.value.id, serial)
+  }
+}
+
+const startTesting = async () => {
+  if (!selectedFirmwareForTest.value) return
+  
+  const result = await firmwareStore.startTesting(selectedFirmwareForTest.value.id)
+  if (result) {
+    startTestConfirmOpen.value = false
+    selectedFirmwareForTest.value = null
+    await fetchFirmwareList()
+  }
+}
+
+const finishTesting = async (force = false) => {
+  if (!selectedFirmwareForTest.value) return
+  
+  const result = await firmwareStore.finishTesting(selectedFirmwareForTest.value.id, force)
+  if (result) {
+    finishTestConfirmOpen.value = false
+    selectedFirmwareForTest.value = null
+    await fetchFirmwareList()
+  }
+}
+
 // 监听搜索输入
 watch(() => searchForm.search, handleSearch)
 watch(() => searchForm.status, () => {
@@ -332,6 +496,12 @@ watch(() => searchForm.device_model_id, () => {
 onMounted(() => {
   fetchFirmwareList()
   fetchDeviceModels()
+})
+
+// 组件卸载时清理定时器
+onUnmounted(() => {
+  stopTestProgressPolling()
+  stopTestDevicesPolling()
 })
 </script>
 
@@ -372,6 +542,7 @@ onMounted(() => {
                 <VSelect v-model="searchForm.status" placeholder="All Status">
                   <VOption value="">All Status</VOption>
                   <VOption value="DRAFT">Draft</VOption>
+                  <VOption value="TESTING">Testing</VOption>
                   <VOption value="PUBLISHED">Published</VOption>
                   <VOption value="ARCHIVED">Archived</VOption>
                 </VSelect>
@@ -574,6 +745,36 @@ onMounted(() => {
                       Compatibility Settings
                     </a>
                     <hr class="dropdown-divider" v-if="firmware.status !== 'ARCHIVED'">
+                    <!-- 测试管理选项 -->
+                    <a 
+                      v-if="firmware.status === 'DRAFT' || firmware.status === 'TESTING'"
+                      href="#" 
+                      class="dropdown-item"
+                      @click.prevent="manageTestDevices(firmware)"
+                    >
+                      <iconify-icon icon="lucide:users" class="mr-2" />
+                      Manage Test Devices
+                    </a>
+                    <a 
+                      v-if="firmware.status === 'TESTING'"
+                      href="#" 
+                      class="dropdown-item"
+                      @click.prevent="viewTestProgress(firmware)"
+                    >
+                      <iconify-icon icon="lucide:activity" class="mr-2" />
+                      View Test Progress
+                    </a>
+                    <hr class="dropdown-divider" v-if="firmware.status === 'DRAFT' || firmware.status === 'TESTING'">
+                    <!-- 状态流转选项 -->
+                    <a 
+                      v-if="firmware.status === 'DRAFT'"
+                      href="#" 
+                      class="dropdown-item"
+                      @click.prevent="showStartTestConfirm(firmware)"
+                    >
+                      <iconify-icon icon="lucide:play-circle" class="mr-2" />
+                      Start Testing
+                    </a>
                     <a 
                       v-if="firmware.status === 'DRAFT'"
                       href="#" 
@@ -581,7 +782,16 @@ onMounted(() => {
                       @click.prevent="updateStatus(firmware, 'PUBLISHED')"
                     >
                       <iconify-icon icon="lucide:upload" class="mr-2" />
-                      Publish
+                      Publish Directly
+                    </a>
+                    <a 
+                      v-if="firmware.status === 'TESTING'"
+                      href="#" 
+                      class="dropdown-item"
+                      @click.prevent="showFinishTestConfirm(firmware)"
+                    >
+                      <iconify-icon icon="lucide:check-circle" class="mr-2" />
+                      Finish Testing
                     </a>
                     <a 
                       v-if="firmware.status === 'PUBLISHED'"
@@ -960,6 +1170,277 @@ onMounted(() => {
         </VButton>
       </template>
     </VModal>
+
+    <!-- 测试设备管理对话框 -->
+    <VModal 
+      :open="testManageDialogOpen"
+      title="Manage Test Devices"
+      size="large"
+      actions="right"
+      @close="() => { testManageDialogOpen = false; stopTestDevicesPolling() }"
+    >
+      <template #content>
+        <div v-if="selectedFirmwareForTest">
+          <div class="mb-4">
+            <strong>Firmware Version:</strong> {{ selectedFirmwareForTest.version }}
+          </div>
+          
+          <div class="mb-4">
+            <VButton color="primary" @click="openAddTestDevicesDialog">
+              <iconify-icon icon="lucide:plus" class="mr-2" />
+              Add Test Devices
+            </VButton>
+          </div>
+          
+          <div v-if="firmwareStore.testLoading" class="loading-placeholder">
+            <VPlaceload />
+            <VPlaceloadText lines="3" />
+          </div>
+          
+          <div v-else>
+            <table class="table is-fullwidth" v-if="firmwareStore.testDevices.get(selectedFirmwareForTest.id)?.length > 0">
+              <thead>
+                <tr>
+                  <th>Device Serial</th>
+                  <th>Device Name</th>
+                  <th>Status</th>
+                  <th>Test Result</th>
+                  <th>Added By</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="testDevice in firmwareStore.testDevices.get(selectedFirmwareForTest.id)" :key="testDevice.device_serial">
+                  <td>{{ testDevice.device_serial }}</td>
+                  <td>{{ testDevice.device?.name || '-' }}</td>
+                  <td>
+                    <VTag :color="testDevice.test_status === 'success' ? 'success' : testDevice.test_status === 'failed' ? 'danger' : 'info'">
+                      {{ testDevice.test_status }}
+                    </VTag>
+                  </td>
+                  <td>
+                    <span v-if="testDevice.test_result">
+                      {{ testDevice.test_result.message || '-' }}
+                    </span>
+                    <span v-else>-</span>
+                  </td>
+                  <td>{{ testDevice.addedBy?.username || '-' }}</td>
+                  <td>
+                    <VButton 
+                      v-if="testDevice.test_status === 'pending'"
+                      color="danger" 
+                      size="small"
+                      @click="removeTestDevice(testDevice.device_serial)"
+                    >
+                      Remove
+                    </VButton>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+            
+            <VPlaceholderSection
+              v-else
+              title="No Test Devices"
+              subtitle="Add devices to test this firmware version"
+              class="my-6"
+            />
+          </div>
+        </div>
+      </template>
+      
+      <template #action>
+        <VButton @click="testManageDialogOpen = false">
+          Close
+        </VButton>
+      </template>
+    </VModal>
+
+    <!-- 添加测试设备对话框 -->
+    <VModal 
+      :open="addTestDevicesDialogOpen"
+      title="Add Test Devices"
+      size="medium"
+      actions="right"
+      @close="addTestDevicesDialogOpen = false"
+    >
+      <template #content>
+        <VField>
+          <VLabel>Device Serial Numbers</VLabel>
+          <VControl>
+            <VTextarea 
+              v-model="testDeviceSerials"
+              placeholder="Enter device serial numbers, one per line"
+              rows="6"
+            />
+          </VControl>
+          <p class="help">Enter one device serial per line. Only online devices can be added for testing.</p>
+        </VField>
+      </template>
+      
+      <template #action>
+        <VButton 
+          color="primary"
+          :loading="firmwareStore.testLoading"
+          @click="addTestDevices"
+        >
+          Add Devices
+        </VButton>
+      </template>
+    </VModal>
+
+    <!-- 测试进度对话框 -->
+    <VModal 
+      :open="testProgressDialogOpen"
+      title="Test Progress"
+      size="medium"
+      actions="right"
+      @close="() => { testProgressDialogOpen = false; stopTestProgressPolling() }"
+    >
+      <template #content>
+        <div v-if="selectedFirmwareForTest">
+          <div class="mb-4">
+            <strong>Firmware Version:</strong> {{ selectedFirmwareForTest.version }}
+          </div>
+          
+          <div v-if="firmwareStore.testProgress.get(selectedFirmwareForTest.id)" class="test-progress">
+            <div class="progress-stats">
+              <div class="columns is-multiline">
+                <div class="column is-6">
+                  <div class="stat-item">
+                    <span class="label">Total Devices:</span>
+                    <span class="value">{{ firmwareStore.testProgress.get(selectedFirmwareForTest.id).total }}</span>
+                  </div>
+                </div>
+                <div class="column is-6">
+                  <div class="stat-item">
+                    <span class="label">In Progress:</span>
+                    <span class="value">{{ firmwareStore.testProgress.get(selectedFirmwareForTest.id).inProgress }}</span>
+                  </div>
+                </div>
+                <div class="column is-6">
+                  <div class="stat-item">
+                    <span class="label">Success:</span>
+                    <span class="value has-text-success">{{ firmwareStore.testProgress.get(selectedFirmwareForTest.id).success }}</span>
+                  </div>
+                </div>
+                <div class="column is-6">
+                  <div class="stat-item">
+                    <span class="label">Failed:</span>
+                    <span class="value has-text-danger">{{ firmwareStore.testProgress.get(selectedFirmwareForTest.id).failed }}</span>
+                  </div>
+                </div>
+              </div>
+              
+              <div class="progress-bar">
+                <progress 
+                  class="progress is-primary" 
+                  :value="firmwareStore.testProgress.get(selectedFirmwareForTest.id).completed" 
+                  :max="firmwareStore.testProgress.get(selectedFirmwareForTest.id).total"
+                >
+                  {{ Math.round((firmwareStore.testProgress.get(selectedFirmwareForTest.id).completed / firmwareStore.testProgress.get(selectedFirmwareForTest.id).total) * 100) }}%
+                </progress>
+              </div>
+              
+              <div class="success-rate" v-if="firmwareStore.testProgress.get(selectedFirmwareForTest.id).completed > 0">
+                <strong>Success Rate:</strong> {{ firmwareStore.testProgress.get(selectedFirmwareForTest.id).successRate.toFixed(1) }}%
+              </div>
+            </div>
+          </div>
+          
+          <div v-else>
+            <VPlaceholderSection
+              title="No Test Data"
+              subtitle="Test progress will appear here once testing begins"
+              class="my-6"
+            />
+          </div>
+        </div>
+      </template>
+      
+      <template #action>
+        <VButton @click="testProgressDialogOpen = false">
+          Close
+        </VButton>
+      </template>
+    </VModal>
+
+    <!-- 开始测试确认对话框 -->
+    <VModal 
+      :open="startTestConfirmOpen"
+      title="Start Testing"
+      size="small"
+      actions="center"
+      @close="startTestConfirmOpen = false"
+    >
+      <template #content>
+        <div class="has-text-centered">
+          <iconify-icon 
+            icon="lucide:play-circle" 
+            class="has-text-info"
+            style="font-size: 3rem; margin-bottom: 1rem;"
+          />
+          <h3 class="title is-5">Start Firmware Testing</h3>
+          <p class="subtitle is-6" v-if="selectedFirmwareForTest">
+            Start testing firmware version <strong>{{ selectedFirmwareForTest.version }}</strong>?
+          </p>
+          <p class="has-text-grey">
+            Only test devices will be able to access this firmware version.
+          </p>
+        </div>
+      </template>
+      
+      <template #action>
+        <VButton 
+          color="info"
+          @click="startTesting"
+        >
+          Start Testing
+        </VButton>
+      </template>
+    </VModal>
+
+    <!-- 完成测试确认对话框 -->
+    <VModal 
+      :open="finishTestConfirmOpen"
+      title="Finish Testing"
+      size="small"
+      actions="center"
+      @close="finishTestConfirmOpen = false"
+    >
+      <template #content>
+        <div class="has-text-centered">
+          <iconify-icon 
+            icon="lucide:check-circle" 
+            class="has-text-success"
+            style="font-size: 3rem; margin-bottom: 1rem;"
+          />
+          <h3 class="title is-5">Finish Testing and Publish</h3>
+          <p class="subtitle is-6" v-if="selectedFirmwareForTest">
+            Finish testing and publish firmware version <strong>{{ selectedFirmwareForTest.version }}</strong>?
+          </p>
+          <div v-if="firmwareStore.testProgress.get(selectedFirmwareForTest?.id)?.inProgress > 0" class="notification is-warning">
+            <p><strong>Warning:</strong> There are still {{ firmwareStore.testProgress.get(selectedFirmwareForTest.id).inProgress }} devices in testing.</p>
+          </div>
+        </div>
+      </template>
+      
+      <template #action>
+        <VButton 
+          color="success"
+          @click="finishTesting(false)"
+        >
+          Finish Testing
+        </VButton>
+        <VButton 
+          v-if="firmwareStore.testProgress.get(selectedFirmwareForTest?.id)?.inProgress > 0"
+          color="warning"
+          @click="finishTesting(true)"
+        >
+          Force Finish
+        </VButton>
+      </template>
+    </VModal>
   </div>
 </template>
 
@@ -1168,5 +1649,53 @@ onMounted(() => {
   color: var(--dark-text);
 }
 
+/* 测试相关样式 */
+.test-progress {
+  padding: 1rem;
+}
+
+.progress-stats {
+  margin-bottom: 1.5rem;
+}
+
+.stat-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--fade-grey-light-6);
+}
+
+.stat-item .label {
+  font-weight: 600;
+  color: var(--dark-text);
+}
+
+.stat-item .value {
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.progress-bar {
+  margin: 1.5rem 0;
+}
+
+.progress-bar .progress {
+  height: 20px;
+}
+
+.success-rate {
+  text-align: center;
+  font-size: 1.1rem;
+  color: var(--dark-text);
+}
+
+.test-device-table {
+  margin-top: 1rem;
+}
+
+.test-device-table .tag {
+  font-weight: 600;
+}
 
 </style>
