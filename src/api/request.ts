@@ -37,7 +37,7 @@ function getApiBaseUrl(): string {
 // 创建axios实例
 const request = axios.create({
   baseURL: getApiBaseUrl(),
-  timeout: 10000,
+  timeout: 30000,  // 调整为30秒，平衡普通API和文件上传需求
   headers: {
     'Content-Type': 'application/json',
   }

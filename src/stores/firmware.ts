@@ -338,7 +338,8 @@ export const useFirmwareStore = defineStore('firmware', () => {
       }
     } catch (error) {
       console.error('Failed to add test devices:', error)
-      notyf.error(extractErrorMessage(error, 'Failed to add test devices'))
+      const errorMessage = extractErrorMessage(error, 'Failed to add test devices')
+      notyf.error(errorMessage)
       return null
     } finally {
       testLoading.value = false
@@ -415,14 +416,14 @@ export const useFirmwareStore = defineStore('firmware', () => {
     try {
       const response = await firmwareApi.finishTesting(firmwareId, force)
       if (response.success) {
-        notyf.success('Testing completed and firmware published')
+        notyf.success('Testing completed, firmware returned to draft status')
         // 更新固件状态
         const index = firmwareList.value.findIndex(f => f.id === firmwareId)
         if (index !== -1) {
-          firmwareList.value[index].status = 'PUBLISHED'
+          firmwareList.value[index].status = 'DRAFT'
         }
         if (currentFirmware.value?.id === firmwareId) {
-          currentFirmware.value.status = 'PUBLISHED'
+          currentFirmware.value.status = 'DRAFT'
         }
         return response.data
       } else {

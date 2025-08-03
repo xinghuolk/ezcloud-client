@@ -498,10 +498,12 @@ export const firmwareApi = {
     }
     formData.append('compatible_models', JSON.stringify(params.device_model_ids))
     
+    // 使用更长的超时时间处理大文件上传
     return request.post('/firmware/upload', formData, {
       headers: {
         'Content-Type': 'multipart/form-data'
-      }
+      },
+      timeout: 180000  // 固件上传超时设置为180秒（3分钟）
     })
   },
 

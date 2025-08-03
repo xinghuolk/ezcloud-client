@@ -36,6 +36,7 @@ const testProgressDialogOpen = ref(false)
 const selectedFirmwareForTest = ref<FirmwareVersion | null>(null)
 const addTestDevicesDialogOpen = ref(false)
 const testDeviceSerials = ref('')
+const addTestDevicesError = ref('')
 const startTestConfirmOpen = ref(false)
 const finishTestConfirmOpen = ref(false)
 
@@ -90,6 +91,109 @@ const formatFileSize = (bytes: number): string => {
   const i = Math.floor(Math.log(bytes) / Math.log(k))
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
 }
+
+// 格式化日期时间
+const formatDateTime = (dateString: string): string => {
+  if (!dateString) return '-'
+  const date = new Date(dateString)
+  return date.toLocaleString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit'
+  })
+}
+
+// 计算测试持续时间
+const calculateTestDuration = (startTime: string, endTime?: string): string => {
+  if (!startTime) return '-'
+  
+  const start = new Date(startTime)
+  const end = endTime ? new Date(endTime) : new Date()
+  const duration = end.getTime() - start.getTime()
+  
+  if (duration < 0) return '-'
+  
+  const seconds = Math.floor(duration / 1000)
+  const minutes = Math.floor(seconds / 60)
+  const hours = Math.floor(minutes / 60)
+  const days = Math.floor(hours / 24)
+  
+  if (days > 0) {
+    return `${days}天 ${hours % 24}小时 ${minutes % 60}分钟`
+  } else if (hours > 0) {
+    return `${hours}小时 ${minutes % 60}分钟`
+  } else if (minutes > 0) {
+    return `${minutes}分钟 ${seconds % 60}秒`
+  } else {
+    return `${seconds}秒`
+  }
+}
+
+// 获取状态颜色
+const getStatusColor = (status: string): string => {
+  switch (status) {
+    case 'success':
+      return 'success'
+    case 'failed':
+      return 'danger'
+    case 'verifying':
+      return 'warning'
+    case 'testing':
+      return 'info'
+    case 'installing':
+      return 'primary'
+    case 'downloading':
+      return 'primary'
+    case 'pending':
+      return 'light'
+    default:
+      return 'info'
+  }
+}
+
+// 获取状态显示文本
+const getStatusDisplayText = (status: string): string => {
+  switch (status) {
+    case 'pending':
+      return '等待中'
+    case 'downloading':
+      return '下载中'
+    case 'installing':
+      return '安装中'
+    case 'testing':
+      return '测试中'
+    case 'verifying':
+      return '验证中'
+    case 'success':
+      return '成功'
+    case 'failed':
+      return '失败'
+    default:
+      return status
+  }
+}
+
+// 当前选中固件的测试进度数据
+const currentTestProgress = computed(() => {
+  if (!selectedFirmwareForTest.value?.id) return null
+  const progress = firmwareStore.testProgress.get(selectedFirmwareForTest.value.id)
+  return progress || {
+    total: 0,
+    pending: 0,
+    downloading: 0,
+    installing: 0,
+    testing: 0,
+    verifying: 0,
+    success: 0,
+    failed: 0,
+    inProgress: 0,
+    completed: 0,
+    successRate: 0
+  }
+})
 
 // 获取固件列表
 const fetchFirmwareList = async () => {
@@ -425,11 +529,15 @@ const showFinishTestConfirm = (firmware: FirmwareVersion) => {
 
 const openAddTestDevicesDialog = () => {
   testDeviceSerials.value = ''
+  addTestDevicesError.value = ''
   addTestDevicesDialogOpen.value = true
 }
 
 const addTestDevices = async () => {
   if (!selectedFirmwareForTest.value || !testDeviceSerials.value.trim()) return
+  
+  // 清除之前的错误信息
+  addTestDevicesError.value = ''
   
   const serials = testDeviceSerials.value
     .split('\n')
@@ -437,17 +545,28 @@ const addTestDevices = async () => {
     .filter(s => s.length > 0)
   
   if (serials.length === 0) {
-    notyf.error('Please enter at least one device serial')
+    addTestDevicesError.value = 'Please enter at least one device serial'
     return
   }
   
-  const result = await firmwareStore.addTestDevices(selectedFirmwareForTest.value.id, {
-    device_serials: serials
-  })
-  
-  if (result) {
-    addTestDevicesDialogOpen.value = false
-    testDeviceSerials.value = ''
+  try {
+    const result = await firmwareStore.addTestDevices(selectedFirmwareForTest.value.id, {
+      device_serials: serials
+    })
+    
+    if (result) {
+      addTestDevicesDialogOpen.value = false
+      testDeviceSerials.value = ''
+      addTestDevicesError.value = ''
+    }
+  } catch (error: any) {
+    console.error('Failed to add test devices:', error)
+    if (error.response?.data) {
+      // 直接从服务器响应中提取错误信息显示在页面上
+      addTestDevicesError.value = error.response.data.message || 'Failed to add test devices'
+    } else {
+      addTestDevicesError.value = 'Failed to add test devices'
+    }
   }
 }
 
@@ -910,10 +1029,7 @@ onUnmounted(() => {
           type="submit"
         >
           Upload
-        </VButton>
-        <VButton @click="uploadDialogOpen = false">
-          Cancel
-        </VButton>
+        </VButton>        
       </template>
     </VModal>
 
@@ -1177,6 +1293,7 @@ onUnmounted(() => {
       title="Manage Test Devices"
       size="large"
       actions="right"
+      cancelLabel="Close"
       @close="() => { testManageDialogOpen = false; stopTestDevicesPolling() }"
     >
       <template #content>
@@ -1204,6 +1321,8 @@ onUnmounted(() => {
                   <th>Device Serial</th>
                   <th>Device Name</th>
                   <th>Status</th>
+                  <th>Test Started</th>
+                  <th>Test Duration</th>
                   <th>Test Result</th>
                   <th>Added By</th>
                   <th>Actions</th>
@@ -1214,9 +1333,21 @@ onUnmounted(() => {
                   <td>{{ testDevice.device_serial }}</td>
                   <td>{{ testDevice.device?.name || '-' }}</td>
                   <td>
-                    <VTag :color="testDevice.test_status === 'success' ? 'success' : testDevice.test_status === 'failed' ? 'danger' : 'info'">
-                      {{ testDevice.test_status }}
+                    <VTag :color="getStatusColor(testDevice.test_status)">
+                      {{ getStatusDisplayText(testDevice.test_status) }}
                     </VTag>
+                  </td>
+                  <td>
+                    <span v-if="testDevice.test_started_at">
+                      {{ formatDateTime(testDevice.test_started_at) }}
+                    </span>
+                    <span v-else>-</span>
+                  </td>
+                  <td>
+                    <span v-if="testDevice.test_started_at">
+                      {{ calculateTestDuration(testDevice.test_started_at, testDevice.test_completed_at) }}
+                    </span>
+                    <span v-else>-</span>
                   </td>
                   <td>
                     <span v-if="testDevice.test_result">
@@ -1248,12 +1379,6 @@ onUnmounted(() => {
           </div>
         </div>
       </template>
-      
-      <template #action>
-        <VButton @click="testManageDialogOpen = false">
-          Close
-        </VButton>
-      </template>
     </VModal>
 
     <!-- 添加测试设备对话框 -->
@@ -1274,6 +1399,9 @@ onUnmounted(() => {
               rows="6"
             />
           </VControl>
+          <p v-if="addTestDevicesError" class="help is-danger" style="color: #dc3545; font-weight: 500;">
+            {{ addTestDevicesError }}
+          </p>
           <p class="help">Enter one device serial per line. Only online devices can be added for testing.</p>
         </VField>
       </template>
@@ -1295,6 +1423,7 @@ onUnmounted(() => {
       title="Test Progress"
       size="medium"
       actions="right"
+      cancelLabel="Close"
       @close="() => { testProgressDialogOpen = false; stopTestProgressPolling() }"
     >
       <template #content>
@@ -1303,31 +1432,31 @@ onUnmounted(() => {
             <strong>Firmware Version:</strong> {{ selectedFirmwareForTest.version }}
           </div>
           
-          <div v-if="firmwareStore.testProgress.get(selectedFirmwareForTest.id)" class="test-progress">
+          <div v-if="currentTestProgress && currentTestProgress.total > 0" class="test-progress">
             <div class="progress-stats">
               <div class="columns is-multiline">
                 <div class="column is-6">
                   <div class="stat-item">
                     <span class="label">Total Devices:</span>
-                    <span class="value">{{ firmwareStore.testProgress.get(selectedFirmwareForTest.id).total }}</span>
+                    <span class="value">{{ currentTestProgress.total }}</span>
                   </div>
                 </div>
                 <div class="column is-6">
                   <div class="stat-item">
                     <span class="label">In Progress:</span>
-                    <span class="value">{{ firmwareStore.testProgress.get(selectedFirmwareForTest.id).inProgress }}</span>
+                    <span class="value">{{ currentTestProgress.inProgress }}</span>
                   </div>
                 </div>
                 <div class="column is-6">
                   <div class="stat-item">
                     <span class="label">Success:</span>
-                    <span class="value has-text-success">{{ firmwareStore.testProgress.get(selectedFirmwareForTest.id).success }}</span>
+                    <span class="value has-text-success">{{ currentTestProgress.success }}</span>
                   </div>
                 </div>
                 <div class="column is-6">
                   <div class="stat-item">
                     <span class="label">Failed:</span>
-                    <span class="value has-text-danger">{{ firmwareStore.testProgress.get(selectedFirmwareForTest.id).failed }}</span>
+                    <span class="value has-text-danger">{{ currentTestProgress.failed }}</span>
                   </div>
                 </div>
               </div>
@@ -1335,15 +1464,62 @@ onUnmounted(() => {
               <div class="progress-bar">
                 <progress 
                   class="progress is-primary" 
-                  :value="firmwareStore.testProgress.get(selectedFirmwareForTest.id).completed" 
-                  :max="firmwareStore.testProgress.get(selectedFirmwareForTest.id).total"
+                  :value="currentTestProgress.completed" 
+                  :max="currentTestProgress.total"
                 >
-                  {{ Math.round((firmwareStore.testProgress.get(selectedFirmwareForTest.id).completed / firmwareStore.testProgress.get(selectedFirmwareForTest.id).total) * 100) }}%
+                  {{ Math.round((currentTestProgress.completed / Math.max(currentTestProgress.total, 1)) * 100) }}%
                 </progress>
               </div>
               
-              <div class="success-rate" v-if="firmwareStore.testProgress.get(selectedFirmwareForTest.id).completed > 0">
-                <strong>Success Rate:</strong> {{ firmwareStore.testProgress.get(selectedFirmwareForTest.id).successRate.toFixed(1) }}%
+              <div class="success-rate" v-if="currentTestProgress && currentTestProgress.completed > 0">
+                <strong>Success Rate:</strong> {{ Number(currentTestProgress.successRate || 0).toFixed(1) }}%
+              </div>
+              
+              <!-- 详细状态分解 -->
+              <div class="status-breakdown mt-4" v-if="currentTestProgress.total > 0">
+                <h6 class="subtitle is-6 mb-3">Status Breakdown:</h6>
+                <div class="columns is-multiline">
+                  <div class="column is-4" v-if="currentTestProgress.pending > 0">
+                    <div class="stat-item small">
+                      <span class="label">
+                        <VTag color="light" size="small">等待中</VTag>
+                      </span>
+                      <span class="value">{{ currentTestProgress.pending }}</span>
+                    </div>
+                  </div>
+                  <div class="column is-4" v-if="currentTestProgress.downloading > 0">
+                    <div class="stat-item small">
+                      <span class="label">
+                        <VTag color="primary" size="small">下载中</VTag>
+                      </span>
+                      <span class="value">{{ currentTestProgress.downloading }}</span>
+                    </div>
+                  </div>
+                  <div class="column is-4" v-if="currentTestProgress.installing > 0">
+                    <div class="stat-item small">
+                      <span class="label">
+                        <VTag color="primary" size="small">安装中</VTag>
+                      </span>
+                      <span class="value">{{ currentTestProgress.installing }}</span>
+                    </div>
+                  </div>
+                  <div class="column is-4" v-if="currentTestProgress.testing > 0">
+                    <div class="stat-item small">
+                      <span class="label">
+                        <VTag color="info" size="small">测试中</VTag>
+                      </span>
+                      <span class="value">{{ currentTestProgress.testing }}</span>
+                    </div>
+                  </div>
+                  <div class="column is-4" v-if="currentTestProgress.verifying > 0">
+                    <div class="stat-item small">
+                      <span class="label">
+                        <VTag color="warning" size="small">验证中</VTag>
+                      </span>
+                      <span class="value">{{ currentTestProgress.verifying }}</span>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -1356,12 +1532,6 @@ onUnmounted(() => {
             />
           </div>
         </div>
-      </template>
-      
-      <template #action>
-        <VButton @click="testProgressDialogOpen = false">
-          Close
-        </VButton>
       </template>
     </VModal>
 

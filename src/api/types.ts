@@ -422,6 +422,7 @@ export interface DeviceQuery {
   stdname?: string
   serial?: string
   name?: string
+  version?: string
   include_trusted?: boolean  // 是否包含托管设备
 }
 

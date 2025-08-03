@@ -43,7 +43,8 @@ const filterForm = reactive<DeviceQuery>({
   is_online: undefined,
   is_activate: undefined,
   oemname: '',
-  stdname: ''
+  stdname: '',
+  version: ''
 })
 
 const bindForm = reactive({
@@ -109,7 +110,8 @@ const handleReset = () => {
     is_online: undefined,
     is_activate: undefined,
     oemname: '',
-    stdname: ''
+    stdname: '',
+    version: ''
   })
   filterForm.page = 1
   fetchDevices()
@@ -508,6 +510,10 @@ watch(() => filterForm.stdname, () => {
   handleDebouncedSearch()
 })
 
+watch(() => filterForm.version, () => {
+  handleDebouncedSearch()
+})
+
 // Lifecycle
 onMounted(() => {
   fetchDevices()
@@ -621,6 +627,18 @@ useHead({
               </VControl>
             </VField>
           </div>
+          <div class="column is-2">
+            <VField>
+              <VLabel>Version</VLabel>
+              <VControl>
+                <VInput
+                  v-model="filterForm.version"
+                  placeholder="Filter by version"
+                  icon="lucide:tag"
+                />
+              </VControl>
+            </VField>
+          </div>
         </div>
         
         <div class="field is-grouped">
@@ -666,6 +684,12 @@ useHead({
             label: 'Model',
             searchable: true,
             grow: true
+          },
+          version: { 
+            label: 'Version',
+            sortable: true,
+            searchable: true,
+            align: 'center'
           },
           ownership: { 
             label: 'Ownership',
@@ -779,6 +803,20 @@ useHead({
                     <small>{{ device.deviceModel.stdname }}</small>
                   </VTextEllipsis>
                 </div>
+                <span v-else class="common-text-light">-</span>
+              </template>
+
+              <template v-if="column.key === 'version'">
+                <VTag 
+                  v-if="device.version"
+                  color="info"
+                  outlined
+                  rounded
+                  size="small"
+                  class="version-tag"
+                >
+                  {{ device.version }}
+                </VTag>
                 <span v-else class="common-text-light">-</span>
               </template>
 
