@@ -96,7 +96,7 @@ const formatFileSize = (bytes: number): string => {
 const formatDateTime = (dateString: string): string => {
   if (!dateString) return '-'
   const date = new Date(dateString)
-  return date.toLocaleString('zh-CN', {
+  return date.toLocaleString('en-US', {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
@@ -122,13 +122,13 @@ const calculateTestDuration = (startTime: string, endTime?: string): string => {
   const days = Math.floor(hours / 24)
   
   if (days > 0) {
-    return `${days}天 ${hours % 24}小时 ${minutes % 60}分钟`
+    return `${days}d ${hours % 24}h ${minutes % 60}m`
   } else if (hours > 0) {
-    return `${hours}小时 ${minutes % 60}分钟`
+    return `${hours}h ${minutes % 60}m`
   } else if (minutes > 0) {
-    return `${minutes}分钟 ${seconds % 60}秒`
+    return `${minutes}m ${seconds % 60}s`
   } else {
-    return `${seconds}秒`
+    return `${seconds}s`
   }
 }
 
@@ -158,19 +158,19 @@ const getStatusColor = (status: string): string => {
 const getStatusDisplayText = (status: string): string => {
   switch (status) {
     case 'pending':
-      return '等待中'
+      return 'Pending'
     case 'downloading':
-      return '下载中'
+      return 'Downloading'
     case 'installing':
-      return '安装中'
+      return 'Installing'
     case 'testing':
-      return '测试中'
+      return 'Testing'
     case 'verifying':
-      return '验证中'
+      return 'Verifying'
     case 'success':
-      return '成功'
+      return 'Success'
     case 'failed':
-      return '失败'
+      return 'Failed'
     default:
       return status
   }
@@ -1482,7 +1482,7 @@ onUnmounted(() => {
                   <div class="column is-4" v-if="currentTestProgress.pending > 0">
                     <div class="stat-item small">
                       <span class="label">
-                        <VTag color="light" size="small">等待中</VTag>
+                        <VTag color="light" size="small">Pending</VTag>
                       </span>
                       <span class="value">{{ currentTestProgress.pending }}</span>
                     </div>
@@ -1490,7 +1490,7 @@ onUnmounted(() => {
                   <div class="column is-4" v-if="currentTestProgress.downloading > 0">
                     <div class="stat-item small">
                       <span class="label">
-                        <VTag color="primary" size="small">下载中</VTag>
+                        <VTag color="primary" size="small">Downloading</VTag>
                       </span>
                       <span class="value">{{ currentTestProgress.downloading }}</span>
                     </div>
@@ -1498,7 +1498,7 @@ onUnmounted(() => {
                   <div class="column is-4" v-if="currentTestProgress.installing > 0">
                     <div class="stat-item small">
                       <span class="label">
-                        <VTag color="primary" size="small">安装中</VTag>
+                        <VTag color="primary" size="small">Installing</VTag>
                       </span>
                       <span class="value">{{ currentTestProgress.installing }}</span>
                     </div>
@@ -1506,7 +1506,7 @@ onUnmounted(() => {
                   <div class="column is-4" v-if="currentTestProgress.testing > 0">
                     <div class="stat-item small">
                       <span class="label">
-                        <VTag color="info" size="small">测试中</VTag>
+                        <VTag color="info" size="small">Testing</VTag>
                       </span>
                       <span class="value">{{ currentTestProgress.testing }}</span>
                     </div>
@@ -1514,7 +1514,7 @@ onUnmounted(() => {
                   <div class="column is-4" v-if="currentTestProgress.verifying > 0">
                     <div class="stat-item small">
                       <span class="label">
-                        <VTag color="warning" size="small">验证中</VTag>
+                        <VTag color="warning" size="small">Verifying</VTag>
                       </span>
                       <span class="value">{{ currentTestProgress.verifying }}</span>
                     </div>
