@@ -44,6 +44,26 @@ export default defineConfig({
     hmr: {
       overlay: true,
     },
+    watch: {
+      ignored: [
+        '**/node_modules/**',
+        '**/dist/**',
+        '**/docs/**',
+        '**/documentation/**',
+        '**/public/**',
+        '**/*.md',
+        '**/coverage/**',
+        '**/logs/**',
+        '**/temp/**',
+        '**/uploads/**',
+        '**/types/**'
+      ],
+      include: [
+        'src/**/*',
+        'vite.config.ts',
+        'index.html'
+      ]
+    }
   },
   // Predefine dependencies in order to prevent reloading them in the browser during development.
   optimizeDeps: {

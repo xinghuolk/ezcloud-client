@@ -40,7 +40,10 @@ import type {
   CreateFirmwareParams,
   UpdateFirmwareParams,
   SetCompatibilityParams,
-  FirmwareUploadResponse
+  FirmwareUploadResponse,
+  FirmwareTestDevice,
+  AddTestDevicesParams,
+  FirmwareTestProgress
 } from './types'
 
 // 认证相关API
