@@ -31,6 +31,7 @@ declare module 'vue-router/auto-routes' {
     '/app/profile': RouteRecordInfo<'/app/profile', '/app/profile', Record<never, never>, Record<never, never>>,
     '/app/serials': RouteRecordInfo<'/app/serials', '/app/serials', Record<never, never>, Record<never, never>>,
     '/app/ssh-terminal/[deviceId]': RouteRecordInfo<'/app/ssh-terminal/[deviceId]', '/app/ssh-terminal/:deviceId', { deviceId: ParamValue<true> }, { deviceId: ParamValue<false> }>,
+    '/app/users': RouteRecordInfo<'/app/users', '/app/users', Record<never, never>, Record<never, never>>,
     '/app/vendors': RouteRecordInfo<'/app/vendors', '/app/vendors', Record<never, never>, Record<never, never>>,
     '/app/wifi-templates': RouteRecordInfo<'/app/wifi-templates', '/app/wifi-templates', Record<never, never>, Record<never, never>>,
     '/auth': RouteRecordInfo<'/auth', '/auth', Record<never, never>, Record<never, never>>,

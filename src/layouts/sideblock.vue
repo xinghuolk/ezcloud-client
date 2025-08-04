@@ -59,6 +59,13 @@ const allLinks = ref<SideblockItem[]>([
     permission: 'wifi:configure',
   },
   {
+    type: 'link',
+    label: 'User Management',
+    icon: 'lucide:users',
+    to: '/app/users',
+    permission: 'user:manage',
+  },
+  {
     type: 'divider',
   },
   {

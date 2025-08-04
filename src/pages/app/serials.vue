@@ -577,6 +577,12 @@ watch(() => searchForm.model_id, () => {
   handleImmediateSearch()
 })
 
+// Watch for pagination limit changes
+watch(() => pagination.limit, () => {
+  pagination.page = 1
+  fetchSerials()
+})
+
 // Lifecycle
 onMounted(async () => {
   await Promise.all([
@@ -884,7 +890,7 @@ useHead({
                 <template #right>
                   <VField>
                     <VControl>
-                      <VSelect v-model="wrapperState.limit" class="is-rounded">
+                      <VSelect v-model="pagination.limit" class="is-rounded">
                         <VOption :value="10">10 条/页</VOption>
                         <VOption :value="20">20 条/页</VOption>
                         <VOption :value="50">50 条/页</VOption>

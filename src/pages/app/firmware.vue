@@ -594,6 +594,12 @@ watch(() => searchForm.device_model_id, () => {
   fetchFirmwareList()
 })
 
+// Watch for pagination limit changes
+watch(() => searchForm.limit, () => {
+  searchForm.page = 1
+  fetchFirmwareList()
+})
+
 // 初始化
 onMounted(() => {
   fetchFirmwareList()
@@ -740,7 +746,7 @@ onUnmounted(() => {
             <template #right>
               <VField>
                 <VControl>
-                  <VSelect v-model="wrapperState.limit" class="is-rounded">
+                  <VSelect v-model="searchForm.limit" class="is-rounded">
                     <VOption :value="10">10 per page</VOption>
                     <VOption :value="20">20 per page</VOption>
                     <VOption :value="50">50 per page</VOption>

@@ -85,6 +85,11 @@ const handleRefresh = () => {
   fetchDevices()
 }
 
+const handlePageChange = (newPage: number) => {
+  pagination.page = newPage
+  fetchDevices()
+}
+
 const handleSearch = () => {
   filterForm.page = 1
   fetchDevices()
@@ -492,6 +497,11 @@ watch(() => filterForm.version, () => {
   handleDebouncedSearch()
 })
 
+watch(() => filterForm.limit, () => {
+  filterForm.page = 1
+  fetchDevices()
+})
+
 // Lifecycle
 onMounted(() => {
   fetchDevices()
@@ -703,7 +713,7 @@ useHead({
             <template #right>
               <VField>
                 <VControl>
-                  <VSelect v-model="wrapperState.limit" class="is-rounded">
+                  <VSelect v-model="filterForm.limit" class="is-rounded">
                     <VOption :value="10">10 per page</VOption>
                     <VOption :value="20">20 per page</VOption>
                     <VOption :value="50">50 per page</VOption>
@@ -962,7 +972,7 @@ useHead({
         :total-items="pagination.total"
         :max-links-displayed="7"
         no-router
-        @update:current-page="fetchDevices"
+        @update:current-page="handlePageChange"
       />
     </VCard>
 

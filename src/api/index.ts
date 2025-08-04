@@ -6,6 +6,11 @@ import type {
   LoginParams,
   RegisterParams,
   LoginResponse,
+  CreateUserParams,
+  UpdateUserParams,
+  UserListParams,
+  UserListResponse,
+  ResetPasswordParams,
   DeviceModel,
   CreateDeviceModelParams,
   SerialNumber,
@@ -81,6 +86,44 @@ export const authApi = {
   // 用户登出
   logout: (): Promise<ApiResponse<null>> => {
     return request.post('/auth/logout')
+  }
+}
+
+// 用户管理API（超级管理员专用）
+export const userManagementApi = {
+  // 获取用户列表
+  getUsers: (params?: UserListParams): Promise<ApiResponse<UserListResponse>> => {
+    return request.get('/users', { params })
+  },
+
+  // 获取用户详情
+  getUser: (id: number): Promise<ApiResponse<User & { deviceCount: number }>> => {
+    return request.get(`/users/${id}`)
+  },
+
+  // 创建用户
+  createUser: (params: CreateUserParams): Promise<ApiResponse<User>> => {
+    return request.post('/users', params)
+  },
+
+  // 更新用户信息
+  updateUser: (id: number, params: UpdateUserParams): Promise<ApiResponse<User>> => {
+    return request.put(`/users/${id}`, params)
+  },
+
+  // 删除用户
+  deleteUser: (id: number): Promise<ApiResponse<null>> => {
+    return request.delete(`/users/${id}`)
+  },
+
+  // 重置用户密码（超级管理员专用）
+  resetUserPassword: (id: number, params: ResetPasswordParams): Promise<ApiResponse<null>> => {
+    return request.post(`/users/${id}/reset-password`, params)
+  },
+
+  // 切换用户状态（启用/禁用）
+  toggleUserStatus: (id: number): Promise<ApiResponse<User>> => {
+    return request.patch(`/users/${id}/toggle-status`)
   }
 }
 
@@ -604,6 +647,7 @@ export const vendorsApi = vendorApi
 export * from './types'
 export default {
   authApi,
+  userManagementApi,
   modelApi,
   serialApi,
   deviceApi,

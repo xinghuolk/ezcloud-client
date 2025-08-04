@@ -41,14 +41,14 @@ const createForm = ref({
   is_active: true,
   radioConfigs: [
     {
-      band: '2.4G' as const,
+      band: '2.4G' as '2.4G' | '5G' | '6G',
       channel: 'auto',
       txpower: 20,
       htmode: '11g',
       enabled: true
     },
     {
-      band: '5G' as const,
+      band: '5G' as '2.4G' | '5G' | '6G',
       channel: 'auto', 
       txpower: 20,
       htmode: '11a',
@@ -57,7 +57,7 @@ const createForm = ref({
   ],
   ssidConfigs: [
     {
-      band: '2.4G' as const,
+      band: '2.4G' as '2.4G' | '5G' | '6G',
       ssid_index: 0,
       ssid: '',
       password: '',
@@ -327,13 +327,13 @@ const submitCreateTemplate = async () => {
 
 // Add radio config
 const addRadioConfig = () => {
-  const availableBands = ['2.4G', '5G', '6G'] as const
+  const availableBands: ('2.4G' | '5G' | '6G')[] = ['2.4G', '5G', '6G']
   const usedBands = createForm.value.radioConfigs.map(r => r.band)
-  const availableBand = availableBands.find(band => !usedBands.includes(band))
+  const availableBand = availableBands.find(band => !(usedBands as string[]).includes(band))
   
   if (availableBand) {
     createForm.value.radioConfigs.push({
-      band: availableBand,
+      band: availableBand as '2.4G' | '5G' | '6G',
       channel: 'auto',
       txpower: 20,
       htmode: availableBand === '2.4G' ? '11g' : '11a',
@@ -380,13 +380,13 @@ const addEditRadioConfig = () => {
     editingTemplate.value.radioConfigs = []
   }
   
-  const availableBands = ['2.4G', '5G', '6G'] as const
+  const availableBands: ('2.4G' | '5G' | '6G')[] = ['2.4G', '5G', '6G']
   const usedBands = editingTemplate.value.radioConfigs.map(r => r.band)
-  const availableBand = availableBands.find(band => !usedBands.includes(band))
+  const availableBand = availableBands.find(band => !(usedBands as string[]).includes(band))
   
   if (availableBand) {
     editingTemplate.value.radioConfigs.push({
-      band: availableBand,
+      band: availableBand as '2.4G' | '5G' | '6G',
       channel: 'auto',
       txpower: 20,
       htmode: availableBand === '2.4G' ? '11g' : '11a',
@@ -478,7 +478,13 @@ watch(() => activeFilter.value, () => {
 })
 
 // Watch pagination
-watch([currentPage, pageSize], () => {
+watch(() => currentPage.value, () => {
+  loadTemplates()
+})
+
+// Watch for pageSize changes - reset to page 1
+watch(() => pageSize.value, () => {
+  currentPage.value = 1
   loadTemplates()
 })
 
@@ -604,7 +610,7 @@ useHead({
             <template #right>
               <VField>
                 <VControl>
-                  <VSelect v-model="wrapperState.limit" class="is-rounded">
+                  <VSelect v-model="pageSize" class="is-rounded">
                     <VOption :value="10">10 条/页</VOption>
                     <VOption :value="20">20 条/页</VOption>
                     <VOption :value="50">50 条/页</VOption>
@@ -836,12 +842,12 @@ useHead({
             <div v-if="viewingTemplate.ssidConfigs && viewingTemplate.ssidConfigs.length > 0" class="ssid-grid">
               <div 
                 v-for="ssid in viewingTemplate.ssidConfigs" 
-                :key="`${ssid.radio_band}-${ssid.ssid_index}`"
+                :key="`${ssid.band}-${ssid.ssid_index}`"
                 class="ssid-item"
               >
                 <h5>{{ ssid.ssid }}</h5>
                 <div class="ssid-details">
-                  <span><strong>Band:</strong> {{ ssid.radio_band }}</span>
+                  <span><strong>Band:</strong> {{ ssid.band }}</span>
                   <span><strong>Index:</strong> {{ ssid.ssid_index }}</span>
                   <span><strong>Security:</strong> {{ ssid.encryption }}</span>
                   <span><strong>Hidden:</strong> {{ ssid.hidden ? 'Yes' : 'No' }}</span>
@@ -961,7 +967,7 @@ useHead({
                   <h5>{{ radio.band }} Band</h5>
                   <VButton 
                     v-if="editingTemplate.radioConfigs && editingTemplate.radioConfigs.length > 1"
-                    size="small" 
+                    size="medium" 
                     color="danger"
                     outlined
                     @click="removeEditRadioConfig(index)"
@@ -1061,7 +1067,7 @@ useHead({
                   <h5>SSID {{ ssid.ssid_index }}</h5>
                   <VButton 
                     v-if="editingTemplate.ssidConfigs && editingTemplate.ssidConfigs.length > 1"
-                    size="small" 
+                    
                     color="danger"
                     outlined
                     @click="removeEditSSIDConfig(index)"
@@ -1279,7 +1285,7 @@ useHead({
                   <h5>{{ radio.band }} Band</h5>
                   <VButton 
                     v-if="createForm.radioConfigs.length > 1"
-                    size="small" 
+                    
                     color="danger"
                     outlined
                     @click="removeRadioConfig(index)"
@@ -1379,7 +1385,7 @@ useHead({
                   <h5>SSID {{ ssid.ssid_index }}</h5>
                   <VButton 
                     v-if="createForm.ssidConfigs.length > 1"
-                    size="small" 
+                    
                     color="danger"
                     outlined
                     @click="removeSSIDConfig(index)"

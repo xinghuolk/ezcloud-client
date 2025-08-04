@@ -92,6 +92,44 @@ export interface RegisterParams {
   phone?: string
 }
 
+// 用户管理相关类型
+export interface CreateUserParams {
+  username: string
+  email: string
+  password: string
+  phone?: string
+  role?: 'user' | 'admin'
+  is_active?: boolean
+}
+
+export interface UpdateUserParams {
+  username?: string
+  email?: string
+  phone?: string
+  role?: 'user' | 'admin'
+  is_active?: boolean
+}
+
+export interface UserListParams extends PaginationParams {
+  search?: string
+  role?: 'user' | 'admin' | 'super_admin'
+  is_active?: boolean
+}
+
+export interface UserListResponse {
+  users: (User & { deviceCount: number })[]
+  pagination: {
+    page: number
+    limit: number
+    total: number
+    totalPages: number
+  }
+}
+
+export interface ResetPasswordParams {
+  new_password: string
+}
+
 // 远程访问状态类型
 export interface RemoteAccessStatus {
   http: {

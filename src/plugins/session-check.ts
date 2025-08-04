@@ -44,5 +44,22 @@ export default definePlugin(async ({ router, pinia }) => {
         query: { error: 'admin_required' },
       }
     }
+    
+    // Check super admin requirement
+    if (to.meta.requiresSuperAdmin && !userSession.isSuperAdmin) {
+      // If user is not logged in, redirect to login first
+      if (!token.value) {
+        return {
+          name: '/auth',
+          query: { redirect: to.fullPath },
+        }
+      }
+      
+      // If user is logged in but not super admin, redirect to dashboard with error
+      return {
+        name: '/app',
+        query: { error: 'super_admin_required' },
+      }
+    }
   })
 })

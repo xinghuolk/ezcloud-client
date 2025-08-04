@@ -133,6 +133,12 @@ watch(() => searchForm.search, () => {
   handleDebouncedSearch()
 })
 
+// Watch for pagination limit changes
+watch(() => searchForm.limit, () => {
+  searchForm.page = 1
+  fetchVendors()
+})
+
 // Lifecycle
 onMounted(() => {
   fetchVendors()
@@ -253,7 +259,7 @@ useHead({
             <template #right>
               <VField>
                 <VControl>
-                  <VSelect v-model="wrapperState.limit" class="is-rounded">
+                  <VSelect v-model="searchForm.limit" class="is-rounded">
                     <VOption :value="10">10 条/页</VOption>
                     <VOption :value="20">20 条/页</VOption>
                     <VOption :value="50">50 条/页</VOption>
@@ -346,7 +352,7 @@ useHead({
         :total-items="pagination.total"
         :max-links-displayed="7"
         no-router
-        @update:current-page="fetchVendors"
+        @update:current-page="(page) => { searchForm.page = page; fetchVendors() }"
       />
     </VCard>
 
