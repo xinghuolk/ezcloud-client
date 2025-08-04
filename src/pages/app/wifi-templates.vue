@@ -26,9 +26,48 @@ const activeFilter = ref('')
 // Dialogs
 const showDetailDialog = ref(false)
 const showEditDialog = ref(false)
+const showCreateDialog = ref(false)
 const viewingTemplate = ref<WiFiTemplate | null>(null)
 const editingTemplate = ref<WiFiTemplate | null>(null)
 const loadingDetails = ref(false)
+const submittingCreate = ref(false)
+const submittingEdit = ref(false)
+
+// Create template form data
+const createForm = ref({
+  name: '',
+  description: '',
+  country: 'CN',
+  is_active: true,
+  radioConfigs: [
+    {
+      band: '2.4G' as const,
+      channel: 'auto',
+      txpower: 20,
+      htmode: '11g',
+      enabled: true
+    },
+    {
+      band: '5G' as const,
+      channel: 'auto', 
+      txpower: 20,
+      htmode: '11a',
+      enabled: true
+    }
+  ],
+  ssidConfigs: [
+    {
+      band: '2.4G' as const,
+      ssid_index: 0,
+      ssid: '',
+      password: '',
+      encryption: 'psk2',
+      hidden: false,
+      enabled: true,
+      isolate: false
+    }
+  ]
+})
 
 // Search debounce
 let searchTimeout: NodeJS.Timeout | null = null
@@ -134,31 +173,265 @@ const editTemplate = async (template: WiFiTemplate) => {
 const saveTemplate = async () => {
   if (!editingTemplate.value) return
   
+  // Validation
+  if (!editingTemplate.value.name.trim()) {
+    notyf.error('Please enter template name')
+    return
+  }
+  
+  if (!editingTemplate.value.ssidConfigs || editingTemplate.value.ssidConfigs.length === 0) {
+    notyf.error('At least one SSID configuration is required')
+    return
+  }
+  
+  // Validate SSIDs
+  for (const ssid of editingTemplate.value.ssidConfigs) {
+    if (!ssid.ssid.trim()) {
+      notyf.error('Please enter SSID name')
+      return
+    }
+    if (ssid.encryption !== 'none' && !ssid.password?.trim()) {
+      notyf.error('Please enter password for secured SSID')
+      return
+    }
+  }
+  
+  submittingEdit.value = true
   try {
-    const response = await wifiTemplatesApi.updateTemplate(editingTemplate.value.id!, {
+    const updateData = {
       name: editingTemplate.value.name,
       description: editingTemplate.value.description,
       country: editingTemplate.value.country,
-      is_active: editingTemplate.value.is_active
-    })
+      is_active: editingTemplate.value.is_active,
+      radioConfigs: editingTemplate.value.radioConfigs?.map(radio => ({
+        band: radio.band,
+        channel: radio.channel,
+        txpower: radio.txpower,
+        htmode: radio.htmode,
+        enabled: radio.enabled
+      })) || [],
+      ssidConfigs: editingTemplate.value.ssidConfigs?.map(ssid => ({
+        band: ssid.band,
+        ssid_index: ssid.ssid_index,
+        ssid: ssid.ssid,
+        password: ssid.password,
+        encryption: ssid.encryption,
+        hidden: ssid.hidden,
+        enabled: ssid.enabled,
+        isolate: ssid.isolate
+      })) || []
+    }
+    
+    const response = await wifiTemplatesApi.updateTemplate(editingTemplate.value.id!, updateData)
     
     if (response.success) {
       notyf.success('Template updated successfully')
       showEditDialog.value = false
       loadTemplates() // Refresh the list
     } else {
-      notyf.error('Failed to update template')
+      notyf.error(response.message || 'Failed to update template')
     }
   } catch (error) {
     console.error('Save template error:', error)
     notyf.error('Failed to update template')
+  } finally {
+    submittingEdit.value = false
   }
 }
 
 // Create template
 const createTemplate = () => {
-  // TODO: Implement create modal
-  notyf.error('Create functionality is not yet implemented')
+  resetCreateForm()
+  showCreateDialog.value = true
+}
+
+// Reset create form
+const resetCreateForm = () => {
+  createForm.value = {
+    name: '',
+    description: '',
+    country: 'CN',
+    is_active: true,
+    radioConfigs: [
+      {
+        band: '2.4G' as const,
+        channel: 'auto',
+        txpower: 20,
+        htmode: '11g',
+        enabled: true
+      },
+      {
+        band: '5G' as const,
+        channel: 'auto', 
+        txpower: 20,
+        htmode: '11a',
+        enabled: true
+      }
+    ],
+    ssidConfigs: [
+      {
+        band: '2.4G' as const,
+        ssid_index: 0,
+        ssid: '',
+        password: '',
+        encryption: 'psk2',
+        hidden: false,
+        enabled: true,
+        isolate: false
+      }
+    ]
+  }
+}
+
+// Submit create template
+const submitCreateTemplate = async () => {
+  if (!createForm.value.name.trim()) {
+    notyf.error('Please enter template name')
+    return
+  }
+  
+  if (createForm.value.ssidConfigs.length === 0) {
+    notyf.error('At least one SSID configuration is required')
+    return
+  }
+  
+  // Validate SSIDs
+  for (const ssid of createForm.value.ssidConfigs) {
+    if (!ssid.ssid.trim()) {
+      notyf.error('Please enter SSID name')
+      return
+    }
+    if (ssid.encryption !== 'none' && !ssid.password?.trim()) {
+      notyf.error('Please enter password for secured SSID')
+      return
+    }
+  }
+  
+  submittingCreate.value = true
+  try {
+    const response = await wifiTemplatesApi.createTemplate(createForm.value)
+    if (response.success) {
+      notyf.success('WiFi template created successfully')
+      showCreateDialog.value = false
+      loadTemplates()
+    } else {
+      notyf.error(response.message || 'Failed to create template')
+    }
+  } catch (error) {
+    console.error('Create template error:', error)
+    notyf.error('Failed to create template')
+  } finally {
+    submittingCreate.value = false
+  }
+}
+
+// Add radio config
+const addRadioConfig = () => {
+  const availableBands = ['2.4G', '5G', '6G'] as const
+  const usedBands = createForm.value.radioConfigs.map(r => r.band)
+  const availableBand = availableBands.find(band => !usedBands.includes(band))
+  
+  if (availableBand) {
+    createForm.value.radioConfigs.push({
+      band: availableBand,
+      channel: 'auto',
+      txpower: 20,
+      htmode: availableBand === '2.4G' ? '11g' : '11a',
+      enabled: true
+    })
+  }
+}
+
+// Remove radio config
+const removeRadioConfig = (index: number) => {
+  if (createForm.value.radioConfigs.length > 1) {
+    createForm.value.radioConfigs.splice(index, 1)
+  }
+}
+
+// Add SSID config
+const addSSIDConfig = () => {
+  const maxIndex = Math.max(...createForm.value.ssidConfigs.map(s => s.ssid_index), -1)
+  createForm.value.ssidConfigs.push({
+    band: '2.4G' as const,
+    ssid_index: maxIndex + 1,
+    ssid: '',
+    password: '',
+    encryption: 'psk2',
+    hidden: false,
+    enabled: true,
+    isolate: false
+  })
+}
+
+// Remove SSID config
+const removeSSIDConfig = (index: number) => {
+  if (createForm.value.ssidConfigs.length > 1) {
+    createForm.value.ssidConfigs.splice(index, 1)
+  }
+}
+
+// Edit mode functions
+// Add radio config for edit mode
+const addEditRadioConfig = () => {
+  if (!editingTemplate.value) return
+  
+  if (!editingTemplate.value.radioConfigs) {
+    editingTemplate.value.radioConfigs = []
+  }
+  
+  const availableBands = ['2.4G', '5G', '6G'] as const
+  const usedBands = editingTemplate.value.radioConfigs.map(r => r.band)
+  const availableBand = availableBands.find(band => !usedBands.includes(band))
+  
+  if (availableBand) {
+    editingTemplate.value.radioConfigs.push({
+      band: availableBand,
+      channel: 'auto',
+      txpower: 20,
+      htmode: availableBand === '2.4G' ? '11g' : '11a',
+      enabled: true
+    })
+  }
+}
+
+// Remove radio config for edit mode
+const removeEditRadioConfig = (index: number) => {
+  if (!editingTemplate.value?.radioConfigs) return
+  
+  if (editingTemplate.value.radioConfigs.length > 1) {
+    editingTemplate.value.radioConfigs.splice(index, 1)
+  }
+}
+
+// Add SSID config for edit mode
+const addEditSSIDConfig = () => {
+  if (!editingTemplate.value) return
+  
+  if (!editingTemplate.value.ssidConfigs) {
+    editingTemplate.value.ssidConfigs = []
+  }
+  
+  const maxIndex = Math.max(...editingTemplate.value.ssidConfigs.map(s => s.ssid_index), -1)
+  editingTemplate.value.ssidConfigs.push({
+    band: '2.4G' as const,
+    ssid_index: maxIndex + 1,
+    ssid: '',
+    password: '',
+    encryption: 'psk2',
+    hidden: false,
+    enabled: true,
+    isolate: false
+  })
+}
+
+// Remove SSID config for edit mode
+const removeEditSSIDConfig = (index: number) => {
+  if (!editingTemplate.value?.ssidConfigs) return
+  
+  if (editingTemplate.value.ssidConfigs.length > 1) {
+    editingTemplate.value.ssidConfigs.splice(index, 1)
+  }
 }
 
 // Toggle template status
@@ -610,52 +883,297 @@ useHead({
 
         <!-- Edit Form -->
         <div v-else-if="editingTemplate" class="edit-form">
-          <VField>
-            <VLabel>Template Name</VLabel>
-            <VControl>
-              <VInput 
-                v-model="editingTemplate.name"
-                placeholder="Enter template name"
-              />
-            </VControl>
-          </VField>
-
-          <VField>
-            <VLabel>Description</VLabel>
-            <VControl>
-              <VTextarea 
-                v-model="editingTemplate.description"
-                placeholder="Enter template description"
-                rows="3"
-              />
-            </VControl>
-          </VField>
-
-          <VField>
-            <VLabel>Country Code</VLabel>
-            <VControl>
-              <VInput 
-                v-model="editingTemplate.country"
-                placeholder="e.g., US, CN, GB"
-                maxlength="2"
-              />
-            </VControl>
-          </VField>
-
-          <VField>
-            <VLabel>Status</VLabel>
-            <VControl>
-              <VCheckbox 
-                v-model="editingTemplate.is_active"
-                color="success"
-                label="Active Template"
-              />
-            </VControl>
-          </VField>
-
+          <!-- Basic Information -->
           <div class="form-section">
-            <h4 class="subtitle">Radio Configurations</h4>
-            <p class="help">Note: Radio and SSID configurations require advanced editing. This form only supports basic template properties.</p>
+            <h4 class="subtitle">Basic Information</h4>
+            
+            <VField>
+              <VLabel>Template Name *</VLabel>
+              <VControl>
+                <VInput 
+                  v-model="editingTemplate.name"
+                  placeholder="Enter template name"
+                />
+              </VControl>
+            </VField>
+
+            <VField>
+              <VLabel>Description</VLabel>
+              <VControl>
+                <VTextarea 
+                  v-model="editingTemplate.description"
+                  placeholder="Enter template description"
+                  rows="3"
+                />
+              </VControl>
+            </VField>
+
+            <div class="columns">
+              <div class="column is-6">
+                <VField>
+                  <VLabel>Country Code</VLabel>
+                  <VControl>
+                    <VInput 
+                      v-model="editingTemplate.country"
+                      placeholder="e.g., CN, US, GB"
+                      maxlength="2"
+                    />
+                  </VControl>
+                </VField>
+              </div>
+              <div class="column is-6">
+                <VField>
+                  <VLabel>Status</VLabel>
+                  <VControl>
+                    <VCheckbox 
+                      v-model="editingTemplate.is_active"
+                      color="success"
+                      label="Active Template"
+                    />
+                  </VControl>
+                </VField>
+              </div>
+            </div>
+          </div>
+
+          <!-- Radio Configurations -->
+          <div class="form-section">
+            <div class="section-header">
+              <h4 class="subtitle">Radio Configurations</h4>
+              <VButton 
+                size="medium" 
+                outlined
+                @click="addEditRadioConfig"
+                :disabled="!editingTemplate.radioConfigs || editingTemplate.radioConfigs.length >= 3"
+              >
+                <iconify-icon icon="lucide:plus" class="mr-2" />
+                Add Radio
+              </VButton>
+            </div>
+            
+            <div class="radio-configs">
+              <div 
+                v-for="(radio, index) in editingTemplate.radioConfigs || []" 
+                :key="radio.id || index"
+                class="config-item"
+              >
+                <div class="config-header">
+                  <h5>{{ radio.band }} Band</h5>
+                  <VButton 
+                    v-if="editingTemplate.radioConfigs && editingTemplate.radioConfigs.length > 1"
+                    size="small" 
+                    color="danger"
+                    outlined
+                    @click="removeEditRadioConfig(index)"
+                  >
+                    <iconify-icon icon="lucide:trash-2" />
+                  </VButton>
+                </div>
+                
+                <div class="columns">
+                  <div class="column is-3">
+                    <VField>
+                      <VLabel>Band</VLabel>
+                      <VControl>
+                        <VSelect v-model="radio.band">
+                          <VOption value="2.4G">2.4G</VOption>
+                          <VOption value="5G">5G</VOption>
+                          <VOption value="6G">6G</VOption>
+                        </VSelect>
+                      </VControl>
+                    </VField>
+                  </div>
+                  <div class="column is-3">
+                    <VField>
+                      <VLabel>Channel</VLabel>
+                      <VControl>
+                        <VInput 
+                          v-model="radio.channel"
+                          placeholder="auto or number"
+                        />
+                      </VControl>
+                    </VField>
+                  </div>
+                  <div class="column is-3">
+                    <VField>
+                      <VLabel>TX Power</VLabel>
+                      <VControl>
+                        <VInput 
+                          v-model.number="radio.txpower"
+                          type="number"
+                          min="1"
+                          max="30"
+                        />
+                      </VControl>
+                    </VField>
+                  </div>
+                  <div class="column is-3">
+                    <VField>
+                      <VLabel>HT Mode</VLabel>
+                      <VControl>
+                        <VSelect v-model="radio.htmode">
+                          <VOption value="11g">11g</VOption>
+                          <VOption value="11a">11a</VOption>
+                          <VOption value="11n">11n</VOption>
+                          <VOption value="11ac">11ac</VOption>
+                          <VOption value="11ax">11ax</VOption>
+                        </VSelect>
+                      </VControl>
+                    </VField>
+                  </div>
+                </div>
+                
+                <VField>
+                  <VControl>
+                    <VCheckbox 
+                      v-model="radio.enabled"
+                      color="success"
+                      label="Enable Radio"
+                    />
+                  </VControl>
+                </VField>
+              </div>
+            </div>
+          </div>
+
+          <!-- SSID Configurations -->
+          <div class="form-section">
+            <div class="section-header">
+              <h4 class="subtitle">SSID Configurations</h4>
+              <VButton 
+                size="medium" 
+                outlined
+                @click="addEditSSIDConfig"
+                :disabled="!editingTemplate.ssidConfigs || editingTemplate.ssidConfigs.length >= 8"
+              >
+                <iconify-icon icon="lucide:plus" class="mr-2" />
+                Add SSID
+              </VButton>
+            </div>
+            
+            <div class="ssid-configs">
+              <div 
+                v-for="(ssid, index) in editingTemplate.ssidConfigs || []" 
+                :key="ssid.id || index"
+                class="config-item"
+              >
+                <div class="config-header">
+                  <h5>SSID {{ ssid.ssid_index }}</h5>
+                  <VButton 
+                    v-if="editingTemplate.ssidConfigs && editingTemplate.ssidConfigs.length > 1"
+                    size="small" 
+                    color="danger"
+                    outlined
+                    @click="removeEditSSIDConfig(index)"
+                  >
+                    <iconify-icon icon="lucide:trash-2" />
+                  </VButton>
+                </div>
+                
+                <div class="columns">
+                  <div class="column is-4">
+                    <VField>
+                      <VLabel>SSID Name *</VLabel>
+                      <VControl>
+                        <VInput 
+                          v-model="ssid.ssid"
+                          placeholder="Enter SSID name"
+                        />
+                      </VControl>
+                    </VField>
+                  </div>
+                  <div class="column is-3">
+                    <VField>
+                      <VLabel>Band</VLabel>
+                      <VControl>
+                        <VSelect v-model="ssid.band">
+                          <VOption value="2.4G">2.4G</VOption>
+                          <VOption value="5G">5G</VOption>
+                          <VOption value="6G">6G</VOption>
+                        </VSelect>
+                      </VControl>
+                    </VField>
+                  </div>
+                  <div class="column is-3">
+                    <VField>
+                      <VLabel>Encryption</VLabel>
+                      <VControl>
+                        <VSelect v-model="ssid.encryption">
+                          <VOption value="none">None</VOption>
+                          <VOption value="psk">WPA-PSK</VOption>
+                          <VOption value="psk2">WPA2-PSK</VOption>
+                          <VOption value="psk-mixed">WPA/WPA2-PSK</VOption>
+                        </VSelect>
+                      </VControl>
+                    </VField>
+                  </div>
+                  <div class="column is-2">
+                    <VField>
+                      <VLabel>Index</VLabel>
+                      <VControl>
+                        <VInput 
+                          v-model.number="ssid.ssid_index"
+                          type="number"
+                          min="0"
+                          max="3"
+                        />
+                      </VControl>
+                    </VField>
+                  </div>
+                </div>
+                
+                <div v-if="ssid.encryption !== 'none'" class="columns">
+                  <div class="column is-6">
+                    <VField>
+                      <VLabel>Password *</VLabel>
+                      <VControl>
+                        <VInput 
+                          v-model="ssid.password"
+                          type="password"
+                          placeholder="Enter WiFi password"
+                        />
+                      </VControl>
+                    </VField>
+                  </div>
+                </div>
+                
+                <div class="columns">
+                  <div class="column is-4">
+                    <VField>
+                      <VControl>
+                        <VCheckbox 
+                          v-model="ssid.enabled"
+                          color="success"
+                          label="Enable SSID"
+                        />
+                      </VControl>
+                    </VField>
+                  </div>
+                  <div class="column is-4">
+                    <VField>
+                      <VControl>
+                        <VCheckbox 
+                          v-model="ssid.hidden"
+                          color="warning"
+                          label="Hidden SSID"
+                        />
+                      </VControl>
+                    </VField>
+                  </div>
+                  <div class="column is-4">
+                    <VField>
+                      <VControl>
+                        <VCheckbox 
+                          v-model="ssid.isolate"
+                          color="info"
+                          label="Client Isolation"
+                        />
+                      </VControl>
+                    </VField>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </template>
@@ -665,10 +1183,328 @@ useHead({
         <VButton 
           color="primary" 
           raised
-          :loading="loadingDetails"
+          :loading="submittingEdit"
           @click="saveTemplate"
         >
           Save Changes
+        </VButton>
+      </template>
+    </VModal>
+
+    <!-- Create Template Modal -->
+    <VModal 
+      :open="showCreateDialog"
+      title="Create WiFi Template"
+      size="large"
+      actions="right"
+      @close="showCreateDialog = false"
+    >
+      <template #content>
+        <div class="create-form">
+          <!-- Basic Information -->
+          <div class="form-section">
+            <h4 class="subtitle">Basic Information</h4>
+            
+            <VField>
+              <VLabel>Template Name *</VLabel>
+              <VControl>
+                <VInput 
+                  v-model="createForm.name"
+                  placeholder="Enter template name"
+                />
+              </VControl>
+            </VField>
+
+            <VField>
+              <VLabel>Description</VLabel>
+              <VControl>
+                <VTextarea 
+                  v-model="createForm.description"
+                  placeholder="Enter template description"
+                  rows="3"
+                />
+              </VControl>
+            </VField>
+
+            <div class="columns">
+              <div class="column is-6">
+                <VField>
+                  <VLabel>Country Code</VLabel>
+                  <VControl>
+                    <VInput 
+                      v-model="createForm.country"
+                      placeholder="e.g., CN, US, GB"
+                      maxlength="2"
+                    />
+                  </VControl>
+                </VField>
+              </div>
+              <div class="column is-6">
+                <VField>
+                  <VLabel>Status</VLabel>
+                  <VControl>
+                    <VCheckbox 
+                      v-model="createForm.is_active"
+                      color="success"
+                      label="Active Template"
+                    />
+                  </VControl>
+                </VField>
+              </div>
+            </div>
+          </div>
+
+          <!-- Radio Configurations -->
+          <div class="form-section">
+            <div class="section-header">
+              <h4 class="subtitle">Radio Configurations</h4>
+              <VButton 
+                size="medium" 
+                outlined
+                @click="addRadioConfig"
+                :disabled="createForm.radioConfigs.length >= 3"
+              >
+                <iconify-icon icon="lucide:plus" class="mr-2" />
+                Add Radio
+              </VButton>
+            </div>
+            
+            <div class="radio-configs">
+              <div 
+                v-for="(radio, index) in createForm.radioConfigs" 
+                :key="index"
+                class="config-item"
+              >
+                <div class="config-header">
+                  <h5>{{ radio.band }} Band</h5>
+                  <VButton 
+                    v-if="createForm.radioConfigs.length > 1"
+                    size="small" 
+                    color="danger"
+                    outlined
+                    @click="removeRadioConfig(index)"
+                  >
+                    <iconify-icon icon="lucide:trash-2" />
+                  </VButton>
+                </div>
+                
+                <div class="columns">
+                  <div class="column is-3">
+                    <VField>
+                      <VLabel>Band</VLabel>
+                      <VControl>
+                        <VSelect v-model="radio.band">
+                          <VOption value="2.4G">2.4G</VOption>
+                          <VOption value="5G">5G</VOption>
+                          <VOption value="6G">6G</VOption>
+                        </VSelect>
+                      </VControl>
+                    </VField>
+                  </div>
+                  <div class="column is-3">
+                    <VField>
+                      <VLabel>Channel</VLabel>
+                      <VControl>
+                        <VInput 
+                          v-model="radio.channel"
+                          placeholder="auto or number"
+                        />
+                      </VControl>
+                    </VField>
+                  </div>
+                  <div class="column is-3">
+                    <VField>
+                      <VLabel>TX Power</VLabel>
+                      <VControl>
+                        <VInput 
+                          v-model.number="radio.txpower"
+                          type="number"
+                          min="1"
+                          max="30"
+                        />
+                      </VControl>
+                    </VField>
+                  </div>
+                  <div class="column is-3">
+                    <VField>
+                      <VLabel>HT Mode</VLabel>
+                      <VControl>
+                        <VSelect v-model="radio.htmode">
+                          <VOption value="11g">11g</VOption>
+                          <VOption value="11a">11a</VOption>
+                          <VOption value="11n">11n</VOption>
+                          <VOption value="11ac">11ac</VOption>
+                          <VOption value="11ax">11ax</VOption>
+                        </VSelect>
+                      </VControl>
+                    </VField>
+                  </div>
+                </div>
+                
+                <VField>
+                  <VControl>
+                    <VCheckbox 
+                      v-model="radio.enabled"
+                      color="success"
+                      label="Enable Radio"
+                    />
+                  </VControl>
+                </VField>
+              </div>
+            </div>
+          </div>
+
+          <!-- SSID Configurations -->
+          <div class="form-section">
+            <div class="section-header">
+              <h4 class="subtitle">SSID Configurations</h4>
+              <VButton 
+                size="medium" 
+                outlined
+                @click="addSSIDConfig"
+                :disabled="createForm.ssidConfigs.length >= 8"
+              >
+                <iconify-icon icon="lucide:plus" class="mr-2" />
+                Add SSID
+              </VButton>
+            </div>
+            
+            <div class="ssid-configs">
+              <div 
+                v-for="(ssid, index) in createForm.ssidConfigs" 
+                :key="index"
+                class="config-item"
+              >
+                <div class="config-header">
+                  <h5>SSID {{ ssid.ssid_index }}</h5>
+                  <VButton 
+                    v-if="createForm.ssidConfigs.length > 1"
+                    size="small" 
+                    color="danger"
+                    outlined
+                    @click="removeSSIDConfig(index)"
+                  >
+                    <iconify-icon icon="lucide:trash-2" />
+                  </VButton>
+                </div>
+                
+                <div class="columns">
+                  <div class="column is-4">
+                    <VField>
+                      <VLabel>SSID Name *</VLabel>
+                      <VControl>
+                        <VInput 
+                          v-model="ssid.ssid"
+                          placeholder="Enter SSID name"
+                        />
+                      </VControl>
+                    </VField>
+                  </div>
+                  <div class="column is-3">
+                    <VField>
+                      <VLabel>Band</VLabel>
+                      <VControl>
+                        <VSelect v-model="ssid.band">
+                          <VOption value="2.4G">2.4G</VOption>
+                          <VOption value="5G">5G</VOption>
+                          <VOption value="6G">6G</VOption>
+                        </VSelect>
+                      </VControl>
+                    </VField>
+                  </div>
+                  <div class="column is-3">
+                    <VField>
+                      <VLabel>Encryption</VLabel>
+                      <VControl>
+                        <VSelect v-model="ssid.encryption">
+                          <VOption value="none">None</VOption>
+                          <VOption value="psk">WPA-PSK</VOption>
+                          <VOption value="psk2">WPA2-PSK</VOption>
+                          <VOption value="psk-mixed">WPA/WPA2-PSK</VOption>
+                        </VSelect>
+                      </VControl>
+                    </VField>
+                  </div>
+                  <div class="column is-2">
+                    <VField>
+                      <VLabel>Index</VLabel>
+                      <VControl>
+                        <VInput 
+                          v-model.number="ssid.ssid_index"
+                          type="number"
+                          min="0"
+                          max="3"
+                        />
+                      </VControl>
+                    </VField>
+                  </div>
+                </div>
+                
+                <div v-if="ssid.encryption !== 'none'" class="columns">
+                  <div class="column is-6">
+                    <VField>
+                      <VLabel>Password *</VLabel>
+                      <VControl>
+                        <VInput 
+                          v-model="ssid.password"
+                          type="password"
+                          placeholder="Enter WiFi password"
+                        />
+                      </VControl>
+                    </VField>
+                  </div>
+                </div>
+                
+                <div class="columns">
+                  <div class="column is-4">
+                    <VField>
+                      <VControl>
+                        <VCheckbox 
+                          v-model="ssid.enabled"
+                          color="success"
+                          label="Enable SSID"
+                        />
+                      </VControl>
+                    </VField>
+                  </div>
+                  <div class="column is-4">
+                    <VField>
+                      <VControl>
+                        <VCheckbox 
+                          v-model="ssid.hidden"
+                          color="warning"
+                          label="Hidden SSID"
+                        />
+                      </VControl>
+                    </VField>
+                  </div>
+                  <div class="column is-4">
+                    <VField>
+                      <VControl>
+                        <VCheckbox 
+                          v-model="ssid.isolate"
+                          color="info"
+                          label="Client Isolation"
+                        />
+                      </VControl>
+                    </VField>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </template>
+      
+      <template #action>
+        <VButton @click="showCreateDialog = false" light>Cancel</VButton>
+        <VButton 
+          color="primary" 
+          raised
+          :loading="submittingCreate"
+          @click="submitCreateTemplate"
+        >
+          Create Template
         </VButton>
       </template>
     </VModal>
@@ -820,6 +1656,62 @@ useHead({
   }
 }
 
+.create-form,
+.edit-form {
+  .form-section {
+    margin-bottom: 2rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid var(--fade-grey-light-3);
+
+    &:last-child {
+      border-bottom: none;
+      margin-bottom: 0;
+    }
+
+    .subtitle {
+      margin: 0 0 1rem 0;
+      color: var(--dark-text);
+      font-weight: 600;
+    }
+
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+
+      .subtitle {
+        margin: 0;
+      }
+    }
+  }
+
+  .config-item {
+    padding: 1.5rem;
+    background: var(--fade-grey-light-6);
+    border-radius: var(--radius);
+    border: 1px solid var(--fade-grey-light-3);
+    margin-bottom: 1rem;
+
+    &:last-child {
+      margin-bottom: 0;
+    }
+
+    .config-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+
+      h5 {
+        margin: 0;
+        color: var(--dark-text);
+        font-weight: 600;
+      }
+    }
+  }
+}
+
 .is-dark {
   .detail-item,
   .radio-item,
@@ -831,6 +1723,18 @@ useHead({
   .empty-config {
     background: var(--dark-sidebar-light-6);
     border-color: var(--dark-sidebar-light-12);
+  }
+
+  .create-form,
+  .edit-form {
+    .form-section {
+      border-color: var(--dark-sidebar-light-12);
+    }
+
+    .config-item {
+      background: var(--dark-sidebar-light-6);
+      border-color: var(--dark-sidebar-light-12);
+    }
   }
 }
 
