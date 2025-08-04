@@ -239,7 +239,7 @@ useHead({
               icon="lucide:refresh-cw"
               color="primary"
               outlined
-              size="small"
+              size="medium"
               @click="reloadFrpConfig"
               :loading="isLoadingConfig || isLoadingStatus"
             >
@@ -386,7 +386,7 @@ useHead({
                 v-for="port in frpStatus.allocated_ports" 
                 :key="port"
                 color="primary"
-                size="small"
+                size="tiny"
                 class="mr-2 mb-2"
               >
                 {{ port }}

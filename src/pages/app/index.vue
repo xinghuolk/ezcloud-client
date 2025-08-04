@@ -211,6 +211,10 @@ const checkErrorMessage = () => {
     notyf.error('Admin permission required to access that page')
     // Clear the error query parameter
     router.replace({ path: route.path })
+  } else if (route.query.error === 'super_admin_required') {
+    notyf.error('Super admin permission required to access that page')
+    // Clear the error query parameter
+    router.replace({ path: route.path })
   }
 }
 
@@ -400,7 +404,7 @@ useHead({
               {{ device.is_online ? 'Online' : 'Offline' }}
             </VTag>
             <span class="device-date">
-              {{ formatDate(device.last_seen) }}
+              {{ formatDate(device.last_seen || null) }}
             </span>
           </div>
         </div>
