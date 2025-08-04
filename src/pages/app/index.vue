@@ -100,15 +100,24 @@ const loadDashboardData = async () => {
   // Load system info for admin users
   if (isAdmin.value) {
     try {
-      // TODO: Replace with actual API call
+      const systemResponse = await statsApi.getSystemStatus()
+      if (systemResponse.success && systemResponse.data) {
+        systemInfo.value = {
+          totalUsers: systemResponse.data.totalUsers,
+          activeUsers: systemResponse.data.activeUsers,
+          todayActivations: systemResponse.data.todayActivations,
+          uptime: systemResponse.data.uptime
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load system info:', error)
+      // Use fallback data when API is not available
       systemInfo.value = {
         totalUsers: 156,
         activeUsers: 89,
         todayActivations: 12,
         uptime: '15 days'
       }
-    } catch (error) {
-      console.error('Failed to load system info:', error)
     }
   }
 }

@@ -340,6 +340,29 @@ export const statsApi = {
   // 获取设备统计
   getDeviceStats: (params?: { period?: string }): Promise<ApiResponse<any>> => {
     return request.get('/stats/devices', { params })
+  },
+
+  // 获取系统状态信息（仅管理员）
+  getSystemStatus: (): Promise<ApiResponse<{
+    totalUsers: number
+    activeUsers: number
+    todayActivations: number
+    uptime: string
+    serverInfo: {
+      nodeVersion: string
+      platform: string
+      memory: {
+        used: number
+        total: number
+        rss: number
+      }
+      cpuUsage: {
+        user: number
+        system: number
+      }
+    }
+  }>> => {
+    return request.get('/stats/system')
   }
 }
 
