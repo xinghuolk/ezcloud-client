@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, watch } from 'vue'
-import { useUserSession } from '/@src/stores/user-session'
+import { ref, onMounted, watch } from 'vue'
 import { wifiTemplatesApi } from '/@src/api'
 import type { WiFiTemplate } from '/@src/api/types'
 import { Notyf } from 'notyf'
 import type { VTagColor } from '/@src/components/base/VTag.vue'
+import VDateTimeSplit from '/@src/components/base/VDateTimeSplit.vue'
 
 definePage({
   meta: {
@@ -12,7 +12,6 @@ definePage({
   }
 })
 
-const userSession = useUserSession()
 const notyf = new Notyf()
 
 // State
@@ -26,7 +25,10 @@ const activeFilter = ref('')
 
 // Dialogs
 const showDetailDialog = ref(false)
+const showEditDialog = ref(false)
 const viewingTemplate = ref<WiFiTemplate | null>(null)
+const editingTemplate = ref<WiFiTemplate | null>(null)
+const loadingDetails = ref(false)
 
 // Search debounce
 let searchTimeout: NodeJS.Timeout | null = null
@@ -89,16 +91,68 @@ const handleFilter = () => {
 }
 
 // View template
-const viewTemplate = (template: WiFiTemplate) => {
-  viewingTemplate.value = template
-  showDetailDialog.value = true
+const viewTemplate = async (template: WiFiTemplate) => {
+  loadingDetails.value = true
+  try {
+    // Fetch full template details including radioConfigs and ssidConfigs
+    const response = await wifiTemplatesApi.getTemplate(template.id!)
+    if (response.success) {
+      viewingTemplate.value = response.data
+      showDetailDialog.value = true
+    } else {
+      notyf.error('Failed to load template details')
+    }
+  } catch (error) {
+    console.error('View template error:', error)
+    notyf.error('Failed to load template details')
+  } finally {
+    loadingDetails.value = false
+  }
 }
 
 // Edit template
-const editTemplate = (template: WiFiTemplate) => {
-  // TODO: Implement edit modal
-  notyf.error('Edit functionality is not yet implemented')
-  console.log('Edit template:', template)
+const editTemplate = async (template: WiFiTemplate) => {
+  loadingDetails.value = true
+  try {
+    // Fetch full template details for editing
+    const response = await wifiTemplatesApi.getTemplate(template.id!)
+    if (response.success) {
+      editingTemplate.value = response.data
+      showEditDialog.value = true
+    } else {
+      notyf.error('Failed to load template for editing')
+    }
+  } catch (error) {
+    console.error('Edit template error:', error)
+    notyf.error('Failed to load template for editing')
+  } finally {
+    loadingDetails.value = false
+  }
+}
+
+// Save template changes
+const saveTemplate = async () => {
+  if (!editingTemplate.value) return
+  
+  try {
+    const response = await wifiTemplatesApi.updateTemplate(editingTemplate.value.id!, {
+      name: editingTemplate.value.name,
+      description: editingTemplate.value.description,
+      country: editingTemplate.value.country,
+      is_active: editingTemplate.value.is_active
+    })
+    
+    if (response.success) {
+      notyf.success('Template updated successfully')
+      showEditDialog.value = false
+      loadTemplates() // Refresh the list
+    } else {
+      notyf.error('Failed to update template')
+    }
+  } catch (error) {
+    console.error('Save template error:', error)
+    notyf.error('Failed to update template')
+  }
 }
 
 // Create template
@@ -139,15 +193,6 @@ const deleteTemplate = async (template: WiFiTemplate) => {
   }
 }
 
-// Format date
-const formatDate = (dateString?: string) => {
-  if (!dateString) return 'N/A'
-  return new Date(dateString).toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric'
-  })
-}
 
 
 // Watch for search and filter changes
@@ -364,9 +409,11 @@ useHead({
               </template>
 
               <template v-if="column.key === 'created'">
-                <VTextEllipsis width="100px" class="date-text">
-                  {{ formatDate(template.created_at) }}
-                </VTextEllipsis>
+                <VDateTimeSplit 
+                  :date-string="template.created_at"
+                  size="small"
+                  align="left"
+                />
               </template>
 
               <template v-if="column.key === 'actions'">
@@ -449,71 +496,174 @@ useHead({
       actions="right"
       @close="showDetailDialog = false"
     >
-      <div v-if="viewingTemplate" class="template-details">
-        <div class="detail-grid">
-          <div class="detail-item">
-            <label>Template Name</label>
-            <span>{{ viewingTemplate.name }}</span>
-          </div>
-          <div class="detail-item">
-            <label>Description</label>
-            <span>{{ viewingTemplate.description || 'No description' }}</span>
-          </div>
-          <div class="detail-item">
-            <label>Country</label>
-            <span>{{ viewingTemplate.country || '-' }}</span>
-          </div>
-          <div class="detail-item">
-            <label>Status</label>
-            <VTag :color="viewingTemplate.is_active ? 'success' : 'light'">
-              {{ viewingTemplate.is_active ? 'Active' : 'Inactive' }}
-            </VTag>
-          </div>
+      <template #content>
+        <!-- Loading State -->
+        <div v-if="loadingDetails" class="loading-state">
+          <VPlaceload />
+          <p class="mt-4 has-text-centered">Loading template details...</p>
         </div>
 
-        <div class="radio-configs">
-          <h4 class="subtitle">Radio Configurations</h4>
-          <div class="radio-grid">
-            <div 
-              v-for="radio in viewingTemplate.radioConfigs || []" 
-              :key="radio.band"
-              class="radio-item"
-            >
-              <h5>{{ radio.band }} Band</h5>
-              <div class="radio-details">
-                <span><strong>Channel:</strong> {{ radio.channel }}</span>
-                <span><strong>Power:</strong> {{ radio.txpower }}dBm</span>
-                <span><strong>Mode:</strong> {{ radio.htmode }}</span>
-                <span><strong>Enabled:</strong> {{ radio.enabled ? 'Yes' : 'No' }}</span>
+        <!-- Template Details -->
+        <div v-else-if="viewingTemplate" class="template-details">
+          <div class="detail-grid">
+            <div class="detail-item">
+              <label>Template Name</label>
+              <span>{{ viewingTemplate.name }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Description</label>
+              <span>{{ viewingTemplate.description || 'No description' }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Country</label>
+              <span>{{ viewingTemplate.country || '-' }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Status</label>
+              <VTag :color="viewingTemplate.is_active ? 'success' : 'light'">
+                {{ viewingTemplate.is_active ? 'Active' : 'Inactive' }}
+              </VTag>
+            </div>
+          </div>
+
+          <div class="radio-configs">
+            <h4 class="subtitle">Radio Configurations</h4>
+            <div v-if="viewingTemplate.radioConfigs && viewingTemplate.radioConfigs.length > 0" class="radio-grid">
+              <div 
+                v-for="radio in viewingTemplate.radioConfigs" 
+                :key="radio.band"
+                class="radio-item"
+              >
+                <h5>{{ radio.band }} Band</h5>
+                <div class="radio-details">
+                  <span><strong>Channel:</strong> {{ radio.channel }}</span>
+                  <span><strong>Power:</strong> {{ radio.txpower }}dBm</span>
+                  <span><strong>Mode:</strong> {{ radio.htmode }}</span>
+                  <span><strong>Enabled:</strong> {{ radio.enabled ? 'Yes' : 'No' }}</span>
+                </div>
               </div>
+            </div>
+            <div v-else class="empty-config">
+              <VPlaceholderSection
+                title="No Radio Configurations"
+                subtitle="This template doesn't have any radio configurations defined"
+                class="py-4"
+              />
+            </div>
+          </div>
+
+          <div class="ssid-configs">
+            <h4 class="subtitle">SSID Configurations</h4>
+            <div v-if="viewingTemplate.ssidConfigs && viewingTemplate.ssidConfigs.length > 0" class="ssid-grid">
+              <div 
+                v-for="ssid in viewingTemplate.ssidConfigs" 
+                :key="`${ssid.radio_band}-${ssid.ssid_index}`"
+                class="ssid-item"
+              >
+                <h5>{{ ssid.ssid }}</h5>
+                <div class="ssid-details">
+                  <span><strong>Band:</strong> {{ ssid.radio_band }}</span>
+                  <span><strong>Index:</strong> {{ ssid.ssid_index }}</span>
+                  <span><strong>Security:</strong> {{ ssid.encryption }}</span>
+                  <span><strong>Hidden:</strong> {{ ssid.hidden ? 'Yes' : 'No' }}</span>
+                  <span><strong>Enabled:</strong> {{ ssid.enabled ? 'Yes' : 'No' }}</span>
+                  <span><strong>Isolate:</strong> {{ ssid.isolate ? 'Yes' : 'No' }}</span>
+                </div>
+              </div>
+            </div>
+            <div v-else class="empty-config">
+              <VPlaceholderSection
+                title="No SSID Configurations"
+                subtitle="This template doesn't have any SSID configurations defined"
+                class="py-4"
+              />
             </div>
           </div>
         </div>
-
-        <div class="ssid-configs">
-          <h4 class="subtitle">SSID Configurations</h4>
-          <div class="ssid-grid">
-            <div 
-              v-for="ssid in viewingTemplate.ssidConfigs || []" 
-              :key="`${ssid.band}-${ssid.ssid_index}`"
-              class="ssid-item"
-            >
-              <h5>{{ ssid.ssid }}</h5>
-              <div class="ssid-details">
-                <span><strong>Band:</strong> {{ ssid.band }}</span>
-                <span><strong>Index:</strong> {{ ssid.ssid_index }}</span>
-                <span><strong>Security:</strong> {{ ssid.encryption }}</span>
-                <span><strong>Hidden:</strong> {{ ssid.hidden ? 'Yes' : 'No' }}</span>
-                <span><strong>Enabled:</strong> {{ ssid.enabled ? 'Yes' : 'No' }}</span>
-                <span><strong>Isolate:</strong> {{ ssid.isolate ? 'Yes' : 'No' }}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+      </template>
       
       <template #action>
         <VButton @click="showDetailDialog = false">Close</VButton>
+      </template>
+    </VModal>
+
+    <!-- Template Edit Modal -->
+    <VModal 
+      :open="showEditDialog"
+      title="Edit WiFi Template"
+      size="large"
+      actions="right"
+      @close="showEditDialog = false"
+    >
+      <template #content>
+        <!-- Loading State -->
+        <div v-if="loadingDetails" class="loading-state">
+          <VPlaceload />
+          <p class="mt-4 has-text-centered">Loading template for editing...</p>
+        </div>
+
+        <!-- Edit Form -->
+        <div v-else-if="editingTemplate" class="edit-form">
+          <VField>
+            <VLabel>Template Name</VLabel>
+            <VControl>
+              <VInput 
+                v-model="editingTemplate.name"
+                placeholder="Enter template name"
+              />
+            </VControl>
+          </VField>
+
+          <VField>
+            <VLabel>Description</VLabel>
+            <VControl>
+              <VTextarea 
+                v-model="editingTemplate.description"
+                placeholder="Enter template description"
+                rows="3"
+              />
+            </VControl>
+          </VField>
+
+          <VField>
+            <VLabel>Country Code</VLabel>
+            <VControl>
+              <VInput 
+                v-model="editingTemplate.country"
+                placeholder="e.g., US, CN, GB"
+                maxlength="2"
+              />
+            </VControl>
+          </VField>
+
+          <VField>
+            <VLabel>Status</VLabel>
+            <VControl>
+              <VCheckbox 
+                v-model="editingTemplate.is_active"
+                color="success"
+                label="Active Template"
+              />
+            </VControl>
+          </VField>
+
+          <div class="form-section">
+            <h4 class="subtitle">Radio Configurations</h4>
+            <p class="help">Note: Radio and SSID configurations require advanced editing. This form only supports basic template properties.</p>
+          </div>
+        </div>
+      </template>
+      
+      <template #action>
+        <VButton @click="showEditDialog = false" light>Cancel</VButton>
+        <VButton 
+          color="primary" 
+          raised
+          :loading="loadingDetails"
+          @click="saveTemplate"
+        >
+          Save Changes
+        </VButton>
       </template>
     </VModal>
   </div>
@@ -561,14 +711,43 @@ useHead({
   font-weight: 600;
 }
 
-.date-text {
-  font-size: 0.85rem;
-  color: var(--muted-grey);
-}
 
 
 .empty-state {
   padding: 3rem 0;
+}
+
+.loading-state {
+  padding: 3rem 0;
+  text-align: center;
+}
+
+.empty-config {
+  padding: 2rem 0;
+  text-align: center;
+  background: var(--fade-grey-light-6);
+  border-radius: var(--radius);
+  border: 1px dashed var(--fade-grey-light-3);
+}
+
+.edit-form {
+  .form-section {
+    margin-top: 2rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--fade-grey-light-3);
+
+    .subtitle {
+      margin: 0 0 0.5rem 0;
+      color: var(--dark-text);
+      font-weight: 600;
+    }
+
+    .help {
+      color: var(--muted-grey);
+      font-size: 0.9rem;
+      font-style: italic;
+    }
+  }
 }
 
 .template-details {
@@ -649,6 +828,11 @@ useHead({
   .detail-item,
   .radio-item,
   .ssid-item {
+    background: var(--dark-sidebar-light-6);
+    border-color: var(--dark-sidebar-light-12);
+  }
+
+  .empty-config {
     background: var(--dark-sidebar-light-6);
     border-color: var(--dark-sidebar-light-12);
   }
