@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useUserSession } from '/@src/stores/user-session'
 import { useDeviceStore } from '/@src/stores/devices'
@@ -35,8 +35,13 @@ const systemInfo = ref({
   totalUsers: 0,
   activeUsers: 0,
   todayActivations: 0,
-  uptime: '0 days'
+  uptime: '0m',
+  serverStartTime: null as Date | null
 })
+
+// 实时运行时间计算
+const realTimeUptime = ref('0m')
+let uptimeInterval: number | null = null
 
 // Computed
 const userName = computed(() => userSession.user?.username || 'User')
@@ -102,22 +107,50 @@ const loadDashboardData = async () => {
     try {
       const systemResponse = await statsApi.getSystemStatus()
       if (systemResponse.success && systemResponse.data) {
+        // 计算服务器启动时间
+        const now = new Date()
+        const uptimeMatch = systemResponse.data.uptime.match(/(\d+)d|(\d+)h|(\d+)m/g)
+        let totalSeconds = 0
+        
+        if (uptimeMatch) {
+          uptimeMatch.forEach(match => {
+            const value = parseInt(match)
+            if (match.includes('d')) totalSeconds += value * 24 * 60 * 60
+            else if (match.includes('h')) totalSeconds += value * 60 * 60
+            else if (match.includes('m')) totalSeconds += value * 60
+          })
+        }
+        
+        const serverStartTime = new Date(now.getTime() - totalSeconds * 1000)
+        
         systemInfo.value = {
           totalUsers: systemResponse.data.totalUsers,
           activeUsers: systemResponse.data.activeUsers,
           todayActivations: systemResponse.data.todayActivations,
-          uptime: systemResponse.data.uptime
+          uptime: systemResponse.data.uptime,
+          serverStartTime
         }
+        
+        // 设置初始运行时间并启动计时器
+        realTimeUptime.value = systemResponse.data.uptime
+        startUptimeTimer()
       }
     } catch (error) {
       console.error('Failed to load system info:', error)
       // Use fallback data when API is not available
+      const now = new Date()
+      const fallbackStartTime = new Date(now.getTime() - 15 * 24 * 60 * 60 * 1000) // 15天前
+      
       systemInfo.value = {
         totalUsers: 156,
         activeUsers: 89,
         todayActivations: 12,
-        uptime: '15 days'
+        uptime: '15d 0h',
+        serverStartTime: fallbackStartTime
       }
+      
+      realTimeUptime.value = '15d 0h'
+      startUptimeTimer()
     }
   }
 }
@@ -138,6 +171,38 @@ const navigateTo = (path: string) => {
   router.push(path)
 }
 
+// 格式化运行时间的函数
+const formatUptime = (seconds: number): string => {
+  const days = Math.floor(seconds / (24 * 60 * 60))
+  const hours = Math.floor((seconds % (24 * 60 * 60)) / (60 * 60))
+  const minutes = Math.floor((seconds % (60 * 60)) / 60)
+  
+  if (days > 0) {
+    return `${days}d ${hours}h ${minutes}m`
+  } else if (hours > 0) {
+    return `${hours}h ${minutes}m`
+  } else {
+    return `${minutes}m`
+  }
+}
+
+// 更新实时运行时间
+const updateRealTimeUptime = () => {
+  if (systemInfo.value.serverStartTime) {
+    const now = new Date()
+    const uptimeSeconds = Math.floor((now.getTime() - systemInfo.value.serverStartTime.getTime()) / 1000)
+    realTimeUptime.value = formatUptime(uptimeSeconds)
+  }
+}
+
+// 启动运行时间计时器
+const startUptimeTimer = () => {
+  if (uptimeInterval) {
+    clearInterval(uptimeInterval)
+  }
+  uptimeInterval = window.setInterval(updateRealTimeUptime, 1000) // 每秒更新
+}
+
 
 // Check for error query parameter
 const checkErrorMessage = () => {
@@ -153,6 +218,13 @@ const checkErrorMessage = () => {
 onMounted(() => {
   checkErrorMessage()
   loadDashboardData()
+})
+
+onUnmounted(() => {
+  // 清理计时器
+  if (uptimeInterval) {
+    clearInterval(uptimeInterval)
+  }
 })
 
 useHead({
@@ -374,7 +446,7 @@ useHead({
         
         <div class="status-item">
           <div class="status-label">Server Uptime</div>
-          <div class="status-value">{{ systemInfo.uptime }}</div>
+          <div class="status-value uptime-counter">{{ realTimeUptime }}</div>
         </div>
       </div>
     </VCard>
@@ -578,6 +650,16 @@ useHead({
     font-size: 1.5rem;
     font-weight: 600;
     color: var(--dark-text);
+    
+    &.uptime-counter {
+      color: var(--success);
+      font-family: 'Courier New', monospace;
+      transition: all 0.3s ease;
+      
+      &:hover {
+        transform: scale(1.05);
+      }
+    }
   }
 }
 
