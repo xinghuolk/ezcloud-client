@@ -76,6 +76,7 @@ declare module 'vue' {
     VControl: typeof import('./../src/components/base/VControl.vue')['default']
     VDarkmodeSwitch: typeof import('./../src/components/base/VDarkmodeSwitch.vue')['default']
     VDarkmodeToggle: typeof import('./../src/components/base/VDarkmodeToggle.vue')['default']
+    VDateTimeSplit: typeof import('./../src/components/base/VDateTimeSplit.vue')['default']
     VDropdown: typeof import('./../src/components/base/VDropdown.vue')['default']
     VField: typeof import('./../src/components/base/VField.vue')['default']
     VFlex: typeof import('./../src/components/base/VFlex.vue')['default']

@@ -5,6 +5,7 @@ import { modelApi } from '/@src/api'
 import type { DeviceModel, CreateDeviceModelParams } from '/@src/api/types'
 import type { VTagColor } from '/@src/components/base/VTag.vue'
 import { Notyf } from 'notyf'
+import { formatDateTime } from '/@src/utils/date-formatter'
 
 definePage({
   meta: {
@@ -295,16 +296,8 @@ const resetForm = () => {
   }
 }
 
-const formatDateTime = (dateString: string) => {
-  const date = new Date(dateString)
-  return date.toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
-}
+// 使用统一的日期格式化工具
+// const formatDateTime = formatDateTime  // 已导入
 
 const onVendorChange = (vendorId: number) => {
   const selectedVendor = vendorStore.vendors.find(v => v.id === vendorId)
@@ -579,9 +572,7 @@ useHead({
               </template>
 
               <template v-if="column.key === 'created_at'">
-                <VTextEllipsis width="120px" class="date-text">
-                  {{ formatDateTime(model.created_at) }}
-                </VTextEllipsis>
+                <VDateTimeSplit :date-string="model.created_at" />
               </template>
 
               <template v-if="column.key === 'actions'">
@@ -790,11 +781,11 @@ useHead({
             </div>
             <div class="common-info-item">
               <label>Created At</label>
-              <span>{{ formatDateTime(currentModel.created_at) }}</span>
+              <VDateTimeSplit :date-string="currentModel.created_at" />
             </div>
             <div class="common-info-item">
               <label>Updated At</label>
-              <span>{{ formatDateTime(currentModel.updated_at) }}</span>
+              <VDateTimeSplit :date-string="currentModel.updated_at" />
             </div>
             <div class="info-item full-width">
               <label>Description</label>
@@ -832,5 +823,6 @@ useHead({
   font-size: 0.85rem;
   color: var(--muted-grey);
 }
+
 
 </style>

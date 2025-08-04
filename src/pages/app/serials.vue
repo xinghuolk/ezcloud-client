@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { serialApi, modelApi } from '/@src/api'
 import type { SerialNumber, GenerateSerialParams, DeviceModel } from '/@src/api/types'
 import { Notyf } from 'notyf'
+import { formatDateTime } from '/@src/utils/date-formatter'
 
 definePage({
   meta: {
@@ -78,7 +79,95 @@ const generateErrors = ref({
 // Computed
 const filteredSerials = computed(() => {
   if (!currentBatch.value) return serials.value
+  
+  // 处理虚拟批次ID的特殊情况
+  if (currentBatch.value === VIRTUAL_AUTO_REGISTERED_ID) {
+    // 显示所有属于AUTO_REGISTERED_DEVICES的序列号
+    const autoRegBatchIdSet = new Set(autoRegisteredBatchIds.value)
+    return serials.value.filter(s => autoRegBatchIdSet.has(s.batch_id))
+  }
+  
+  // 处理普通批次
   return serials.value.filter(s => s.batch_id === currentBatch.value)
+})
+
+// 排序后的序列号列表 - 虚拟批次按设备型号分组
+const sortedFilteredSerials = computed(() => {
+  const filtered = filteredSerials.value
+  
+  // 如果是虚拟批次，按设备型号排序分组
+  if (currentBatch.value === VIRTUAL_AUTO_REGISTERED_ID) {
+    return [...filtered].sort((a, b) => {
+      // 首先按设备型号排序
+      const modelA = (a.deviceModel || a.device_model)
+      const modelB = (b.deviceModel || b.device_model)
+      
+      if (modelA && modelB) {
+        const modelCompare = `${modelA.oemname} ${modelA.stdname}`.localeCompare(`${modelB.oemname} ${modelB.stdname}`)
+        if (modelCompare !== 0) return modelCompare
+      } else if (modelA && !modelB) {
+        return -1
+      } else if (!modelA && modelB) {
+        return 1
+      }
+      
+      // 然后按序列号排序
+      return a.serial.localeCompare(b.serial)
+    })
+  }
+  
+  // 普通批次按序列号排序
+  return [...filtered].sort((a, b) => a.serial.localeCompare(b.serial))
+})
+
+// AUTO_REGISTERED_DEVICES批次合并逻辑
+const AUTO_REGISTERED_BATCH_NAME = 'AUTO_REGISTERED_DEVICES'
+const VIRTUAL_AUTO_REGISTERED_ID = 'VIRTUAL_AUTO_REGISTERED'
+
+// 收集所有自动注册批次的真实ID
+const autoRegisteredBatchIds = computed(() => {
+  return batches.value
+    .filter(batch => batch.batch_id === AUTO_REGISTERED_BATCH_NAME)
+    .map(batch => batch.id || batch.batch_id) // 尝试获取真实的唯一ID，回退到batch_id
+})
+
+// 获取所有自动注册批次记录
+const autoRegisteredBatches = computed(() => {
+  return batches.value.filter(batch => batch.batch_id === AUTO_REGISTERED_BATCH_NAME)
+})
+
+// 用于显示的批次列表 - 合并AUTO_REGISTERED_DEVICES
+const displayBatches = computed(() => {
+  // 过滤掉原始的自动注册批次
+  const manualBatches = batches.value.filter(batch => batch.batch_id !== AUTO_REGISTERED_BATCH_NAME)
+  
+  // 如果存在自动注册批次，创建虚拟合并批次
+  if (autoRegisteredBatches.value.length > 0) {
+    // 计算所有自动注册批次的统计总和
+    const autoRegisteredStats = autoRegisteredBatches.value
+      .reduce((acc, batch) => ({
+        total_count: acc.total_count + (parseInt(batch.total_count || batch.count || 0, 10)),
+        unused_count: acc.unused_count + (parseInt(batch.unused_count || 0, 10)),
+        bound_count: acc.bound_count + (parseInt(batch.bound_count || 0, 10)),
+        activated_count: acc.activated_count + (parseInt(batch.activated_count || 0, 10))
+      }), { total_count: 0, unused_count: 0, bound_count: 0, activated_count: 0 })
+    
+    // 创建虚拟批次对象
+    const virtualBatch = {
+      batch_id: VIRTUAL_AUTO_REGISTERED_ID,
+      id: VIRTUAL_AUTO_REGISTERED_ID, // 确保有id字段
+      name: 'Auto-Registered Devices',
+      display_name: `Auto-Registered Devices (${autoRegisteredBatches.value.length} Models)`,
+      is_virtual: true,
+      model_count: autoRegisteredBatches.value.length,
+      ...autoRegisteredStats,
+      created_at: autoRegisteredBatches.value[0]?.created_at || new Date().toISOString()
+    }
+    
+    return [virtualBatch, ...manualBatches]
+  }
+  
+  return manualBatches
 })
 
 // 调试用计算属性
@@ -340,7 +429,16 @@ const handleRefresh = () => {
 
 const selectBatch = (batchId: string) => {
   currentBatch.value = currentBatch.value === batchId ? '' : batchId
-  searchForm.batch_id = currentBatch.value
+  
+  // 处理虚拟批次ID的特殊情况
+  if (currentBatch.value === VIRTUAL_AUTO_REGISTERED_ID) {
+    // 对于虚拟批次，不设置searchForm.batch_id，让前端进行过滤
+    // 或者我们可以设置为空，获取所有数据然后在前端过滤
+    searchForm.batch_id = ''
+  } else {
+    searchForm.batch_id = currentBatch.value
+  }
+  
   handleImmediateSearch()
 }
 
@@ -440,16 +538,8 @@ const resetGenerateForm = () => {
   }
 }
 
-const formatDateTime = (dateString: string) => {
-  const date = new Date(dateString)
-  return date.toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
-}
+// 使用统一的日期格式化工具
+// const formatDateTime = formatDateTime  // 已导入
 
 const onPageChange = (page: number) => {
   pagination.page = page
@@ -601,15 +691,17 @@ useHead({
 
           <div class="batch-list" :class="{ 'is-loading': loading }">
             <div
-              v-for="batch in batches"
+              v-for="batch in displayBatches"
               :key="batch.batch_id"
               class="batch-item"
-              :class="{ 'is-active': currentBatch === batch.batch_id }"
+              :class="{ 'is-active': currentBatch === batch.batch_id, 'is-virtual': batch.is_virtual }"
               @click="selectBatch(batch.batch_id)"
             >
               <div class="batch-item-header">
-                <span class="batch-id">{{ batch.batch_id }}</span>
-                <VDropdown spaced right icon="lucide:more-horizontal">
+                <span class="batch-id" :class="{ 'is-virtual': batch.is_virtual }">
+                  {{ batch.is_virtual ? batch.display_name : batch.batch_id }}
+                </span>
+                <VDropdown v-if="!batch.is_virtual" spaced right icon="lucide:more-horizontal">
                   <template #content>
                     <a 
                       class="dropdown-item is-media"
@@ -639,19 +731,26 @@ useHead({
               </div>
 
               <div class="batch-info">
-                <div v-if="batch.deviceModel" class="model-info">
+                <div v-if="batch.is_virtual" class="model-info virtual-info">
+                  <iconify-icon icon="lucide:layers" class="mr-1" />
+                  Combined from {{ batch.model_count }} device models
+                </div>
+                <div v-else-if="batch.deviceModel" class="model-info">
                   {{ batch.deviceModel.oemname }} {{ batch.deviceModel.stdname }}
                 </div>
                 <div class="batch-stats">
                   <VTag size="tiny" color="info">Total: {{ batch.total_count || batch.count || 0 }}</VTag>
                   <VTag size="tiny" color="success">Unused: {{ batch.unused_count || 0 }}</VTag>
                   <VTag size="tiny" color="warning">Bound: {{ batch.bound_count || 0 }}</VTag>
+                  <VTag v-if="batch.activated_count" size="tiny" color="primary">Activated: {{ batch.activated_count }}</VTag>
                 </div>
-                <div class="batch-date">{{ formatDateTime(batch.created_at) }}</div>
+                <div class="batch-date">
+                  <VDateTimeSplit :date-string="batch.created_at" variant="batch" size="small" />
+                </div>
               </div>
             </div>
 
-            <div v-if="batches.length === 0" class="empty-state">
+            <div v-if="displayBatches.length === 0" class="empty-state">
               <p>No batches found</p>
             </div>
           </div>
@@ -722,6 +821,14 @@ useHead({
             </div>
           </div>
 
+          <!-- Virtual Batch Info Banner -->
+          <div v-if="currentBatch === VIRTUAL_AUTO_REGISTERED_ID" class="virtual-batch-info mb-4">
+            <VMessage color="info" class="virtual-batch-message">
+              <iconify-icon icon="lucide:layers" class="mr-2" />
+              Viewing auto-registered devices from {{ autoRegisteredBatches.length }} models, grouped by device model
+            </VMessage>
+          </div>
+
           <!-- Serials Table -->
           <VFlexTableWrapper
             :columns="{
@@ -736,6 +843,12 @@ useHead({
                 label: 'Batch ID', 
                 searchable: true,
                 sortable: true
+              },
+              device_model: {
+                label: 'Device Model',
+                searchable: true,
+                sortable: true,
+                show: currentBatch === VIRTUAL_AUTO_REGISTERED_ID
               },
               mac_info: { 
                 label: 'MAC Info',
@@ -760,7 +873,7 @@ useHead({
                 align: 'end'
               }
             }"
-            :data="filteredSerials"
+            :data="sortedFilteredSerials"
             :loading="loading"
           >
             <template #default="wrapperState">
@@ -816,6 +929,21 @@ useHead({
                     </VTextEllipsis>
                   </template>
 
+                  <template v-if="column.key === 'device_model'">
+                    <div v-if="serial.deviceModel || serial.device_model" class="device-model-info">
+                      <VTextEllipsis width="140px" class="model-name">
+                        {{ (serial.deviceModel || serial.device_model)?.oemname }} 
+                        {{ (serial.deviceModel || serial.device_model)?.stdname }}
+                      </VTextEllipsis>
+                      <small class="model-type">
+                        {{ (serial.deviceModel || serial.device_model)?.devtype || 'Gateway' }}
+                      </small>
+                    </div>
+                    <span v-else class="common-text-light">
+                      <small>Unknown Model</small>
+                    </span>
+                  </template>
+
                   <template v-if="column.key === 'mac_info'">
                     <div class="mac-info">
                       <div class="mb-1">
@@ -842,15 +970,12 @@ useHead({
                   </template>
 
                   <template v-if="column.key === 'created_at'">
-                    <VTextEllipsis width="120px" class="date-text">
-                      {{ formatDateTime(serial.created_at) }}
-                    </VTextEllipsis>
+                    <VDateTimeSplit :date-string="serial.created_at" />
                   </template>
 
                   <template v-if="column.key === 'bound_at'">
-                    <VTextEllipsis width="120px" class="date-text">
-                      {{ serial.bound_at ? formatDateTime(serial.bound_at) : '-' }}
-                    </VTextEllipsis>
+                    <VDateTimeSplit v-if="serial.bound_at" :date-string="serial.bound_at" />
+                    <span v-else class="common-text-light">-</span>
                   </template>
 
                   <template v-if="column.key === 'actions'">
@@ -1089,11 +1214,12 @@ useHead({
             </div>
             <div class="common-info-item">
               <label>Created At</label>
-              <span>{{ formatDateTime(selectedSerial.created_at) }}</span>
+              <VDateTimeSplit :date-string="selectedSerial.created_at" />
             </div>
             <div class="common-info-item">
               <label>Bound At</label>
-              <span>{{ formatDateTime(selectedSerial.bound_at || '') }}</span>
+              <VDateTimeSplit v-if="selectedSerial.bound_at" :date-string="selectedSerial.bound_at" />
+              <span v-else class="common-text-light">-</span>
             </div>
           </div>
         </div>
@@ -1139,6 +1265,37 @@ useHead({
     &.is-active {
       border-color: var(--primary);
       background: var(--primary-light);
+    }
+
+    &.is-virtual {
+      border-left: 4px solid var(--info);
+      background: linear-gradient(135deg, var(--fade-grey-light-6) 0%, var(--info-light) 100%);
+      
+      &.is-active {
+        border-color: var(--info);
+        background: linear-gradient(135deg, var(--info-light) 0%, var(--primary-light) 100%);
+      }
+      
+      .batch-id.is-virtual {
+        color: var(--info);
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        
+        &::before {
+          content: '🔗';
+          margin-right: 0.5rem;
+          font-size: 0.9rem;
+        }
+      }
+      
+      .virtual-info {
+        color: var(--info);
+        font-weight: 500;
+        display: flex;
+        align-items: center;
+        font-size: 0.8rem;
+      }
     }
 
     .batch-item-header {
@@ -1212,6 +1369,39 @@ useHead({
   color: var(--muted-grey);
 }
 
+.device-model-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  
+  .model-name {
+    font-weight: 500;
+    color: var(--dark-text);
+    line-height: 1.2;
+  }
+  
+  .model-type {
+    color: var(--muted-grey);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+}
+
+.virtual-batch-info {
+  .virtual-batch-message {
+    :deep(.message-body) {
+      display: flex;
+      align-items: center;
+      font-weight: 500;
+      
+      iconify-icon {
+        color: var(--info);
+      }
+    }
+  }
+}
+
 .rem-30 {
   font-size: 1.875rem;
 }
@@ -1252,4 +1442,5 @@ useHead({
     line-height: 1.4;
   }
 }
+
 </style>

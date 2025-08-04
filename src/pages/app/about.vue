@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { Notyf } from 'notyf'
+import { formatDateTime } from '/@src/utils/date-formatter'
 import { useUserSession } from '/@src/stores/user-session'
 import request from '/@src/api/request'
 
@@ -353,7 +354,7 @@ useHead({
             </div>
             <div class="config-item full-width" v-if="frpStatus.uptime">
               <label>Uptime</label>
-              <span>{{ new Date(frpStatus.uptime).toLocaleString() }}</span>
+              <span>{{ formatDateTime(frpStatus.uptime) }}</span>
             </div>
           </div>
 

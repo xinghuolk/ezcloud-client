@@ -7,6 +7,7 @@ import { deviceApi } from '/@src/api'
 import RemoteAccessButton from '/@src/components/RemoteAccessButton.vue'
 import DeviceTrustManager from '/@src/components/DeviceTrustManager.vue'
 import { Notyf } from 'notyf'
+import { formatDateTime } from '/@src/utils/date-formatter'
 
 definePage({
   meta: {
@@ -71,6 +72,8 @@ const trustedCount = computed(() => deviceStore.trustedCount)
 const fetchDevices = async () => {
   loading.value = true
   try {
+    // Sync pagination state
+    filterForm.page = pagination.page
     // Fetch device list including trusted devices
     await deviceStore.fetchDevicesWithTrusted(filterForm)
   } finally {
@@ -351,33 +354,8 @@ const loadModemData = async () => {
   }
 }
 
-const formatDate = (dateString: string) => {
-  if (!dateString) return 'Never'
-  const date = new Date(dateString)
-  return date.toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
-}
-
-const formatDateSplit = (dateString: string) => {
-  if (!dateString) return { date: 'Never', time: '' }
-  const date = new Date(dateString)
-  return {
-    date: date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit'
-    }),
-    time: date.toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit'
-    })
-  }
-}
+// 使用统一的日期格式化工具
+const formatDate = formatDateTime
 
 // Format bytes to human readable format
 const formatBytes = (bytes: number) => {
@@ -886,8 +864,7 @@ useHead({
               <template v-if="column.key === 'lastSeen'">
                 <div class="last-seen-info">
                   <div v-if="device.last_seen" class="last-seen-content">
-                    <div class="last-seen-date">{{ formatDateSplit(device.last_seen).date }}</div>
-                    <div class="last-seen-time">{{ formatDateSplit(device.last_seen).time }}</div>
+                    <VDateTimeSplit :date-string="device.last_seen" size="small" />
                   </div>
                   <div v-else class="last-seen-content">
                     <div class="last-seen-date common-text-light">Never</div>
@@ -979,13 +956,13 @@ useHead({
 
       <!-- Pagination -->
       <VFlexPagination
-        v-if="pagination.total > 0 && pagination.total > (pagination.limit || 20)"
-        v-model:current-page="filterForm.page"
+        v-if="pagination.total > 0"
+        v-model:current-page="pagination.page"
         :item-per-page="pagination.limit || 20"
         :total-items="pagination.total"
         :max-links-displayed="7"
         no-router
-        @update:current-page="handleSearch"
+        @update:current-page="fetchDevices"
       />
     </VCard>
 
@@ -1102,15 +1079,18 @@ useHead({
                   </div>
                   <div class="device-info-item">
                     <label>First Connection</label>
-                    <span class="device-info-value">{{ formatDate(selectedDevice.firsttime || '') }}</span>
+                    <VDateTimeSplit v-if="selectedDevice.firsttime" :date-string="selectedDevice.firsttime" class="device-info-value" />
+                    <span v-else class="device-info-value common-text-light">Never</span>
                   </div>
                   <div class="device-info-item">
                     <label>Last Seen</label>
-                    <span class="device-info-value">{{ formatDate(selectedDevice.last_seen || '') }}</span>
+                    <VDateTimeSplit v-if="selectedDevice.last_seen" :date-string="selectedDevice.last_seen" class="device-info-value" />
+                    <span v-else class="device-info-value common-text-light">Never</span>
                   </div>
                   <div class="device-info-item">
                     <label>Created At</label>
-                    <span class="device-info-value">{{ formatDate(selectedDevice.created_at || '') }}</span>
+                    <VDateTimeSplit v-if="selectedDevice.created_at" :date-string="selectedDevice.created_at" class="device-info-value" />
+                    <span v-else class="device-info-value common-text-light">Never</span>
                   </div>
                   <div class="device-info-item">
                     <label>Status</label>
@@ -1452,7 +1432,8 @@ useHead({
                           </div>
                           <div class="info-item">
                             <label>Last Update:</label>
-                            <span>{{ formatDate(modemData.last_update || selectedDevice?.last_seen || '') }}</span>
+                            <VDateTimeSplit v-if="modemData.last_update || selectedDevice?.last_seen" :date-string="modemData.last_update || selectedDevice.last_seen" variant="inline" />
+                            <span v-else class="common-text-light">Never</span>
                           </div>
                         </div>
                       </VCard>
@@ -1512,7 +1493,8 @@ useHead({
                           </div>
                           <div class="column is-3">
                             <div class="stat-item">
-                              <span class="stat-value">{{ formatDate(modemData.last_updated || selectedDevice?.last_seen || '') }}</span>
+                              <VDateTimeSplit v-if="modemData.last_updated || selectedDevice?.last_seen" :date-string="modemData.last_updated || selectedDevice.last_seen" variant="stat" class="stat-value" />
+                              <span v-else class="stat-value common-text-light">Never</span>
                               <span class="stat-label">Last Updated</span>
                             </div>
                           </div>
@@ -1815,6 +1797,7 @@ useHead({
   }
 }
 
+
 :deep(.dark) {
   .device-info-item {
     background: var(--dark-sidebar-light-6);
@@ -1883,5 +1866,6 @@ useHead({
       }
     }
   }
+  
 }
 </style>

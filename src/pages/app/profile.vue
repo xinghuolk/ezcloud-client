@@ -2,6 +2,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useUserSession } from '/@src/stores/user-session'
 import { Notyf } from 'notyf'
+import { formatDateTime } from '/@src/utils/date-formatter'
 
 definePage({
   meta: {
@@ -182,17 +183,8 @@ const resetPasswordForm = () => {
   }
 }
 
-const formatDate = (dateString: string | null) => {
-  if (!dateString) return 'Never'
-  const date = new Date(dateString)
-  return date.toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
-}
+// 使用统一的日期格式化工具
+const formatDate = formatDateTime
 
 // Lifecycle
 onMounted(() => {

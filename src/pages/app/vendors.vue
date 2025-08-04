@@ -125,14 +125,8 @@ const handleDelete = async (vendor: Vendor) => {
   }
 }
 
-const formatDate = (dateString: string) => {
-  const date = new Date(dateString)
-  return date.toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit'
-  })
-}
+// 使用统一的日期格式化工具
+// const formatDate = formatDateTime  // 已导入
 
 // Watch for filter changes
 watch(() => searchForm.search, () => {
@@ -234,7 +228,7 @@ useHead({
           description: { 
             label: 'Description',
             searchable: true,
-            grow: 'xl'
+            grow: 'lg'
           },
           status: { 
             label: 'Status',
@@ -248,7 +242,8 @@ useHead({
           },
           actions: { 
             label: 'Actions',
-            align: 'end'
+            align: 'end',
+            grow: 'lg'
           }
         }"
         :data="vendors"
@@ -316,9 +311,7 @@ useHead({
               </template>
 
               <template v-if="column.key === 'created_at'">
-                <VTextEllipsis width="100px" class="date-text">
-                  {{ formatDate(vendor.created_at) }}
-                </VTextEllipsis>
+                <VDateTimeSplit :date-string="vendor.created_at" />
               </template>
 
               <template v-if="column.key === 'actions'">
@@ -328,14 +321,14 @@ useHead({
                     outlined
                     @click="openEditDialog(vendor)"
                   >
-                    编辑
+                    Edit
                   </VButton>
                   <VButton 
                     color="danger" 
                     outlined
                     @click="handleDelete(vendor)"
                   >
-                    删除
+                    Delete
                   </VButton>
                 </div>
                 <span v-else class="common-text-light">-</span>
@@ -347,7 +340,7 @@ useHead({
 
       <!-- Pagination -->
       <VFlexPagination
-        v-if="pagination.total > pagination.limit"
+        v-if="pagination.total > 0"
         v-model:current-page="pagination.page"
         :item-per-page="pagination.limit"
         :total-items="pagination.total"
@@ -428,4 +421,5 @@ useHead({
   flex-wrap: wrap;
   gap: 0.5rem;
 }
+
 </style>

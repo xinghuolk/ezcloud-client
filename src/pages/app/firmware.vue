@@ -92,19 +92,6 @@ const formatFileSize = (bytes: number): string => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
 }
 
-// 格式化日期时间
-const formatDateTime = (dateString: string): string => {
-  if (!dateString) return '-'
-  const date = new Date(dateString)
-  return date.toLocaleString('en-US', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit'
-  })
-}
 
 // 计算测试持续时间
 const calculateTestDuration = (startTime: string, endTime?: string): string => {
@@ -430,11 +417,7 @@ const saveCompatibility = async () => {
   savingCompatibility.value = false
 }
 
-// 分页处理
-const handlePageChange = (page: number) => {
-  searchForm.page = page
-  fetchFirmwareList()
-}
+// 分页处理已内联到模板中
 
 // 测试管理方法
 const manageTestDevices = async (firmware: FirmwareVersion) => {
@@ -810,18 +793,18 @@ onUnmounted(() => {
                 <div class="compatibility-tags">
                   <div class="tags">
                     <VTag 
-                      v-for="model in firmware.compatibleModels?.slice(0, 2)" 
+                      v-for="model in firmware.compatible_models?.slice(0, 2)" 
                       :key="model.id"
-                      size="small"
+                      size="tiny"
                     >
                       {{ model.stdname }}
                     </VTag>
                     <VTag 
-                      v-if="(firmware.compatibleModels?.length || 0) > 2"
-                      size="small"
+                      v-if="(firmware.compatible_models?.length || 0) > 2"
+                      size="tiny"
                       color="light"
                     >
-                      +{{ (firmware.compatibleModels?.length || 0) - 2 }}
+                      +{{ (firmware.compatible_models?.length || 0) - 2 }}
                     </VTag>
                   </div>
                 </div>
@@ -841,7 +824,7 @@ onUnmounted(() => {
               </template>
 
               <template v-if="column.key === 'created_at'">
-                {{ new Date(firmware.created_at).toLocaleDateString() }}
+                <VDateTimeSplit :date-string="firmware.created_at" />
               </template>
 
               <template v-if="column.key === 'actions'">
@@ -941,13 +924,13 @@ onUnmounted(() => {
 
       <!-- Pagination -->
       <VFlexPagination
-        v-if="firmwareStore.pagination.total > firmwareStore.pagination.limit"
-        v-model:current-page="firmwareStore.pagination.page"
+        v-if="firmwareStore.pagination.total > 0"
+        v-model:current-page="searchForm.page"
         :item-per-page="firmwareStore.pagination.limit"
         :total-items="firmwareStore.pagination.total"
         :max-links-displayed="7"
         no-router
-        @update:current-page="handlePageChange"
+        @update:current-page="(page) => { searchForm.page = page; fetchFirmwareList() }"
       />
     </VCard>
 
@@ -1088,7 +1071,7 @@ onUnmounted(() => {
               <VField>
                 <VLabel>Upload Time</VLabel>
                 <div class="content">
-                  {{ new Date(selectedFirmware.created_at).toLocaleString() }}
+                  <VDateTimeSplit :date-string="selectedFirmware.created_at" />
                 </div>
               </VField>
             </div>
@@ -1099,7 +1082,7 @@ onUnmounted(() => {
             <div class="content">
               <div class="tags">
                 <VTag 
-                  v-for="model in selectedFirmware.compatibleModels" 
+                  v-for="model in selectedFirmware.compatible_models" 
                   :key="model.id"
                 >
                   {{ model.stdname }} ({{ model.oemname }})
@@ -1136,7 +1119,7 @@ onUnmounted(() => {
           
           <div v-if="loadingCompatibility" class="loading-placeholder">
             <VPlaceload />
-            <VPlaceloadText lines="2" />
+            <VPlaceloadText :lines="3" />
           </div>
           
           <div v-else>
@@ -1311,11 +1294,11 @@ onUnmounted(() => {
           
           <div v-if="firmwareStore.testLoading" class="loading-placeholder">
             <VPlaceload />
-            <VPlaceloadText lines="3" />
+            <VPlaceloadText :lines="4" />
           </div>
           
           <div v-else>
-            <table class="table is-fullwidth" v-if="firmwareStore.testDevices.get(selectedFirmwareForTest.id)?.length > 0">
+            <table class="table is-fullwidth" v-if="selectedFirmwareForTest && (firmwareStore.testDevices.get(selectedFirmwareForTest.id)?.length || 0) > 0">
               <thead>
                 <tr>
                   <th>Device Serial</th>
@@ -1329,18 +1312,16 @@ onUnmounted(() => {
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="testDevice in firmwareStore.testDevices.get(selectedFirmwareForTest.id)" :key="testDevice.device_serial">
+                <tr v-for="testDevice in (selectedFirmwareForTest ? (firmwareStore.testDevices.get(selectedFirmwareForTest.id) || []) : [])" :key="testDevice.device_serial">
                   <td>{{ testDevice.device_serial }}</td>
                   <td>{{ testDevice.device?.name || '-' }}</td>
                   <td>
-                    <VTag :color="getStatusColor(testDevice.test_status)">
+                    <VTag :color="getStatusColor(testDevice.test_status) as VTagColor">
                       {{ getStatusDisplayText(testDevice.test_status) }}
                     </VTag>
                   </td>
                   <td>
-                    <span v-if="testDevice.test_started_at">
-                      {{ formatDateTime(testDevice.test_started_at) }}
-                    </span>
+                    <VDateTimeSplit v-if="testDevice.test_started_at" :date-string="testDevice.test_started_at" size="small" />
                     <span v-else>-</span>
                   </td>
                   <td>
@@ -1360,7 +1341,7 @@ onUnmounted(() => {
                     <VButton 
                       v-if="testDevice.test_status === 'pending'"
                       color="danger" 
-                      size="small"
+                      size="medium"
                       @click="removeTestDevice(testDevice.device_serial)"
                     >
                       Remove
@@ -1482,7 +1463,7 @@ onUnmounted(() => {
                   <div class="column is-4" v-if="currentTestProgress.pending > 0">
                     <div class="stat-item small">
                       <span class="label">
-                        <VTag color="light" size="small">Pending</VTag>
+                        <VTag color="light" size="tiny">Pending</VTag>
                       </span>
                       <span class="value">{{ currentTestProgress.pending }}</span>
                     </div>
@@ -1490,7 +1471,7 @@ onUnmounted(() => {
                   <div class="column is-4" v-if="currentTestProgress.downloading > 0">
                     <div class="stat-item small">
                       <span class="label">
-                        <VTag color="primary" size="small">Downloading</VTag>
+                        <VTag color="primary" size="tiny">Downloading</VTag>
                       </span>
                       <span class="value">{{ currentTestProgress.downloading }}</span>
                     </div>
@@ -1498,7 +1479,7 @@ onUnmounted(() => {
                   <div class="column is-4" v-if="currentTestProgress.installing > 0">
                     <div class="stat-item small">
                       <span class="label">
-                        <VTag color="primary" size="small">Installing</VTag>
+                        <VTag color="primary" size="tiny">Installing</VTag>
                       </span>
                       <span class="value">{{ currentTestProgress.installing }}</span>
                     </div>
@@ -1506,17 +1487,17 @@ onUnmounted(() => {
                   <div class="column is-4" v-if="currentTestProgress.testing > 0">
                     <div class="stat-item small">
                       <span class="label">
-                        <VTag color="info" size="small">Testing</VTag>
+                        <VTag color="info" size="tiny">Testing</VTag>
                       </span>
                       <span class="value">{{ currentTestProgress.testing }}</span>
                     </div>
                   </div>
-                  <div class="column is-4" v-if="currentTestProgress.verifying > 0">
+                  <div class="column is-4" v-if="currentTestProgress && 'verifying' in currentTestProgress && currentTestProgress.verifying > 0">
                     <div class="stat-item small">
                       <span class="label">
-                        <VTag color="warning" size="small">Verifying</VTag>
+                        <VTag color="warning" size="tiny">Verifying</VTag>
                       </span>
-                      <span class="value">{{ currentTestProgress.verifying }}</span>
+                      <span class="value">{{ 'verifying' in currentTestProgress ? currentTestProgress.verifying : 0 }}</span>
                     </div>
                   </div>
                 </div>
@@ -1589,8 +1570,8 @@ onUnmounted(() => {
           <p class="subtitle is-6" v-if="selectedFirmwareForTest">
             Finish testing and publish firmware version <strong>{{ selectedFirmwareForTest.version }}</strong>?
           </p>
-          <div v-if="firmwareStore.testProgress.get(selectedFirmwareForTest?.id)?.inProgress > 0" class="notification is-warning">
-            <p><strong>Warning:</strong> There are still {{ firmwareStore.testProgress.get(selectedFirmwareForTest.id).inProgress }} devices in testing.</p>
+          <div v-if="selectedFirmwareForTest && firmwareStore.testProgress.get(selectedFirmwareForTest.id)?.inProgress && firmwareStore.testProgress.get(selectedFirmwareForTest.id)!.inProgress > 0" class="notification is-warning">
+            <p><strong>Warning:</strong> There are still {{ selectedFirmwareForTest ? firmwareStore.testProgress.get(selectedFirmwareForTest.id)?.inProgress : 0 }} devices in testing.</p>
           </div>
         </div>
       </template>
@@ -1603,7 +1584,7 @@ onUnmounted(() => {
           Finish Testing
         </VButton>
         <VButton 
-          v-if="firmwareStore.testProgress.get(selectedFirmwareForTest?.id)?.inProgress > 0"
+          v-if="selectedFirmwareForTest && firmwareStore.testProgress.get(selectedFirmwareForTest.id)?.inProgress && firmwareStore.testProgress.get(selectedFirmwareForTest.id)!.inProgress > 0"
           color="warning"
           @click="finishTesting(true)"
         >
