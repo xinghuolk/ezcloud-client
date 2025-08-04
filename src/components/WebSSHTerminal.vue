@@ -56,7 +56,7 @@
           size="medium"
         >
           <iconify-icon icon="lucide:refresh-cw" class="mr-2" />
-          重新连接
+          Reconnect
         </VButton>
         <VButton 
           color="secondary" 
@@ -65,7 +65,7 @@
           size="medium"
         >
           <iconify-icon icon="lucide:x" class="mr-2" />
-          关闭窗口
+          Close Window
         </VButton>
       </div>
     </div>
@@ -81,7 +81,7 @@
     <div v-if="isConnecting" class="loading-overlay" :class="{ 'standalone-loading': props.standalone }">
       <div class="loading-content">
         <VLoader size="large" />
-        <p class="loading-text">{{ props.standalone ? '正在连接SSH终端...' : 'Connecting SSH Terminal...' }}</p>
+        <p class="loading-text">{{ props.standalone ? 'Connecting SSH Terminal...' : 'Connecting SSH Terminal...' }}</p>
       </div>
     </div>
   </div>
@@ -356,38 +356,51 @@ const connectSSH = async () => {
 
     websocket.onerror = (error) => {
       console.error('SSH WebSocket Connection Error:', error)
+      
+      // 强制更新连接状态
       isConnecting.value = false
       isConnected.value = false
       
-      statusMessage.value = 'SSH Connection Failed'
-      // 尝试从错误事件中提取更具体的错误信息
-      let errorDetail = 'WebSocket connection failed. Please check network connection or retry.'
-      if (error && error.target && (error.target as WebSocket).readyState === WebSocket.CLOSED) {
-        errorDetail = 'WebSocket connection was closed. Server may be unreachable or network issue.'
-      }
-      statusDescription.value = errorDetail
-      statusType.value = 'danger'
-      
-      emit('statusChange', 'error', 'SSH Connection Failed')
-      notyf.error('SSH Terminal Connection Failed')
+      // 使用nextTick确保状态更新
+      nextTick(() => {
+        statusMessage.value = 'SSH Connection Failed'
+        // 尝试从错误事件中提取更具体的错误信息
+        let errorDetail = 'WebSocket connection failed. Please check network connection or retry.'
+        if (error && error.target && (error.target as WebSocket).readyState === WebSocket.CLOSED) {
+          errorDetail = 'WebSocket connection was closed. Server may be unreachable or network issue.'
+        }
+        statusDescription.value = errorDetail
+        statusType.value = 'danger'
+        
+        emit('statusChange', 'error', 'SSH Connection Failed')
+        notyf.error('SSH Terminal Connection Failed')
+      })
     }
 
     websocket.onclose = (event) => {
       console.log('SSH WebSocket Connection Closed', event)
+      
+      // 强制更新连接状态
       isConnected.value = false
       isConnecting.value = false
       
-      // 只有在正常关闭时才显示info状态，错误关闭保持之前的错误状态
-      if (event.wasClean || statusType.value !== 'danger') {
-        statusMessage.value = 'SSH Connection Closed'
-        statusDescription.value = 'Connection has been terminated'
-        statusType.value = 'info'
-        emit('statusChange', 'disconnected', 'SSH Connection Closed')
-      } else {
-        // 如果是因为错误而关闭，保持错误状态不变
-        console.log('Connection closed due to error, keeping error status')
-        emit('statusChange', 'error', 'SSH Connection Failed')
-      }
+      // 使用nextTick确保状态更新
+      nextTick(() => {
+        // 只有在正常关闭时才显示info状态，错误关闭保持之前的错误状态
+        if (event.wasClean || statusType.value !== 'danger') {
+          statusMessage.value = 'SSH Connection Closed'
+          statusDescription.value = 'Connection has been terminated'
+          statusType.value = 'info'
+          emit('statusChange', 'disconnected', 'SSH Connection Closed')
+        } else {
+          // 如果是因为错误而关闭，确保显示错误状态
+          console.log('Connection closed due to error, setting error status')
+          statusMessage.value = 'SSH Connection Failed'
+          statusDescription.value = 'Connection failed due to network error or server unavailable'
+          statusType.value = 'danger'
+          emit('statusChange', 'error', 'SSH Connection Failed')
+        }
+      })
       
       // Clean up terminal handlers
       if (terminal) {
@@ -398,11 +411,20 @@ const connectSSH = async () => {
 
   } catch (error) {
     console.error('Establish SSH Connection Failed:', error)
+    
+    // 强制更新状态，确保响应性触发
     isConnecting.value = false
+    isConnected.value = false
+    
+    // 使用nextTick确保状态更新顺序
+    await nextTick()
+    
     const errorMsg = error instanceof Error ? error.message : 'Connection Failed, Please Retry'
     statusMessage.value = 'SSH Connection Failed'
     statusDescription.value = `Error Details: ${errorMsg}`
     statusType.value = 'danger'
+    
+    emit('statusChange', 'error', `SSH Connection Failed: ${errorMsg}`)
     notyf.error(`SSH Connection Failed: ${errorMsg}`)
   }
 }
@@ -418,11 +440,16 @@ const disconnectSSH = () => {
     initTerminal() // Reinitialize terminal
   }
   
+  // 强制更新状态
   isConnected.value = false
   isConnecting.value = false
-  statusMessage.value = 'SSH Connection Closed'
-  statusDescription.value = 'Connection has been closed by user'
-  statusType.value = 'info'
+  
+  // 使用nextTick确保状态更新
+  nextTick(() => {
+    statusMessage.value = 'SSH Connection Closed'
+    statusDescription.value = 'Connection has been closed by user'
+    statusType.value = 'info'
+  })
 }
 
 const toggleConnection = () => {

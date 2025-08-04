@@ -101,8 +101,19 @@ const handleHttpAccess = async () => {
     
   } catch (error: any) {
     console.error('Start HTTP access error:', error)
-    notyf.error(error.response?.data?.message || 'Failed to start HTTP access')
     httpLoading.value = false
+    
+    // 设置HTTP错误状态
+    if (accessStatus.value) {
+      accessStatus.value.http = { status: 'error', message: error.response?.data?.message || 'Failed to start HTTP access' }
+    } else {
+      accessStatus.value = {
+        http: { status: 'error', message: error.response?.data?.message || 'Failed to start HTTP access' },
+        ssh: { status: 'disconnected' }
+      }
+    }
+    
+    notyf.error(error.response?.data?.message || 'Failed to start HTTP access')
   }
 }
 
@@ -124,8 +135,19 @@ const handleSshAccess = async () => {
     
   } catch (error: any) {
     console.error('Start SSH access error:', error)
-    notyf.error(error.response?.data?.message || 'Failed to start SSH access')
     sshLoading.value = false
+    
+    // 设置SSH错误状态
+    if (accessStatus.value) {
+      accessStatus.value.ssh = { status: 'error', message: error.response?.data?.message || 'Failed to start SSH access' }
+    } else {
+      accessStatus.value = {
+        http: { status: 'disconnected' },
+        ssh: { status: 'error', message: error.response?.data?.message || 'Failed to start SSH access' }
+      }
+    }
+    
+    notyf.error(error.response?.data?.message || 'Failed to start SSH access')
   }
 }
 
@@ -185,11 +207,37 @@ const fetchAccessStatus = async () => {
     }
   } catch (error) {
     console.error('Get remote access status failed:', error)
-    if (httpLoading.value || sshLoading.value) {
+    
+    // 设置错误状态确保UI正确显示
+    if (httpLoading.value) {
       httpLoading.value = false
-      sshLoading.value = false
-      stopStatusPolling()
+      // 设置HTTP错误状态
+      if (accessStatus.value) {
+        accessStatus.value.http = { status: 'error', message: 'Failed to get status' }
+      } else {
+        accessStatus.value = {
+          http: { status: 'error', message: 'Failed to get status' },
+          ssh: { status: 'disconnected' }
+        }
+      }
+      notyf.error('HTTP connection status check failed')
     }
+    
+    if (sshLoading.value) {
+      sshLoading.value = false
+      // 设置SSH错误状态
+      if (accessStatus.value) {
+        accessStatus.value.ssh = { status: 'error', message: 'Failed to get status' }
+      } else {
+        accessStatus.value = {
+          http: { status: 'disconnected' },
+          ssh: { status: 'error', message: 'Failed to get status' }
+        }
+      }
+      notyf.error('SSH connection status check failed')
+    }
+    
+    stopStatusPolling()
   }
 }
 
