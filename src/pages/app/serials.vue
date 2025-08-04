@@ -873,10 +873,6 @@ useHead({
                 label: 'Created At', 
                 sortable: true
               },
-              bound_at: { 
-                label: 'Bound At', 
-                sortable: true
-              },
               actions: { 
                 label: 'Actions',
                 align: 'end'
@@ -940,13 +936,16 @@ useHead({
 
                   <template v-if="column.key === 'device_model'">
                     <div v-if="serial.deviceModel || serial.device_model" class="device-model-info">
-                      <VTextEllipsis width="140px" class="model-name">
-                        {{ (serial.deviceModel || serial.device_model)?.oemname }} 
-                        {{ (serial.deviceModel || serial.device_model)?.stdname }}
-                      </VTextEllipsis>
-                      <small class="model-type">
-                        {{ (serial.deviceModel || serial.device_model)?.devtype || 'Gateway' }}
-                      </small>
+                      <div class="model-oemname">
+                        <VTextEllipsis width="140px" class="model-name">
+                          {{ (serial.deviceModel || serial.device_model)?.oemname }}
+                        </VTextEllipsis>
+                      </div>
+                      <div class="model-stdname">
+                        <VTextEllipsis width="140px" class="model-std">
+                          {{ (serial.deviceModel || serial.device_model)?.stdname }}
+                        </VTextEllipsis>
+                      </div>
                     </div>
                     <span v-else class="common-text-light">
                       <small>Unknown Model</small>
@@ -982,10 +981,6 @@ useHead({
                     <VDateTimeSplit :date-string="serial.created_at" />
                   </template>
 
-                  <template v-if="column.key === 'bound_at'">
-                    <VDateTimeSplit v-if="serial.bound_at" :date-string="serial.bound_at" />
-                    <span v-else class="common-text-light">-</span>
-                  </template>
 
                   <template v-if="column.key === 'actions'">
                     <VButton 
@@ -1387,17 +1382,21 @@ useHead({
   flex-direction: column;
   gap: 0.25rem;
   
-  .model-name {
-    font-weight: 500;
-    color: var(--dark-text);
-    line-height: 1.2;
+  .model-oemname {
+    .model-name {
+      font-weight: 600;
+      color: var(--primary);
+      line-height: 1.2;
+    }
   }
   
-  .model-type {
-    color: var(--muted-grey);
-    font-size: 0.75rem;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+  .model-stdname {
+    .model-std {
+      font-weight: 500;
+      color: var(--dark-text);
+      line-height: 1.2;
+      font-size: 0.9rem;
+    }
   }
 }
 
