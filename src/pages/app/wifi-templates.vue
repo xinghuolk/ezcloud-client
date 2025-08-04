@@ -228,58 +228,64 @@ useHead({
           <h1 class="title is-3">WiFi Template Management</h1>
           <p class="subtitle is-6">Manage WiFi configuration templates for tri-band multi-SSID devices</p>
         </div>
-        <div class="header-actions">
-          <VButton 
-            color="primary" 
-            raised
-            @click="createTemplate"
-          >
-            <iconify-icon icon="lucide:plus" class="mr-2" />
-            Create Template
-          </VButton>
-        </div>
       </div>
     </div>
 
-    <!-- Filter Bar -->
-    <VCard radius="smooth" class="mb-6">
-      <div class="filter-bar">
-        <div class="filter-left">
-          <VField>
-            <VControl>
-              <VInput
-                v-model="searchQuery"
-                placeholder="Search templates..."
-                icon="feather:search"
-              />
-            </VControl>
-          </VField>
-          
-          <VField>
-            <VControl>
-              <VSelect
-                v-model="activeFilter"
-                placeholder="All Status"
-              >
-                <VOption value="">All Status</VOption>
-                <VOption value="true">Active</VOption>
-                <VOption value="false">Inactive</VOption>
-              </VSelect>
-            </VControl>
-          </VField>
-        </div>
-        
-        <div class="filter-right">
-          <VButton @click="loadTemplates" outlined>
-            <iconify-icon icon="lucide:refresh-cw" class="mr-2" />
-            Refresh
-          </VButton>
+    <!-- Controls -->
+    <VCard>
+      <!-- Filter Section -->
+      <div class="card-content">
+        <div class="columns">
+          <div class="column is-6">
+            <VField>
+              <VLabel>Search Templates</VLabel>
+              <VControl>
+                <VInput
+                  v-model="searchQuery"
+                  placeholder="Search by template name"
+                  icon="lucide:search"
+                />
+              </VControl>
+            </VField>
+          </div>
+          <div class="column is-3">
+            <VField>
+              <VLabel>Status Filter</VLabel>
+              <VControl>
+                <VSelect
+                  v-model="activeFilter"
+                  placeholder="All Status"
+                >
+                  <VOption value="">All Status</VOption>
+                  <VOption value="true">Active</VOption>
+                  <VOption value="false">Inactive</VOption>
+                </VSelect>
+              </VControl>
+            </VField>
+          </div>
+          <div class="column is-3">
+            <VField>
+              <VLabel>&nbsp;</VLabel>
+              <VControl>
+                <div class="field is-grouped">
+                  <div class="control">
+                    <VButton @click="loadTemplates" :loading="loading">
+                      Refresh
+                    </VButton>
+                  </div>
+                  <div class="control">
+                    <VButton color="primary" @click="createTemplate">
+                      Add Template
+                    </VButton>
+                  </div>
+                </div>
+              </VControl>
+            </VField>
+          </div>
         </div>
       </div>
-    </VCard>
 
-    <!-- Templates Table -->
-    <VCard radius="smooth">
+      <!-- WiFi Templates Table -->
       <VFlexTableWrapper
         :columns="{
           name: { 
@@ -670,19 +676,9 @@ useHead({
 </template>
 
 <style lang="scss" scoped>
-
-.filter-bar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 1rem;
-  padding: 1.5rem;
-
-  .filter-left {
-    display: flex;
-    gap: 1rem;
-    align-items: center;
-  }
+:deep(.field.is-grouped) {
+  flex-wrap: wrap;
+  gap: 0.5rem;
 }
 
 .template-name {
@@ -839,16 +835,6 @@ useHead({
 }
 
 @media only screen and (max-width: 767px) {
-  .filter-bar {
-    flex-direction: column;
-    gap: 1rem;
-
-    .filter-left {
-      flex-direction: column;
-      width: 100%;
-    }
-  }
-
   .detail-grid,
   .radio-grid,
   .ssid-grid {

@@ -341,29 +341,27 @@ useHead({
     <!-- Page Header -->
     <div class="common-page-header">
       <div class="header-content">
-        <h1 class="title is-3">Device Model Management</h1>
-        <VButton color="primary" raised @click="handleAdd">
-          <iconify-icon icon="lucide:plus" class="mr-2" />
-          Add Model
-        </VButton>
+        <div class="header-info">
+          <h1 class="title is-3">Device Model Management</h1>
+          <p class="subtitle is-6">Manage device models and specifications</p>
+        </div>
       </div>
     </div>
 
-    <!-- Search & Filter -->
-    <VCard radius="smooth" class="mb-6">
-      <h3 class="title is-6 mb-4">Search & Filter</h3>
-      <div class="common-filter-form">
+    <!-- Controls -->
+    <VCard>
+      <!-- Filter Section -->
+      <div class="card-content">
         <div class="columns is-multiline">
           <div class="column is-3">
             <VField>
-              <VLabel>Search</VLabel>
+              <VLabel>Search Models</VLabel>
               <VControl>
                 <VInput
                   v-model="searchForm.search"
                   placeholder="Search model name, vendor, description"
-                  @keyup.enter="handleSearch"
+                  icon="lucide:search"
                 />
-                <iconify-icon icon="lucide:search" class="form-icon" />
               </VControl>
             </VField>
           </div>
@@ -375,7 +373,6 @@ useHead({
                 <VInput
                   v-model="searchForm.oemname"
                   placeholder="OEM Name"
-                  @keyup.enter="handleSearch"
                 />
               </VControl>
             </VField>
@@ -412,18 +409,25 @@ useHead({
             <VField>
               <VLabel>&nbsp;</VLabel>
               <VControl>
-                <div class="buttons">
-                  <VButton @click="handleReset">Reset Filters</VButton>
+                <div class="field is-grouped">
+                  <div class="control">
+                    <VButton @click="handleReset">
+                      Reset Filters
+                    </VButton>
+                  </div>
+                  <div class="control">
+                    <VButton color="primary" @click="handleAdd">
+                      Add Model
+                    </VButton>
+                  </div>
                 </div>
               </VControl>
             </VField>
           </div>
         </div>
       </div>
-    </VCard>
 
-    <!-- Models Table -->
-    <VCard radius="smooth">
+      <!-- Models Table -->
       <VFlexTableWrapper
         :columns="{
           id: { 
@@ -799,6 +803,10 @@ useHead({
 </template>
 
 <style lang="scss" scoped>
+:deep(.field.is-grouped) {
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
 
 .model-id {
   font-weight: 600;

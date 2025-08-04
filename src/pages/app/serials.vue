@@ -597,24 +597,9 @@ useHead({
     <!-- Page Header -->
     <div class="common-page-header">
       <div class="header-content">
-        <h1 class="title is-3">Serial Number Management</h1>
-        <div class="header-actions">
-          <VButton 
-            color="primary" 
-            raised
-            :loading="generating"
-            @click="handleGenerate"
-          >
-            <iconify-icon icon="lucide:settings" class="mr-2" />
-            Batch Generate
-          </VButton>
-          <VButton 
-            @click="handleRefresh"
-            :loading="loading"
-          >
-            <iconify-icon icon="lucide:refresh-cw" class="mr-2" />
-            Refresh
-          </VButton>
+        <div class="header-info">
+          <h1 class="title is-3">Serial Number Management</h1>
+          <p class="subtitle is-6">Manage device serial numbers and MAC address allocation</p>
         </div>
       </div>
     </div>
@@ -760,23 +745,23 @@ useHead({
       <!-- Serial Numbers Table -->
       <div class="column is-8">
         <VCard radius="smooth">
-          <!-- Search & Filter -->
-          <div class="common-filter-section mb-4">
+          <!-- Filter Section -->
+          <div class="card-content">
             <div class="columns">
-              <div class="column is-4">
+              <div class="column is-3">
                 <VField>
-                  <VLabel>Batch ID</VLabel>
+                  <VLabel>Search Batch ID</VLabel>
                   <VControl>
                     <VInput
                       v-model="searchForm.batch_id"
                       placeholder="Filter by batch ID"
-                      @keyup.enter="handleDebouncedSearch"
+                      icon="lucide:search"
                     />
                   </VControl>
                 </VField>
               </div>
 
-              <div class="column is-3">
+              <div class="column is-2">
                 <VField>
                   <VLabel>Status</VLabel>
                   <VControl>
@@ -808,12 +793,30 @@ useHead({
                 </VField>
               </div>
 
-              <div class="column is-2">
+              <div class="column is-4">
                 <VField>
                   <VLabel>&nbsp;</VLabel>
                   <VControl>
-                    <div class="buttons">
-                      <VButton @click="handleReset">Reset Filters</VButton>
+                    <div class="field is-grouped">
+                      <div class="control">
+                        <VButton @click="handleReset">
+                          Reset Filters
+                        </VButton>
+                      </div>
+                      <div class="control">
+                        <VButton @click="handleRefresh" :loading="loading">
+                          Refresh
+                        </VButton>
+                      </div>
+                      <div class="control">
+                        <VButton 
+                          color="primary" 
+                          :loading="generating"
+                          @click="handleGenerate"
+                        >
+                          Batch Generate
+                        </VButton>
+                      </div>
                     </div>
                   </VControl>
                 </VField>
@@ -1233,6 +1236,10 @@ useHead({
 </template>
 
 <style lang="scss" scoped>
+:deep(.field.is-grouped) {
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
 
 .batch-header {
   display: flex;
