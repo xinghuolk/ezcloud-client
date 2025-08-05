@@ -230,6 +230,7 @@ watch(() => props.open, (isOpen) => {
     title="Device Trust Management" 
     size="large"
     actions="right"
+    cancel-label="Close"
     @close="emit('close')"
   >
     <template #content>
@@ -399,10 +400,6 @@ watch(() => props.open, (isOpen) => {
           </template>
         </VTabs>
       </div>
-    </template>
-
-    <template #action>
-      <VButton @click="emit('close')">Close</VButton>
     </template>
   </VModal>
 </template>

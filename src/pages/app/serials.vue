@@ -216,17 +216,13 @@ const displayBatches = computed(() => {
       created_at: autoRegisteredBatches.value[0]?.created_at || new Date().toISOString()
     }
     
-    return [virtualBatch, ...manualBatches]
+    const result = [virtualBatch, ...manualBatches]
+    return result
+  } else {
+    return manualBatches
   }
-  
-  return manualBatches
 })
 
-// 调试用计算属性
-const debugModels = computed(() => {
-  console.log('computed debugModels called, models.value:', models.value)
-  return models.value
-})
 
 // Methods
 const validateGenerateForm = () => {
@@ -350,9 +346,6 @@ const fetchBatches = async () => {
 const fetchModels = async () => {
   try {
     const response = await modelApi.getAllModels()
-    console.log('fetchModels response:', response)
-    console.log('response type:', typeof response)
-    console.log('response is array:', Array.isArray(response))
     
     // 强制初始化为数组
     if (!models.value) {
@@ -367,10 +360,8 @@ const fetchModels = async () => {
         // 检查是否有models字段（分页响应）
         if (data.models && Array.isArray(data.models)) {
           models.value = data.models
-          console.log('Set models from response.data.models:', models.value.length)
         } else if (Array.isArray(data)) {
           models.value = data
-          console.log('Set models from response.data array:', models.value.length)
         } else {
           console.warn('No models found in response.data:', response.data)
           models.value = []
@@ -378,7 +369,6 @@ const fetchModels = async () => {
       } else if (Array.isArray(response)) {
         // 直接返回数组的情况
         models.value = response
-        console.log('Set models from response array:', models.value.length)
       } else {
         console.warn('Unexpected models response format:', response)
         models.value = []
@@ -388,8 +378,6 @@ const fetchModels = async () => {
       models.value = []
     }
     
-    console.log('Final models.value:', models.value)
-    console.log('Final models.value.length:', models.value?.length)
   } catch (error) {
     console.error('Error fetching models:', error)
     models.value = []
@@ -399,7 +387,6 @@ const fetchModels = async () => {
 const updateStats = () => {
   // 从批次数据计算统计信息
   if (batches.value.length > 0) {
-    console.log('Batches data for stats calculation:', batches.value)
     
     // 确保数值转换为整数，避免字符串拼接
     stats.totalSerials = batches.value.reduce((sum, batch) => {
@@ -437,16 +424,9 @@ const updateStats = () => {
 }
 
 const handleGenerate = async () => {
-  console.log('handleGenerate called')
-  console.log('current models.value:', models.value)
-  console.log('current models.value.length:', models.value?.length)
-  
   if (!models.value || models.value.length === 0) {
-    console.log('Models array is empty or undefined, fetching models...')
     await fetchModels()
   }
-  console.log('Models after potential fetch:', models.value)
-  console.log('Models length after fetch:', models.value?.length)
   resetGenerateForm()
   generateDialogVisible.value = true
 }
@@ -1050,9 +1030,9 @@ useHead({
                 placeholder="Please select device model"
               >
                 <VOption :value="0">Please select device model</VOption>
-                <template v-if="debugModels && debugModels.length > 0">
+                <template v-if="models && models.length > 0">
                   <VOption 
-                    v-for="model in debugModels" 
+                    v-for="model in models" 
                     :key="model.id" 
                     :value="model.id"
                   >
@@ -1060,13 +1040,6 @@ useHead({
                   </VOption>
                 </template>
               </VSelect>
-              <!-- 调试信息 -->
-              <div v-if="debugModels.length === 0" style="color: orange; font-size: 12px; margin-top: 4px;">
-                Debug: No models available ({{ debugModels.length }} models)
-              </div>
-              <div v-else style="color: green; font-size: 12px; margin-top: 4px;">
-                Debug: {{ debugModels.length }} models loaded
-              </div>
               <p v-if="generateErrors.model_id" class="help is-danger">
                 {{ generateErrors.model_id }}
               </p>
@@ -1098,8 +1071,8 @@ useHead({
               </div>
               <div class="help-text">
                 <small class="has-text-info">
-                  Auto: EZ + ModelID(2位) + YYYYMM + 6位递增号<br>
-                  Custom: 自定义起始序列号，最后6位递增
+                  Auto: EZ + ModelID(2 digits) + YYYYMM + 6-digit increment<br>
+                  Custom: Custom starting serial number, last 6 digits increment
                 </small>
               </div>
               <p v-if="generateErrors.mode" class="help is-danger">
@@ -1188,7 +1161,6 @@ useHead({
       </template>
 
       <template #action>
-        <VButton @click="generateDialogVisible = false">Cancel</VButton>
         <VButton 
           color="primary" 
           :loading="generating"

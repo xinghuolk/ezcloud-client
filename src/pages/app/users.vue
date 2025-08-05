@@ -53,6 +53,10 @@ const userForm = reactive({
 // Computed
 const isSuperAdmin = computed(() => userSession.isSuperAdmin)
 const currentUser = computed(() => userSession.user)
+const isEditingSuperAdmin = computed(() => selectedUser.value?.role === 'super_admin')
+const existingSuperAdminCount = computed(() => 
+  users.value.filter(user => user.role === 'super_admin').length
+)
 
 // Table columns definition
 const columns = {
@@ -129,6 +133,7 @@ const openEditDialog = (user: User) => {
   userForm.email = user.email
   userForm.phone = user.phone || ''
   userForm.password = '' // 重置密码字段
+  // Super Admin的role保持不变，其他用户正常设置
   userForm.role = user.role === 'super_admin' ? 'admin' : user.role
   userForm.is_active = user.is_active
   editDialogOpen.value = true
@@ -138,6 +143,12 @@ const openEditDialog = (user: User) => {
 const handleCreate = async () => {
   if (!userForm.username.trim() || !userForm.email.trim() || !userForm.password.trim()) {
     notyf.error('Please fill in all required fields')
+    return
+  }
+
+  // 防止创建多个Super Admin（虽然UI不允许选择，但安全检查）
+  if (userForm.role === 'super_admin' && existingSuperAdminCount.value > 0) {
+    notyf.error('Only one Super Admin user is allowed')
     return
   }
 
@@ -174,7 +185,8 @@ const handleUpdate = async () => {
       username: userForm.username.trim(),
       email: userForm.email.trim(),
       phone: userForm.phone.trim() || undefined,
-      role: userForm.role,
+      // 保护Super Admin的role不被修改
+      role: isEditingSuperAdmin.value ? selectedUser.value.role : userForm.role,
       is_active: userForm.is_active
     }
 
@@ -545,11 +557,18 @@ onMounted(() => {
         <VField>
           <VLabel>Role</VLabel>
           <VControl>
-            <VSelect v-model="userForm.role">
+            <VSelect 
+              v-model="userForm.role" 
+              :disabled="isEditingSuperAdmin"
+            >
               <VOption value="user">User</VOption>
               <VOption value="admin">Admin</VOption>
             </VSelect>
           </VControl>
+          <p v-if="isEditingSuperAdmin" class="help has-text-info">
+            <VIcon icon="lucide:info" />
+            Super Admin role cannot be changed for security reasons
+          </p>
         </VField>
 
         <VField>

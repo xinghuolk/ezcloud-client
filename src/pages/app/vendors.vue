@@ -22,6 +22,10 @@ const createDialogOpen = ref(false)
 const editDialogOpen = ref(false)
 const selectedVendor = ref<Vendor | null>(null)
 
+// Delete confirmation
+const deleteConfirmOpen = ref(false)
+const selectedVendorForDelete = ref<Vendor | null>(null)
+
 // Search debounce
 let searchTimeout: NodeJS.Timeout | null = null
 
@@ -114,14 +118,22 @@ const handleUpdate = async () => {
   }
 }
 
-const handleDelete = async (vendor: Vendor) => {
-  if (!confirm(`Are you sure you want to delete vendor "${vendor.name}"?`)) {
-    return
-  }
+const handleDelete = (vendor: Vendor) => {
+  selectedVendorForDelete.value = vendor
+  deleteConfirmOpen.value = true
+}
 
-  const success = await vendorStore.deleteVendor(vendor.id)
-  if (success) {
-    fetchVendors()
+const confirmDelete = async () => {
+  if (!selectedVendorForDelete.value) return
+  
+  try {
+    const success = await vendorStore.deleteVendor(selectedVendorForDelete.value.id)
+    if (success) {
+      fetchVendors()
+    }
+  } finally {
+    deleteConfirmOpen.value = false
+    selectedVendorForDelete.value = null
   }
 }
 
@@ -416,6 +428,41 @@ useHead({
       <template #action>
         <VButton color="primary" @click="handleUpdate">
           Update Vendor
+        </VButton>
+      </template>
+    </VModal>
+
+    <!-- Delete Confirmation Modal -->
+    <VModal
+      :open="deleteConfirmOpen"
+      title="Confirm Delete"
+      size="small"
+      actions="center"
+      @close="() => { deleteConfirmOpen = false; selectedVendorForDelete = null }"
+    >
+      <template #content>
+        <div class="has-text-centered">
+          <iconify-icon 
+            icon="lucide:trash-2" 
+            class="has-text-danger"
+            style="font-size: 3rem; margin-bottom: 1rem;"
+          />
+          <h3 class="title is-5">Delete Vendor</h3>
+          <p class="subtitle is-6" v-if="selectedVendorForDelete">
+            Are you sure you want to delete vendor <strong>"{{ selectedVendorForDelete.name }}"</strong>?
+          </p>
+          <p class="has-text-grey">
+            This action cannot be undone.
+          </p>
+        </div>
+      </template>
+      
+      <template #action>
+        <VButton 
+          color="danger"
+          @click="confirmDelete"
+        >
+          Delete Vendor
         </VButton>
       </template>
     </VModal>

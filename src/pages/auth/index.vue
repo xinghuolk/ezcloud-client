@@ -280,6 +280,7 @@ useHead({
       title="User Registration"
       size="small"
       actions="right"
+      cancelLabel="Cancel"
       @close="showRegister = false"
     >
       <template #content>
@@ -356,7 +357,6 @@ useHead({
       </template>
       
       <template #action>
-        <VButton @click="showRegister = false">Cancel</VButton>
         <VButton 
           color="primary" 
           :loading="registerLoading"

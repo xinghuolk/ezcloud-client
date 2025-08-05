@@ -178,11 +178,12 @@ export const serialApi = {
     return request.get('/serials', { params })
   },
 
-  // 获取批次列表
+  // 获取所有批次列表（不分页）
   getBatches: (): Promise<ApiResponse<{ 
     batches: { batch_id: string; count: number; created_at: string }[]; 
     pagination: { page: number; limit: number; total: number; pages: number }
   }>> => {
+    // ✅ 后端已优化：使用CASE WHEN确保AUTO_REGISTERED_DEVICES总是排在前面，返回所有批次
     return request.get('/serials/batches')
   },
 

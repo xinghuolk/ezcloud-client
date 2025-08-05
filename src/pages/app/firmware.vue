@@ -30,6 +30,14 @@ const archiveConfirmOpen = ref(false)
 const selectedFirmwareForPublish = ref<FirmwareVersion | null>(null)
 const selectedFirmwareForArchive = ref<FirmwareVersion | null>(null)
 
+// Delete confirmation
+const deleteConfirmOpen = ref(false)
+const selectedFirmwareForDelete = ref<FirmwareVersion | null>(null)
+
+// Remove test device confirmation
+const removeTestDeviceConfirmOpen = ref(false)
+const selectedDeviceSerialForRemove = ref<string>('')
+
 // 测试相关状态
 const testManageDialogOpen = ref(false)
 const testProgressDialogOpen = ref(false)
@@ -360,17 +368,25 @@ const updateStatus = async (firmware: FirmwareVersion, newStatus: 'PUBLISHED' | 
 }
 
 // 删除固件
-const deleteFirmware = async (firmware: FirmwareVersion) => {
+const deleteFirmware = (firmware: FirmwareVersion) => {
   if (firmware.status !== 'DRAFT') {
     notyf.error('Only draft firmware can be deleted')
     return
   }
   
-  if (!confirm(`Are you sure you want to delete firmware version ${firmware.version}?`)) {
-    return
-  }
+  selectedFirmwareForDelete.value = firmware
+  deleteConfirmOpen.value = true
+}
+
+const confirmDeleteFirmware = async () => {
+  if (!selectedFirmwareForDelete.value) return
   
-  await firmwareStore.deleteFirmware(firmware.id)
+  try {
+    await firmwareStore.deleteFirmware(selectedFirmwareForDelete.value.id)
+  } finally {
+    deleteConfirmOpen.value = false
+    selectedFirmwareForDelete.value = null
+  }
 }
 
 // Handle upload success confirmation
@@ -553,11 +569,19 @@ const addTestDevices = async () => {
   }
 }
 
-const removeTestDevice = async (serial: string) => {
-  if (!selectedFirmwareForTest.value) return
+const removeTestDevice = (serial: string) => {
+  selectedDeviceSerialForRemove.value = serial
+  removeTestDeviceConfirmOpen.value = true
+}
+
+const confirmRemoveTestDevice = async () => {
+  if (!selectedFirmwareForTest.value || !selectedDeviceSerialForRemove.value) return
   
-  if (confirm(`Are you sure you want to remove test device ${serial}?`)) {
-    await firmwareStore.deleteTestDevice(selectedFirmwareForTest.value.id, serial)
+  try {
+    await firmwareStore.deleteTestDevice(selectedFirmwareForTest.value.id, selectedDeviceSerialForRemove.value)
+  } finally {
+    removeTestDeviceConfirmOpen.value = false
+    selectedDeviceSerialForRemove.value = ''
   }
 }
 
@@ -1595,6 +1619,76 @@ onUnmounted(() => {
           @click="finishTesting(true)"
         >
           Force Finish
+        </VButton>
+      </template>
+    </VModal>
+
+    <!-- Delete Firmware Confirmation Modal -->
+    <VModal
+      :open="deleteConfirmOpen"
+      title="Confirm Delete"
+      size="small"
+      actions="center"
+      @close="() => { deleteConfirmOpen = false; selectedFirmwareForDelete = null }"
+    >
+      <template #content>
+        <div class="has-text-centered">
+          <iconify-icon 
+            icon="lucide:trash-2" 
+            class="has-text-danger"
+            style="font-size: 3rem; margin-bottom: 1rem;"
+          />
+          <h3 class="title is-5">Delete Firmware</h3>
+          <p class="subtitle is-6" v-if="selectedFirmwareForDelete">
+            Are you sure you want to delete firmware version <strong>{{ selectedFirmwareForDelete.version }}</strong>?
+          </p>
+          <p class="has-text-grey">
+            This action cannot be undone.
+          </p>
+        </div>
+      </template>
+      
+      <template #action>
+        <VButton 
+          color="danger"
+          @click="confirmDeleteFirmware"
+        >
+          Delete Firmware
+        </VButton>
+      </template>
+    </VModal>
+
+    <!-- Remove Test Device Confirmation Modal -->
+    <VModal
+      :open="removeTestDeviceConfirmOpen"
+      title="Remove Test Device"
+      size="small"
+      actions="center"
+      @close="() => { removeTestDeviceConfirmOpen = false; selectedDeviceSerialForRemove = '' }"
+    >
+      <template #content>
+        <div class="has-text-centered">
+          <iconify-icon 
+            icon="lucide:user-x" 
+            class="has-text-warning"
+            style="font-size: 3rem; margin-bottom: 1rem;"
+          />
+          <h3 class="title is-5">Remove Test Device</h3>
+          <p class="subtitle is-6" v-if="selectedDeviceSerialForRemove">
+            Are you sure you want to remove test device <strong>{{ selectedDeviceSerialForRemove }}</strong>?
+          </p>
+          <p class="has-text-grey">
+            This device will no longer participate in firmware testing.
+          </p>
+        </div>
+      </template>
+      
+      <template #action>
+        <VButton 
+          color="warning"
+          @click="confirmRemoveTestDevice"
+        >
+          Remove Device
         </VButton>
       </template>
     </VModal>

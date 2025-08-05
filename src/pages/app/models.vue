@@ -42,6 +42,10 @@ const dialogVisible = ref(false)
 const detailDialogVisible = ref(false)
 const editingId = ref<number | null>(null)
 
+// Delete confirmation
+const deleteConfirmOpen = ref(false)
+const selectedModelForDelete = ref<DeviceModel | null>(null)
+
 // Search form
 const searchForm = reactive({
   search: '',
@@ -195,13 +199,16 @@ const handleView = (model: DeviceModel) => {
   detailDialogVisible.value = true
 }
 
-const handleDelete = async (model: DeviceModel) => {
-  if (!confirm(`Are you sure you want to delete model "${model.stdname}" by ${model.oemname}? This action cannot be undone.`)) {
-    return
-  }
+const handleDelete = (model: DeviceModel) => {
+  selectedModelForDelete.value = model
+  deleteConfirmOpen.value = true
+}
+
+const confirmDelete = async () => {
+  if (!selectedModelForDelete.value) return
   
   try {
-    const response = await modelApi.deleteModel(model.id)
+    const response = await modelApi.deleteModel(selectedModelForDelete.value.id)
     if (response.success) {
       notyf.success('Model deleted successfully')
       fetchModels()
@@ -211,6 +218,9 @@ const handleDelete = async (model: DeviceModel) => {
   } catch (error) {
     console.error('Error deleting model:', error)
     notyf.error('Failed to delete model')
+  } finally {
+    deleteConfirmOpen.value = false
+    selectedModelForDelete.value = null
   }
 }
 
@@ -803,6 +813,41 @@ useHead({
             </div>
           </div>
         </div>
+      </template>
+    </VModal>
+
+    <!-- Delete Confirmation Modal -->
+    <VModal
+      :open="deleteConfirmOpen"
+      title="Confirm Delete"
+      size="small"
+      actions="center"
+      @close="() => { deleteConfirmOpen = false; selectedModelForDelete = null }"
+    >
+      <template #content>
+        <div class="has-text-centered">
+          <iconify-icon 
+            icon="lucide:trash-2" 
+            class="has-text-danger"
+            style="font-size: 3rem; margin-bottom: 1rem;"
+          />
+          <h3 class="title is-5">Delete Device Model</h3>
+          <p class="subtitle is-6" v-if="selectedModelForDelete">
+            Are you sure you want to delete model <strong>"{{ selectedModelForDelete.stdname }}"</strong> by {{ selectedModelForDelete.oemname }}?
+          </p>
+          <p class="has-text-grey">
+            This action cannot be undone.
+          </p>
+        </div>
+      </template>
+      
+      <template #action>
+        <VButton 
+          color="danger"
+          @click="confirmDelete"
+        >
+          Delete Model
+        </VButton>
       </template>
     </VModal>
   </div>

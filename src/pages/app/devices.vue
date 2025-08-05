@@ -25,8 +25,12 @@ const bindDialogOpen = ref(false)
 const detailsDialogOpen = ref(false)
 const batchDialogOpen = ref(false)
 const trustDialogOpen = ref(false)
+const rebootConfirmOpen = ref(false)
+const unbindConfirmOpen = ref(false)
 const selectedDevices = ref<Device[]>([])
 const selectedDevice = ref<Device | null>(null)
+const selectedDeviceForReboot = ref<Device | null>(null)
+const selectedDeviceForUnbind = ref<Device | null>(null)
 const activeTab = ref('basic')
 const wifiData = ref<any>(null)
 const modemData = ref<any>(null)
@@ -44,7 +48,6 @@ const filterForm = reactive<DeviceQuery>({
   is_online: undefined,
   is_activate: undefined,
   oemname: '',
-  stdname: '',
   version: ''
 })
 
@@ -118,7 +121,6 @@ const handleReset = () => {
     is_online: undefined,
     is_activate: undefined,
     oemname: '',
-    stdname: '',
     version: ''
   })
   filterForm.page = 1
@@ -155,15 +157,20 @@ const handleBindDevice = async () => {
   }
 }
 
-const handleUnbind = async (device: Device) => {
-  if (!confirm(`Are you sure you want to unbind device "${device.serial}"? This will remove the device from your account.`)) {
-    return
-  }
+const handleUnbind = (device: Device) => {
+  selectedDeviceForUnbind.value = device
+  unbindConfirmOpen.value = true
+}
+
+const confirmUnbind = async () => {
+  if (!selectedDeviceForUnbind.value) return
   
-  const success = await deviceStore.unbindDevice(device.id)
+  const success = await deviceStore.unbindDevice(selectedDeviceForUnbind.value.id)
   if (success) {
     fetchDevices()
   }
+  unbindConfirmOpen.value = false
+  selectedDeviceForUnbind.value = null
 }
 
 const handleBatchOperation = async () => {
@@ -189,8 +196,17 @@ const handleBatchOperation = async () => {
   }
 }
 
-const handleReboot = async (device: Device) => {
-  await deviceStore.rebootDevice(device.id)
+const handleReboot = (device: Device) => {
+  selectedDeviceForReboot.value = device
+  rebootConfirmOpen.value = true
+}
+
+const confirmReboot = async () => {
+  if (!selectedDeviceForReboot.value) return
+  
+  await deviceStore.rebootDevice(selectedDeviceForReboot.value.id)
+  rebootConfirmOpen.value = false
+  selectedDeviceForReboot.value = null
 }
 
 const handleSIMSwitch = async (device: Device, slot: number) => {
@@ -489,10 +505,6 @@ watch(() => filterForm.oemname, () => {
   handleDebouncedSearch()
 })
 
-watch(() => filterForm.stdname, () => {
-  handleDebouncedSearch()
-})
-
 watch(() => filterForm.version, () => {
   handleDebouncedSearch()
 })
@@ -609,7 +621,7 @@ useHead({
               <VLabel>Model</VLabel>
               <VControl>
                 <VInput
-                  v-model="filterForm.stdname"
+                  v-model="filterForm.oemname"
                   placeholder="Filter by model"
                 />
               </VControl>
@@ -787,9 +799,6 @@ useHead({
                   <VTextEllipsis width="120px" class="has-text-weight-semibold model-brand">
                     {{ device.deviceModel.oemname }}
                   </VTextEllipsis>
-                  <VTextEllipsis width="120px" class="common-text-light model-name">
-                    <small>{{ device.deviceModel.stdname }}</small>
-                  </VTextEllipsis>
                 </div>
                 <span v-else class="common-text-light">-</span>
               </template>
@@ -908,7 +917,7 @@ useHead({
                     </a>
                     <hr v-if="canOperateDevice(device)" class="dropdown-divider">
                     <a 
-                      v-if="canOperateDevice(device)"
+                      v-if="canOperateDevice(device) && device.is_online"
                       class="dropdown-item is-media" 
                       @click="handleReboot(device)"
                     >
@@ -920,7 +929,20 @@ useHead({
                       </div>
                     </a>
                     <a 
-                      v-if="canOperateDevice(device)"
+                      v-if="canOperateDevice(device) && !device.is_online"
+                      class="dropdown-item is-media is-disabled" 
+                      style="cursor: not-allowed; opacity: 0.5;"
+                      title="Device must be online to reboot"
+                    >
+                      <div class="icon">
+                        <iconify-icon icon="lucide:refresh-cw" />
+                      </div>
+                      <div class="meta">
+                        <span>Reboot (Offline)</span>
+                      </div>
+                    </a>
+                    <a 
+                      v-if="canOperateDevice(device) && device.is_online"
                       class="dropdown-item is-media" 
                       @click="handleSIMSwitch(device, 1)"
                     >
@@ -932,7 +954,7 @@ useHead({
                       </div>
                     </a>
                     <a 
-                      v-if="canOperateDevice(device)"
+                      v-if="canOperateDevice(device) && device.is_online"
                       class="dropdown-item is-media" 
                       @click="handleSIMSwitch(device, 2)"
                     >
@@ -943,6 +965,32 @@ useHead({
                         <span>Switch to Slot 2</span>
                       </div>
                     </a>
+                    <template v-if="canOperateDevice(device) && !device.is_online">
+                      <a 
+                        class="dropdown-item is-media is-disabled" 
+                        style="cursor: not-allowed; opacity: 0.5;"
+                        title="Device must be online for SIM operations"
+                      >
+                        <div class="icon">
+                          <iconify-icon icon="lucide:sim-card" />
+                        </div>
+                        <div class="meta">
+                          <span>Switch to Slot 1 (Offline)</span>
+                        </div>
+                      </a>
+                      <a 
+                        class="dropdown-item is-media is-disabled" 
+                        style="cursor: not-allowed; opacity: 0.5;"
+                        title="Device must be online for SIM operations"
+                      >
+                        <div class="icon">
+                          <iconify-icon icon="lucide:sim-card" />
+                        </div>
+                        <div class="meta">
+                          <span>Switch to Slot 2 (Offline)</span>
+                        </div>
+                      </a>
+                    </template>
                     <hr class="dropdown-divider">
                     <a 
                       v-if="isAdmin" 
@@ -1064,12 +1112,8 @@ useHead({
                     <span class="device-info-value">{{ selectedDevice.name || 'Unnamed Device' }}</span>
                   </div>
                   <div class="device-info-item">
-                    <label>Brand</label>
-                    <span class="device-info-value">{{ selectedDevice.deviceModel?.oemname || '-' }}</span>
-                  </div>
-                  <div class="device-info-item">
                     <label>Model</label>
-                    <span class="device-info-value">{{ selectedDevice.deviceModel?.stdname || '-' }}</span>
+                    <span class="device-info-value">{{ selectedDevice.deviceModel?.oemname || '-' }}</span>
                   </div>
                   <div class="device-info-item">
                     <label>MAC Address</label>
@@ -1542,6 +1586,76 @@ useHead({
       @close="trustDialogOpen = false"
       @updated="handleTrustUpdated"
     />
+
+    <!-- Reboot Confirmation Dialog -->
+    <VModal 
+      :open="rebootConfirmOpen"
+      title="Confirm Reboot"
+      size="small"
+      actions="center"
+      @close="rebootConfirmOpen = false"
+    >
+      <template #content>
+        <div class="has-text-centered">
+          <iconify-icon 
+            icon="lucide:refresh-cw" 
+            class="has-text-warning"
+            style="font-size: 3rem; margin-bottom: 1rem;"
+          />
+          <h3 class="title is-5">Reboot Device</h3>
+          <p class="subtitle is-6" v-if="selectedDeviceForReboot">
+            Are you sure you want to reboot device "<strong>{{ selectedDeviceForReboot.serial }}</strong>"?
+          </p>
+          <p class="has-text-grey">
+            The reboot process takes about 1-2 minutes and the device will be temporarily disconnected.
+          </p>
+        </div>
+      </template>
+      
+      <template #action>
+        <VButton 
+          color="warning"
+          @click="confirmReboot"
+        >
+          Confirm Reboot
+        </VButton>
+      </template>
+    </VModal>
+
+    <!-- Unbind Confirmation Dialog -->
+    <VModal 
+      :open="unbindConfirmOpen"
+      title="Confirm Unbind Device"
+      size="small"
+      actions="center"
+      @close="unbindConfirmOpen = false"
+    >
+      <template #content>
+        <div class="has-text-centered">
+          <iconify-icon 
+            icon="lucide:unlink" 
+            class="has-text-danger"
+            style="font-size: 3rem; margin-bottom: 1rem;"
+          />
+          <h3 class="title is-5">Unbind Device</h3>
+          <p class="subtitle is-6" v-if="selectedDeviceForUnbind">
+            Are you sure you want to unbind device "<strong>{{ selectedDeviceForUnbind.serial }}</strong>"?
+          </p>
+          <p class="has-text-grey">
+            This will remove the device from your account permanently. This action cannot be undone.
+          </p>
+        </div>
+      </template>
+      
+      <template #action>
+        <VButton 
+          color="danger"
+          @click="confirmUnbind"
+        >
+          Unbind Device
+        </VButton>
+      </template>
+    </VModal>
   </div>
 </template>
 

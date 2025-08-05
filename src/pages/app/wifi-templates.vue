@@ -27,8 +27,10 @@ const activeFilter = ref('')
 const showDetailDialog = ref(false)
 const showEditDialog = ref(false)
 const showCreateDialog = ref(false)
+const deleteConfirmOpen = ref(false)
 const viewingTemplate = ref<WiFiTemplate | null>(null)
 const editingTemplate = ref<WiFiTemplate | null>(null)
+const selectedTemplateForDelete = ref<WiFiTemplate | null>(null)
 const loadingDetails = ref(false)
 const submittingCreate = ref(false)
 const submittingEdit = ref(false)
@@ -449,13 +451,16 @@ const toggleTemplateStatus = async (template: WiFiTemplate) => {
 }
 
 // Delete template
-const deleteTemplate = async (template: WiFiTemplate) => {
-  if (!confirm(`Are you sure you want to delete WiFi template "${template.name}"? This action cannot be undone.`)) {
-    return
-  }
+const deleteTemplate = (template: WiFiTemplate) => {
+  selectedTemplateForDelete.value = template
+  deleteConfirmOpen.value = true
+}
+
+const confirmDeleteTemplate = async () => {
+  if (!selectedTemplateForDelete.value) return
   
   try {
-    const response = await wifiTemplatesApi.deleteTemplate(template.id!)
+    const response = await wifiTemplatesApi.deleteTemplate(selectedTemplateForDelete.value.id!)
     if (response.success) {
       notyf.success('Template deleted successfully')
       loadTemplates()
@@ -463,6 +468,9 @@ const deleteTemplate = async (template: WiFiTemplate) => {
   } catch (error) {
     console.error('Delete template error:', error)
     notyf.error('Failed to delete template')
+  } finally {
+    deleteConfirmOpen.value = false
+    selectedTemplateForDelete.value = null
   }
 }
 
@@ -779,6 +787,7 @@ useHead({
       title="Template Details"
       size="large"
       actions="right"
+      cancel-label="Close"
       @close="showDetailDialog = false"
     >
       <template #content>
@@ -865,10 +874,6 @@ useHead({
             </div>
           </div>
         </div>
-      </template>
-      
-      <template #action>
-        <VButton @click="showDetailDialog = false">Close</VButton>
       </template>
     </VModal>
 
@@ -1511,6 +1516,41 @@ useHead({
           @click="submitCreateTemplate"
         >
           Create Template
+        </VButton>
+      </template>
+    </VModal>
+
+    <!-- Delete Template Confirmation Dialog -->
+    <VModal 
+      :open="deleteConfirmOpen"
+      title="Confirm Delete Template"
+      size="small"
+      actions="center"
+      @close="deleteConfirmOpen = false"
+    >
+      <template #content>
+        <div class="has-text-centered">
+          <iconify-icon 
+            icon="lucide:trash-2" 
+            class="has-text-danger"
+            style="font-size: 3rem; margin-bottom: 1rem;"
+          />
+          <h3 class="title is-5">Delete WiFi Template</h3>
+          <p class="subtitle is-6" v-if="selectedTemplateForDelete">
+            Are you sure you want to delete WiFi template "<strong>{{ selectedTemplateForDelete.name }}</strong>"?
+          </p>
+          <p class="has-text-grey">
+            This action cannot be undone.
+          </p>
+        </div>
+      </template>
+      
+      <template #action>
+        <VButton 
+          color="danger"
+          @click="confirmDeleteTemplate"
+        >
+          Delete Template
         </VButton>
       </template>
     </VModal>

@@ -31,6 +31,10 @@ const detailsDialogVisible = ref(false)
 const showBatchOperationDialog = ref(false)
 const activeTab = ref('basic')
 
+// Unbind confirmation
+const unbindConfirmOpen = ref(false)
+const selectedDeviceForUnbind = ref<Device | null>(null)
+
 // Filter form
 const filterForm = reactive<DeviceQuery>({
   page: 1,
@@ -159,19 +163,25 @@ const handleBindDevice = async () => {
   }
 }
 
-const handleUnbind = async (device: Device) => {
-  if (!confirm(`Are you sure you want to unbind device "${device.serial}"? This will remove the device from your account.`)) {
-    return
-  }
+const handleUnbind = (device: Device) => {
+  selectedDeviceForUnbind.value = device
+  unbindConfirmOpen.value = true
+}
+
+const confirmUnbind = async () => {
+  if (!selectedDeviceForUnbind.value) return
   
   try {
-    const success = await deviceStore.unbindDevice(device.id)
+    const success = await deviceStore.unbindDevice(selectedDeviceForUnbind.value.id)
     if (success) {
       notyf.success('Device unbound successfully')
       fetchDevices()
     }
   } catch (error) {
     console.error('Error unbinding device:', error)
+  } finally {
+    unbindConfirmOpen.value = false
+    selectedDeviceForUnbind.value = null
   }
 }
 
@@ -720,6 +730,41 @@ useHead({
             </div>
           </VTabs>
         </div>
+      </template>
+    </VModal>
+
+    <!-- Unbind Device Confirmation Modal -->
+    <VModal
+      :open="unbindConfirmOpen"
+      title="Unbind Device"
+      size="small"
+      actions="center"
+      @close="() => { unbindConfirmOpen = false; selectedDeviceForUnbind = null }"
+    >
+      <template #content>
+        <div class="has-text-centered">
+          <iconify-icon 
+            icon="lucide:unlink" 
+            class="has-text-warning"
+            style="font-size: 3rem; margin-bottom: 1rem;"
+          />
+          <h3 class="title is-5">Unbind Device</h3>
+          <p class="subtitle is-6" v-if="selectedDeviceForUnbind">
+            Are you sure you want to unbind device <strong>"{{ selectedDeviceForUnbind.serial }}"</strong>?
+          </p>
+          <p class="has-text-grey">
+            This will remove the device from your account.
+          </p>
+        </div>
+      </template>
+      
+      <template #action>
+        <VButton 
+          color="warning"
+          @click="confirmUnbind"
+        >
+          Unbind Device
+        </VButton>
       </template>
     </VModal>
   </div>
