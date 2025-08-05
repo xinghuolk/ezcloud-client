@@ -30,7 +30,9 @@ let searchTimeout: NodeJS.Timeout | null = null
 // Dialog controls
 const generateDialogVisible = ref(false)
 const detailDialogVisible = ref(false)
+const deleteBatchConfirmOpen = ref(false)
 const selectedSerial = ref<SerialNumber | null>(null)
+const selectedBatchForDelete = ref<string>('')
 
 // Generate form
 const generateForm = reactive<GenerateSerialParams>({
@@ -74,6 +76,56 @@ const generateErrors = ref({
   mac_interval: '',
   mode: '',
   custom_start_serial: ''
+})
+
+// 动态列配置
+const tableColumns = computed(() => {
+  const baseColumns: Record<string, any> = {
+    serial: { 
+      label: 'Serial Number', 
+      searchable: true,
+      sortable: true,
+      bold: true,
+      grow: true
+    },
+    batch_id: { 
+      label: 'Batch ID', 
+      searchable: true,
+      sortable: true
+    },
+    mac_info: { 
+      label: 'MAC Info',
+      grow: 'lg' as const
+    },
+    status: { 
+      label: 'Status', 
+      searchable: true,
+      sortable: true,
+      align: 'center' as const
+    },
+    created_at: { 
+      label: 'Created At', 
+      sortable: true
+    },
+    actions: { 
+      label: 'Actions',
+      align: 'end' as const
+    }
+  }
+  
+  // 只有在虚拟批次中才显示设备型号列
+  if (currentBatch.value === VIRTUAL_AUTO_REGISTERED_ID) {
+    return {
+      ...baseColumns,
+      device_model: {
+        label: 'Device Model',
+        searchable: true,
+        sortable: true
+      }
+    }
+  }
+  
+  return baseColumns
 })
 
 // Computed
@@ -310,12 +362,14 @@ const fetchModels = async () => {
     // 兼容处理：如果响应有success字段，使用response.data；否则直接使用response
     if (response && typeof response === 'object') {
       if ('success' in response && response.success && response.data) {
+        // 类型断言以支持分页响应
+        const data = response.data as any
         // 检查是否有models字段（分页响应）
-        if (response.data.models && Array.isArray(response.data.models)) {
-          models.value = response.data.models
+        if (data.models && Array.isArray(data.models)) {
+          models.value = data.models
           console.log('Set models from response.data.models:', models.value.length)
-        } else if (Array.isArray(response.data)) {
-          models.value = response.data
+        } else if (Array.isArray(data)) {
+          models.value = data
           console.log('Set models from response.data array:', models.value.length)
         } else {
           console.warn('No models found in response.data:', response.data)
@@ -494,16 +548,19 @@ const handleExportBatch = async (batchId: string) => {
   }
 }
 
-const handleDeleteBatch = async (batchId: string) => {
-  if (!confirm('Are you sure you want to delete this batch? This will permanently delete all serial numbers in this batch and cannot be undone.')) {
-    return
-  }
+const handleDeleteBatch = (batchId: string) => {
+  selectedBatchForDelete.value = batchId
+  deleteBatchConfirmOpen.value = true
+}
+
+const confirmDeleteBatch = async () => {
+  if (!selectedBatchForDelete.value) return
   
   try {
-    const response = await serialApi.deleteBatch(batchId)
+    const response = await serialApi.deleteBatch(selectedBatchForDelete.value)
     if (response.success) {
       notyf.success('Batch deleted successfully')
-      if (currentBatch.value === batchId) {
+      if (currentBatch.value === selectedBatchForDelete.value) {
         currentBatch.value = ''
       }
       fetchSerials()
@@ -514,6 +571,9 @@ const handleDeleteBatch = async (batchId: string) => {
   } catch (error) {
     console.error('Error deleting batch:', error)
     notyf.error('Failed to delete batch')
+  } finally {
+    deleteBatchConfirmOpen.value = false
+    selectedBatchForDelete.value = ''
   }
 }
 
@@ -840,44 +900,7 @@ useHead({
 
           <!-- Serials Table -->
           <VFlexTableWrapper
-            :columns="{
-              serial: { 
-                label: 'Serial Number', 
-                searchable: true,
-                sortable: true,
-                bold: true,
-                grow: true
-              },
-              batch_id: { 
-                label: 'Batch ID', 
-                searchable: true,
-                sortable: true
-              },
-              device_model: {
-                label: 'Device Model',
-                searchable: true,
-                sortable: true,
-                show: currentBatch === VIRTUAL_AUTO_REGISTERED_ID
-              },
-              mac_info: { 
-                label: 'MAC Info',
-                grow: 'lg'
-              },
-              status: { 
-                label: 'Status', 
-                searchable: true,
-                sortable: true,
-                align: 'center'
-              },
-              created_at: { 
-                label: 'Created At', 
-                sortable: true
-              },
-              actions: { 
-                label: 'Actions',
-                align: 'end'
-              }
-            }"
+            :columns="tableColumns"
             :data="sortedFilteredSerials"
             :loading="loading"
           >
@@ -1182,6 +1205,7 @@ useHead({
       title="Serial Number Details"
       size="medium"
       actions="right"
+      cancel-label="Close"
       @close="detailDialogVisible = false"
     >
       <template #content>
@@ -1228,9 +1252,40 @@ useHead({
           </div>
         </div>
       </template>
+    </VModal>
 
+    <!-- Delete Batch Confirmation Dialog -->
+    <VModal 
+      :open="deleteBatchConfirmOpen"
+      title="Confirm Delete Batch"
+      size="small"
+      actions="center"
+      @close="deleteBatchConfirmOpen = false"
+    >
+      <template #content>
+        <div class="has-text-centered">
+          <iconify-icon 
+            icon="lucide:trash-2" 
+            class="has-text-danger"
+            style="font-size: 3rem; margin-bottom: 1rem;"
+          />
+          <h3 class="title is-5">Delete Batch</h3>
+          <p class="subtitle is-6">
+            Are you sure you want to delete this batch?
+          </p>
+          <p class="has-text-grey">
+            This will permanently delete all serial numbers in this batch and cannot be undone.
+          </p>
+        </div>
+      </template>
+      
       <template #action>
-        <VButton @click="detailDialogVisible = false">Close</VButton>
+        <VButton 
+          color="danger"
+          @click="confirmDeleteBatch"
+        >
+          Delete Batch
+        </VButton>
       </template>
     </VModal>
   </div>

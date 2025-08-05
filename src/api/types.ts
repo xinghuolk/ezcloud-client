@@ -186,6 +186,8 @@ export interface SerialNumber {
   status: 'unused' | 'bound' | 'activated'
   created_at: string
   bound_at?: string
+  deviceModel?: DeviceModel  // 关联的设备型号信息
+  device_model?: DeviceModel // 备用字段名
 }
 
 export interface GenerateSerialParams {
