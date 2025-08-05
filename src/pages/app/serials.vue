@@ -134,9 +134,8 @@ const filteredSerials = computed(() => {
   
   // 处理虚拟批次ID的特殊情况
   if (currentBatch.value === VIRTUAL_AUTO_REGISTERED_ID) {
-    // 显示所有属于AUTO_REGISTERED_DEVICES的序列号
-    const autoRegBatchIdSet = new Set(autoRegisteredBatchIds.value)
-    return serials.value.filter(s => autoRegBatchIdSet.has(s.batch_id))
+    // 对于虚拟批次，我们显示所有 batch_id 为 AUTO_REGISTERED_DEVICES 的序列号
+    return serials.value.filter(s => s.batch_id === AUTO_REGISTERED_BATCH_NAME)
   }
   
   // 处理普通批次
@@ -466,14 +465,14 @@ const selectBatch = (batchId: string) => {
   
   // 处理虚拟批次ID的特殊情况
   if (currentBatch.value === VIRTUAL_AUTO_REGISTERED_ID) {
-    // 对于虚拟批次，不设置searchForm.batch_id，让前端进行过滤
-    // 或者我们可以设置为空，获取所有数据然后在前端过滤
-    searchForm.batch_id = ''
+    // 对于虚拟批次，我们设置searchForm.batch_id为通用标识符
+    searchForm.batch_id = AUTO_REGISTERED_BATCH_NAME
   } else {
     searchForm.batch_id = currentBatch.value
   }
   
-  handleImmediateSearch()
+  // 移除 handleImmediateSearch() 调用，让 watch 自动处理搜索
+  // 避免重复请求：selectBatch 修改 searchForm.batch_id -> watch 触发搜索
 }
 
 // Debounced search for text inputs
@@ -604,9 +603,9 @@ const validateCustomSerial = () => {
   }
 }
 
-// Watch for filter changes
+// Watch for filter changes - 批次ID使用立即搜索，避免延迟
 watch(() => searchForm.batch_id, () => {
-  handleDebouncedSearch()
+  handleImmediateSearch()
 })
 
 watch(() => searchForm.status, () => {
