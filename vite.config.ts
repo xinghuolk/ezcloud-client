@@ -41,6 +41,16 @@ export default defineConfig({
     host: '0.0.0.0',
     port: 3000,
     strictPort: true,
+    // 允许外部域名访问（解决OAuth回调域名访问问题）
+    allowedHosts: [
+      'localhost',
+      '127.0.0.1',
+      '0.0.0.0',
+      'ezcloud.xinghuolike.top',
+      '.xinghuolike.top', // 允许所有子域名
+      '.localhost', // 允许localhost子域名
+      'host.docker.internal' // Docker内部访问
+    ],
     hmr: {
       overlay: true,
     },

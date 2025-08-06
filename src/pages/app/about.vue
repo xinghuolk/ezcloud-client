@@ -24,6 +24,11 @@ const frpStatus = ref<any>(null)
 const isLoadingConfig = ref(false)
 const isLoadingStatus = ref(false)
 
+// Google OAuth认证相关状态
+const oauthStatus = ref<any>(null)
+const isLoadingOAuth = ref(false)
+const isAuthenticating = ref(false)
+
 const appInfo = {
   name: 'EzCloud IoT Management Platform',
   version: '2.0.0',
@@ -90,11 +95,118 @@ const reloadFrpConfig = async () => {
   }
 }
 
+// 获取Google OAuth认证状态
+const fetchOAuthStatus = async () => {
+  try {
+    isLoadingOAuth.value = true
+    const response = await request.get('/auth/google/status')
+    oauthStatus.value = response.data
+  } catch (error) {
+    console.error('获取OAuth状态失败:', error)
+    // 如果没有权限或服务未启用，静默处理
+    oauthStatus.value = { enabled: false, authenticated: false }
+  } finally {
+    isLoadingOAuth.value = false
+  }
+}
+
+// 开始OAuth认证
+const startOAuthAuthentication = async () => {
+  try {
+    isAuthenticating.value = true
+    const response = await request.get('/auth/google/oauth-url?popup=true')
+    
+    if (response.success && response.data.authUrl) {
+      // 在新窗口中打开Google OAuth认证页面
+      const authWindow = window.open(
+        response.data.authUrl,
+        'oauth-auth',
+        'width=600,height=700,scrollbars=yes,resizable=yes,status=yes,location=yes'
+      )
+      
+      if (authWindow) {
+        // 监听认证窗口关闭事件
+        const checkClosed = setInterval(() => {
+          if (authWindow.closed) {
+            clearInterval(checkClosed)
+            console.log('OAuth认证窗口已关闭，刷新认证状态')
+            // 窗口关闭后刷新OAuth状态
+            setTimeout(() => {
+              fetchOAuthStatus()
+            }, 1000) // 延迟1秒确保后端处理完成
+          }
+        }, 1000)
+        
+        // 10分钟后自动停止检查（防止内存泄漏）
+        setTimeout(() => {
+          clearInterval(checkClosed)
+        }, 600000)
+        
+        notyf.info('请在新窗口中完成Google OAuth认证')
+      } else {
+        notyf.error('无法打开认证窗口，请检查浏览器弹窗阻止设置')
+      }
+    } else {
+      notyf.error('获取认证URL失败')
+    }
+  } catch (error) {
+    console.error('开始OAuth认证失败:', error)
+    notyf.error('开始OAuth认证失败')
+  } finally {
+    isAuthenticating.value = false
+  }
+}
+
+// 检查URL参数中的认证结果
+const checkOAuthResult = () => {
+  const urlParams = new URLSearchParams(window.location.search)
+  const status = urlParams.get('status')
+  const configuredAt = urlParams.get('configured_at')
+  const error = urlParams.get('error')
+
+  if (status === 'oauth_success') {
+    notyf.success('邮件认证配置成功！')
+    if (configuredAt) {
+      console.log('认证配置时间:', decodeURIComponent(configuredAt))
+    }
+    // 清除URL参数
+    window.history.replaceState({}, document.title, window.location.pathname)
+    // 刷新OAuth状态
+    fetchOAuthStatus()
+  } else if (error) {
+    let errorMessage = '认证失败'
+    switch (error) {
+      case 'oauth_disabled':
+        errorMessage = 'Google Workspace功能未启用'
+        break
+      case 'missing_code':
+        errorMessage = '缺少授权码'
+        break
+      case 'invalid_grant':
+        errorMessage = '授权码无效或已过期'
+        break
+      case 'access_denied':
+        errorMessage = '用户拒绝了授权'
+        break
+      default:
+        errorMessage = `认证错误: ${error}`
+    }
+    notyf.error(errorMessage)
+    // 清除URL参数
+    window.history.replaceState({}, document.title, window.location.pathname)
+  }
+}
+
 // 页面挂载时获取数据
 onMounted(async () => {
+  // 先检查OAuth认证结果
+  checkOAuthResult()
+  
+  // 并行获取系统数据
   await Promise.all([
     fetchSystemConfig(),
-    fetchFrpStatus()
+    fetchFrpStatus(),
+    fetchOAuthStatus()
   ])
 })
 
@@ -288,7 +400,7 @@ useHead({
         </VCard>
 
         <!-- Environment Information -->
-        <VCard radius="smooth">
+        <VCard radius="smooth" class="mb-6">
           <h3 class="title is-5 mb-4">Environment Information</h3>
           
           <div class="config-grid">
@@ -320,6 +432,96 @@ useHead({
               <label>Log Level</label>
               <span>{{ systemConfig.application.log_level }}</span>
             </div>
+          </div>
+        </VCard>
+
+        <!-- Google OAuth Email Authentication -->
+        <VCard radius="smooth" v-if="oauthStatus || isLoadingOAuth">
+          <div class="card-header" v-if="!isLoadingOAuth">
+            <h3 class="title is-5 mb-2">Administrator Email Authentication</h3>
+            <VButton
+              v-if="oauthStatus?.enabled && !oauthStatus?.authenticated"
+              icon="lucide:mail-check"
+              color="primary"
+              outlined
+              size="medium"
+              @click="startOAuthAuthentication"
+              :loading="isAuthenticating"
+            >
+              Start Authentication
+            </VButton>
+            <VButton
+              v-else-if="oauthStatus?.enabled && oauthStatus?.authenticated"
+              icon="lucide:rotate-ccw"
+              color="warning"
+              outlined
+              size="medium"
+              @click="startOAuthAuthentication"
+              :loading="isAuthenticating"
+            >
+              Re-authenticate
+            </VButton>
+          </div>
+
+          <!-- Loading State -->
+          <div v-if="isLoadingOAuth" class="has-text-centered py-6">
+            <VPlaceload />
+            <p class="mt-4">Loading OAuth authentication status...</p>
+          </div>
+          
+          <div v-else-if="oauthStatus" class="config-grid">
+            <div class="config-item">
+              <label>Service Status</label>
+              <VTag :color="oauthStatus?.enabled ? 'success' : 'warning'">
+                {{ oauthStatus?.enabled ? 'Enabled' : 'Disabled' }}
+              </VTag>
+            </div>
+            <div class="config-item">
+              <label>Authentication Status</label>
+              <VTag :color="oauthStatus?.authenticated ? 'success' : 'danger'">
+                {{ oauthStatus?.authenticated ? 'Authenticated' : 'Not Authenticated' }}
+              </VTag>
+            </div>
+            <div class="config-item" v-if="oauthStatus?.senderEmail">
+              <label>Sender Email</label>
+              <span>{{ oauthStatus.senderEmail }}</span>
+            </div>
+            <div class="config-item full-width" v-if="oauthStatus?.configuredAt">
+              <label>Configuration Time</label>
+              <span>{{ formatDateTime(oauthStatus.configuredAt) }}</span>
+            </div>
+            <div class="config-item" v-if="oauthStatus?.accessTokenExpired">
+              <label>Token Status</label>
+              <VTag color="warning">
+                Access Token Expired
+              </VTag>
+            </div>
+          </div>
+
+          <!-- Service Not Enabled Warning -->
+          <div class="mt-4" v-if="oauthStatus && !oauthStatus.enabled">
+            <VMessage color="warning" class="mb-0">
+              <p class="mb-2">
+                <iconify-icon icon="lucide:info" class="mr-2" />
+                <strong>Google Workspace Service Not Enabled</strong>
+              </p>
+              <p class="is-size-7">
+                To enable administrator email authentication, configure the Google Workspace service in your environment settings.
+              </p>
+            </VMessage>
+          </div>
+
+          <!-- Authentication Instructions -->
+          <div class="mt-4" v-if="oauthStatus?.enabled && !oauthStatus?.authenticated">
+            <VMessage color="info" class="mb-0">
+              <p class="mb-2">
+                <iconify-icon icon="lucide:shield-check" class="mr-2" />
+                <strong>Administrator Email Authentication Required</strong>
+              </p>
+              <p class="is-size-7">
+                Configure Gmail API access for system email sending. Click "Start Authentication" to begin the OAuth2.0 flow.
+              </p>
+            </VMessage>
           </div>
         </VCard>
       </div>
