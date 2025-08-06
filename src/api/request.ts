@@ -140,6 +140,18 @@ request.interceptors.response.use(
           errorMessage = errorMessage || 'Resource conflict'
           // 不显示通知，让上层处理
           break
+        case 423:
+          // 423 Locked - 用于 reCAPTCHA 挑战响应
+          // 对于登录API的423错误，不显示通知消息，让上层组件处理
+          if (error.config?.url?.includes('/auth/login')) {
+            // 保持错误消息但不显示通知，让前端组件处理 reCAPTCHA 挑战
+            break
+          } else {
+            // 非登录API的423错误显示通知
+            errorMessage = errorMessage || 'Resource locked, please try again later'
+            notyf.error(errorMessage)
+          }
+          break
         case 500:
           // 使用后端返回的具体错误信息
           errorMessage = errorMessage || 'Internal server error'

@@ -83,6 +83,7 @@ export interface User {
 export interface LoginParams {
   email: string
   password: string
+  recaptcha_token?: string
 }
 
 export interface RegisterParams {
@@ -90,6 +91,30 @@ export interface RegisterParams {
   email: string
   password: string
   phone?: string
+}
+
+// 验证码相关类型
+export interface SendVerificationCodeParams {
+  email: string
+  type: 'registration' | 'password_reset' | 'email_verification'
+  recaptcha_token?: string
+  recaptcha_v2_token?: string
+}
+
+export interface VerifyCodeParams {
+  email: string
+  code: string
+  type: 'registration' | 'password_reset' | 'email_verification'
+}
+
+export interface EnhancedRegisterParams {
+  username: string
+  email: string
+  password: string
+  phone?: string
+  verification_code: string
+  recaptcha_token?: string
+  recaptcha_v2_token?: string
 }
 
 // 用户管理相关类型

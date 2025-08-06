@@ -1,7 +1,7 @@
 import { acceptHMRUpdate, defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { authApi } from '/@src/api'
-import type { User, LoginParams, RegisterParams } from '/@src/api/types'
+import type { User, LoginParams, RegisterParams, SendVerificationCodeParams, VerifyCodeParams, EnhancedRegisterParams } from '/@src/api/types'
 import { useUserToken } from '/@src/composables/user-token'
 import { Notyf } from 'notyf'
 import { extractErrorMessage } from '/@src/utils/error-utils'
@@ -68,15 +68,39 @@ export const useUserSession = defineStore('userSession', () => {
       return false
     } catch (error: any) {
       console.error('Login error:', error)
-      // 不在这里显示错误消息，让上层组件处理
-      // 抛出包含具体错误信息的错误供上层使用
-      throw new Error(error.message || 'Login failed')
+      
+      // 对于 423 reCAPTCHA 挑战响应，需要保留完整错误结构供上层组件处理
+      if (error.response?.status === 423) {
+        // 构造包含挑战信息的错误对象，直接传递挑战数据（避免双重嵌套）
+        const challengeError = new Error(error.response.data?.message || 'Security challenge required') as any
+        challengeError.status = 423
+        challengeError.data = error.response.data?.data || error.response.data // 直接传递挑战数据
+        throw challengeError
+      }
+      
+      // 为其他HTTP错误提供友好的错误消息
+      let friendlyMessage = 'Login failed'
+      if (error.response?.status === 429) {
+        friendlyMessage = 'Too many login attempts. Please try again later.'
+      } else if (error.response?.status === 401 || error.response?.status === 403) {
+        friendlyMessage = 'Invalid email or password'
+      } else if (error.response?.status === 500) {
+        friendlyMessage = 'Server error. Please try again later.'
+      } else if (error.response?.data?.message) {
+        // 使用后端返回的友好错误消息
+        friendlyMessage = error.response.data.message
+      } else if (error.message && !error.message.includes('status code')) {
+        // 只有当错误消息不包含技术细节时才使用
+        friendlyMessage = error.message
+      }
+      
+      throw new Error(friendlyMessage)
     } finally {
       loading.value = false
     }
   }
 
-  // 注册方法
+  // 注册方法 (传统)
   async function registerUser(params: RegisterParams): Promise<boolean> {
     loading.value = true
     try {
@@ -90,6 +114,54 @@ export const useUserSession = defineStore('userSession', () => {
       console.error('Register error:', error)
       notyf.error(extractErrorMessage(error, 'Registration failed'))
       return false
+    } finally {
+      loading.value = false
+    }
+  }
+
+  // 发送验证码
+  async function sendVerificationCode(params: SendVerificationCodeParams): Promise<{ success: boolean; expires_in?: number; error?: string }> {
+    try {
+      const response = await authApi.sendVerificationCode(params)
+      if (response.success && response.data) {
+        return {
+          success: true,
+          expires_in: response.data.expires_in
+        }
+      }
+      return { success: false, error: response.message || 'Failed to send verification code' }
+    } catch (error: any) {
+      console.error('Send verification code error:', error)
+      return { success: false, error: extractErrorMessage(error, 'Failed to send verification code') }
+    }
+  }
+
+  // 验证验证码
+  async function verifyCode(params: VerifyCodeParams): Promise<{ success: boolean; error?: string }> {
+    try {
+      const response = await authApi.verifyCode(params)
+      if (response.success && response.data?.valid) {
+        return { success: true }
+      }
+      return { success: false, error: response.message || 'Invalid verification code' }
+    } catch (error: any) {
+      console.error('Verify code error:', error)
+      return { success: false, error: extractErrorMessage(error, 'Failed to verify code') }
+    }
+  }
+
+  // 增强注册方法 (包含验证码)
+  async function enhancedRegisterUser(params: EnhancedRegisterParams): Promise<{ success: boolean; error?: string }> {
+    loading.value = true
+    try {
+      const response = await authApi.enhancedRegister(params)
+      if (response.success && response.data) {
+        return { success: true }
+      }
+      return { success: false, error: response.message || 'Registration failed' }
+    } catch (error: any) {
+      console.error('Enhanced register error:', error)
+      return { success: false, error: extractErrorMessage(error, 'Registration failed') }
     } finally {
       loading.value = false
     }
@@ -280,6 +352,10 @@ export const useUserSession = defineStore('userSession', () => {
     requireAdmin,
     requireSuperAdmin,
     initializeAuth,
+    // 验证码相关方法
+    sendVerificationCode,
+    verifyCode,
+    enhancedRegisterUser,
   } as const
 })
 

@@ -63,6 +63,21 @@ export const authApi = {
     return request.post('/auth/register', params)
   },
 
+  // 发送验证码
+  sendVerificationCode: (params: SendVerificationCodeParams): Promise<ApiResponse<{ expires_in: number }>> => {
+    return request.post('/auth/send-verification-code', params)
+  },
+
+  // 验证验证码
+  verifyCode: (params: VerifyCodeParams): Promise<ApiResponse<{ valid: boolean }>> => {
+    return request.post('/auth/verify-code', params)
+  },
+
+  // 增强注册（包含验证码）
+  enhancedRegister: (params: EnhancedRegisterParams): Promise<ApiResponse<User>> => {
+    return request.post('/auth/enhanced-register', params)
+  },
+
   // 获取用户信息
   getProfile: (): Promise<ApiResponse<User>> => {
     return request.get('/auth/profile')
