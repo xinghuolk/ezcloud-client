@@ -3,8 +3,12 @@ import { ref, reactive, computed, watch, onBeforeUnmount, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserSession } from '/@src/stores/user-session'
 import { useUserToken } from '/@src/composables/user-token'
+import { useDarkmode } from '/@src/composables/darkmode'
 import { Notyf } from 'notyf'
 import type { SendVerificationCodeParams, VerifyCodeParams, EnhancedRegisterParams } from '/@src/api/types'
+// Import logos directly  
+import logoLight from '/@src/assets/images/EzenCloud-Logo_v2.png'
+import logoDark from '/@src/assets/images/EzenCloud-Logo-v2-Dark.png'
 
 // reCAPTCHA 类型声明
 declare global {
@@ -35,7 +39,14 @@ definePage({
 
 const router = useRouter()
 const userSession = useUserSession()
+const darkmode = useDarkmode()
 const notyf = new Notyf()
+
+// 根据dark mode状态动态选择logo
+const logoSrc = computed(() => {
+  const isDarkMode = darkmode.isDark.value
+  return isDarkMode ? logoDark : logoLight
+})
 
 // State
 const loading = ref(false)
@@ -1365,7 +1376,7 @@ useHead({
     <div class="login-wrapper">
       <!-- Logo -->
       <div class="logo-container">
-        <img src="/src/assets/images/EzenCloud-Logo_v2.png" alt="EzCloud Logo" class="logo-image" />
+        <img :src="logoSrc" alt="EzCloud Logo" class="logo-image" />
       </div>
       
       <!-- Login Card -->

@@ -1,0 +1,24 @@
+/*! gradients.scss | EzCloud | Layout gradient system */
+
+:root {
+  // Layout section background colors (Light mode)
+  --header-bg: #edf3fa;
+  --middle-bg: linear-gradient(180deg, #edf3fa, #d5e8df);
+  --footer-bg: #d5e8df;
+  
+  // Layout section solid colors for utility
+  --header-color: #edf3fa;
+  --footer-color: #d5e8df;
+}
+
+// Dark mode gradient overrides
+.is-dark {
+  // Layout section background colors (Dark mode)
+  --header-bg: #0d2236;
+  --middle-bg: linear-gradient(180deg, #0d2236, #002417);
+  --footer-bg: #002417;
+  
+  // Layout section solid colors for utility
+  --header-color: #0d2236;
+  --footer-color: #002417;
+}

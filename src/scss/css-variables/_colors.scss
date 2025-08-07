@@ -6,7 +6,7 @@
   --placeload-nuance-to: rgb(0 0 0 / 15%);
 
   // bulma colors
-  --primary: oklch(66.67% 0.146 173.07);
+  --primary: #00b885;
   --primary--color-invert: color-mix(in oklab, var(--primary), white 90%);
   --primary--dark-color: color-mix(in oklab, var(--primary), black 5%);
   --primary--light-color: color-mix(in oklab, var(--primary), white 90%);
@@ -16,22 +16,22 @@
   --link--dark-color: color-mix(in oklab, var(--link), black 5%);
   --link--light-color: color-mix(in oklab, var(--link), white 90%);
 
-  --info: #0398e2;
+  --info: #488ac9;
   --info--color-invert: color-mix(in oklab, var(--info), white 85%);
   --info--dark-color: color-mix(in oklab, var(--info), black 5%);
   --info--light-color: color-mix(in oklab, var(--info), white 90%);
 
-  --success: #05d69e;
+  --success: #34cd9b;
   --success--color-invert: color-mix(in oklab, var(--success), white 85%);
   --success--dark-color: color-mix(in oklab, var(--success), black 20%);
   --success--light-color: color-mix(in oklab, var(--success), white 90%);
 
-  --warning: #faad42;
+  --warning: #f9aa31;
   --warning--color-invert: color-mix(in oklab, var(--warning), white 85%);
   --warning--dark-color: color-mix(in oklab, var(--warning), black 20%);
   --warning--light-color: color-mix(in oklab, var(--warning), white 90%);
 
-  --danger: #e62864;
+  --danger: #c41e3a;
   --danger--color-invert: color-mix(in oklab, var(--danger), white 85%);
   --danger--dark-color: color-mix(in oklab, var(--danger), black 15%);
   --danger--light-color: color-mix(in oklab, var(--danger), white 90%);
@@ -56,14 +56,14 @@
   
   --smoke-white: #fcfcfc;
   --primary-grey: #cccccc;
-  --muted-grey: #999999;
+  --muted-grey: #727480;
   --fade-grey: #ededed;
   --widget-grey: #f5f6fa;
   --placeholder: #cfcfcf;
 
   --dark-dark-text: #a9a9b2;
-  --dark-text: #283252;
-  --light-text: #a2a5b9;
+  --dark-text: #002417;
+  --light-text: #727480;
 
   // Additional colors
   --secondary: #336aeb;
@@ -82,6 +82,8 @@
   --background-grey: color-mix(in oklab, var(--dark-sidebar), white 5%);
   --border: color-mix(in oklab, var(--dark-sidebar), white 12%);
   --dark-text: #fcfcfc;
+  --light-text: #a9a9b2;
+  --muted-grey: #d5e8df;
   
   --placeload-nuance-from: rgb(255 255 255 / 15%);
   --placeload-nuance-to: rgb(255 255 255 / 24%);
@@ -89,6 +91,6 @@
   --primary: oklch(59.02% 0.146 172.62);
   --primary--color-invert: color-mix(in oklab, var(--primary), white 80%);
   --success: #1dc598;
-  --warning: #e0a654;
-  --danger: #ee3c74;
+  --warning: #fab350;
+  --danger: #f74d5d;
 }

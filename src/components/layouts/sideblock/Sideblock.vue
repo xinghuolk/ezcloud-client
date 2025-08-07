@@ -63,6 +63,7 @@ const themeClasses = computed(() => {
     height: 60px;
     width: 100%;
     padding: 0 2.5rem;
+    background: var(--header-bg);
 
     .sidebar-block-logo {
       display: flex;
@@ -102,8 +103,7 @@ const themeClasses = computed(() => {
     width: 100%;
     overflow-y: auto;
     overflow-x: hidden;
-    background: var(--white);
-    margin-top: 40px;
+    background: var(--middle-bg);
 
     &::-webkit-scrollbar {
       width: 3px;
@@ -398,6 +398,7 @@ const themeClasses = computed(() => {
     display: flex;
     align-items: center;
     justify-content: space-between;
+    background: var(--footer-bg);
 
     a:not(.dropdown-item) {
       display: flex;
@@ -462,7 +463,7 @@ const themeClasses = computed(() => {
 
 .is-dark {
   .sidebar-block {
-    background: color-mix(in oklab, var(--dark-sidebar), white 5%);
+    background: var(--middle-bg);
     border-color: color-mix(in oklab, var(--dark-sidebar), white 5%) !important;
 
     .panel-close {
@@ -472,13 +473,15 @@ const themeClasses = computed(() => {
     }
 
     .sidebar-block-header {
+      background: var(--header-bg);
+      
       h3 {
         color: var(--smoke-white);
       }
     }
 
     .sidebar-block-inner {
-      background: color-mix(in oklab, var(--dark-sidebar), white 5%);
+      background: var(--middle-bg);
 
       li {
         &.has-children {
@@ -535,6 +538,8 @@ const themeClasses = computed(() => {
     }
 
     .sidebar-block-footer {
+      background: var(--footer-bg);
+      
       .search-link {
         color: var(--light-text);
 
@@ -567,7 +572,7 @@ const themeClasses = computed(() => {
 html:not(.is-dark) {
   .sidebar-block {
     &.is-colored {
-      background: color-mix(in oklab, var(--dark), black 12%) !important;
+      background: var(--middle-bg) !important;
       border-color: color-mix(in oklab, var(--dark), white 5%) !important;
 
       .panel-close {
@@ -577,13 +582,15 @@ html:not(.is-dark) {
       }
 
       .sidebar-block-header {
+        background: var(--header-bg) !important;
+        
         h3 {
           color: var(--smoke-white) !important;
         }
       }
 
       .sidebar-block-inner {
-        background: color-mix(in oklab, var(--dark), black 12%) !important;
+        background: var(--middle-bg) !important;
 
         li {
           &.has-children {
@@ -640,6 +647,8 @@ html:not(.is-dark) {
       }
 
       .sidebar-block-footer {
+        background: var(--footer-bg) !important;
+        
         .search-link {
           color: var(--light-text) !important;
 

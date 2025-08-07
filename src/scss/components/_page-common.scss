@@ -38,7 +38,7 @@ Common Page Layout Styles
       }
 
       .subtitle {
-        color: var(--muted-grey);
+        color: var(--light-text);
         margin: 0;
         line-height: 1.4;
       }
@@ -271,22 +271,59 @@ Common Color Text Classes
 
 .common-text-primary {
   color: var(--primary) !important;
+  font-size: 1.5rem;
 }
 
 .common-text-success {
   color: var(--success) !important;
+  font-size: 1.5rem;
 }
 
 .common-text-danger {
   color: var(--danger) !important;
+  font-size: 1rem;
 }
 
 .common-text-warning {
   color: var(--warning) !important;
+  font-size: 1rem;
+}
+
+.common-text-info {
+  color: var(--info) !important;
+  font-size: 1rem;
 }
 
 .common-text-light {
-  color: var(--muted-grey) !important;
+  color: var(--light-text) !important;
+  font-size: 0.9rem;
+}
+
+/* ==========================================================================
+Help Text Classes (Form Validation)
+========================================================================== */
+
+.help {
+  font-size: 0.8rem;
+  color: var(--light-text);
+  margin-top: 0.25rem;
+  line-height: 1.4;
+
+  &.is-danger {
+    color: var(--danger);
+  }
+
+  &.is-success {
+    color: var(--success);
+  }
+
+  &.is-warning {
+    color: var(--warning);
+  }
+
+  &.is-info {
+    color: var(--info);
+  }
 }
 
 /* ==========================================================================
