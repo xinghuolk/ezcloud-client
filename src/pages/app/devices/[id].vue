@@ -208,7 +208,7 @@ onMounted(() => {
 })
 
 useHead({
-  title: computed(() => device.value ? `Device ${device.value.name || device.value.serial} - EzCloud` : 'Device Details - EzCloud')
+  title: computed(() => device.value ? `Device ${device.value.name || device.value.serial} - Ezen Cloud` : 'Device Details - Ezen Cloud')
 })
 </script>
 

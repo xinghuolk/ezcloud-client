@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, computed, watch, onBeforeUnmount } from 'vue'
+import { ref, reactive, computed, watch, onBeforeUnmount, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserSession } from '/@src/stores/user-session'
 import { useUserToken } from '/@src/composables/user-token'
@@ -77,6 +77,10 @@ const codeVerification = reactive({
   isValid: false
 })
 
+// 6位验证码输入框
+const codeInputs = ref(['', '', '', '', '', ''])
+const codeInputRefs = ref<HTMLInputElement[]>([])
+
 // Login form
 const loginForm = reactive({
   email: '',
@@ -90,7 +94,9 @@ const registerForm = reactive({
   phone: '',
   password: '',
   confirmPassword: '',
-  verificationCode: ''
+  verificationCode: '',
+  agreeToPrivacy: false,
+  agreeToTerms: false
 })
 
 const errors = ref({
@@ -103,7 +109,9 @@ const registerErrors = ref({
   email: '',
   password: '',
   confirmPassword: '',
-  verificationCode: ''
+  verificationCode: '',
+  agreeToPrivacy: '',
+  agreeToTerms: ''
 })
 
 // Computed
@@ -130,20 +138,14 @@ const canSubmitRegistration = computed(() => {
                       registerForm.password.length >= 6 &&
                       registerForm.confirmPassword === registerForm.password
   
-  return hasBasicInfo && codeVerification.isValid && !registerLoading.value
+  // 检查是否同意隐私政策和服务条款
+  const hasAgreedToTerms = registerForm.agreeToPrivacy && registerForm.agreeToTerms
+  
+  return hasBasicInfo && codeVerification.isValid && hasAgreedToTerms && !registerLoading.value
 })
 
 // Watch verification code input for auto-validation
-watch(() => registerForm.verificationCode, async (newCode) => {
-  if (newCode && newCode.length === 6 && /^\d{6}$/.test(newCode)) {
-    await verifyCodeRealtime()
-  } else if (newCode && newCode.length < 6) {
-    // Reset verification status when user is typing
-    codeVerification.status = 'idle'
-    codeVerification.message = ''
-    codeVerification.isValid = false
-  }
-})
+// 现在由 updateVerificationCode 函数处理，不再需要这个 watcher
 
 // 倒计时管理
 const startCountdown = (seconds: number = 60) => {
@@ -185,7 +187,9 @@ const handleModalClose = () => {
     phone: '',
     password: '',
     confirmPassword: '',
-    verificationCode: ''
+    verificationCode: '',
+    agreeToPrivacy: false,
+    agreeToTerms: false
   })
   
   // Reset errors
@@ -194,19 +198,179 @@ const handleModalClose = () => {
     email: '',
     password: '',
     confirmPassword: '',
-    verificationCode: ''
+    verificationCode: '',
+    agreeToPrivacy: '',
+    agreeToTerms: ''
   })
   
-  // Reset verification status
-  codeVerification.status = 'idle'
-  codeVerification.message = ''
-  codeVerification.isValid = false
+  // Reset verification status and clear code inputs
+  clearCodeInputs()
   
   // 重置注册reCAPTCHA v2状态
   hideRegisterRecaptchaV2Challenge()
   
   // 清理Token缓存 (可选择性清理，保留用户验证状态)
   // clearTokenCache()
+}
+
+// 验证码输入框处理函数
+const handleCodeInput = (index: number, event: Event) => {
+  const target = event.target as HTMLInputElement
+  const value = target.value.replace(/\D/g, '') // 只允许数字
+  
+  // 检查是否是粘贴操作（输入了多个字符）
+  if (value.length > 1) {
+    // 直接处理多字符输入（类似粘贴）
+    const digits = value.slice(0, 6) // 只取前6个数字
+    
+    // 清空所有输入框
+    for (let i = 0; i < 6; i++) {
+      codeInputs.value[i] = ''
+    }
+    
+    // 填充数字
+    for (let i = 0; i < 6; i++) {
+      if (digits[i]) {
+        codeInputs.value[i] = digits[i]
+        const input = codeInputRefs.value[i]
+        if (input) {
+          input.value = digits[i]
+        }
+      }
+    }
+    
+    updateVerificationCode()
+    
+    // 焦点移到最后一个有值的输入框
+    const lastFilledIndex = digits.length - 1
+    const focusIndex = lastFilledIndex >= 0 ? Math.min(lastFilledIndex, 5) : 0
+    const targetInput = codeInputRefs.value[focusIndex]
+    if (targetInput) {
+      targetInput.focus()
+    }
+    return
+  }
+  
+  // 正常单个字符输入
+  codeInputs.value[index] = value
+  target.value = value // 确保DOM同步
+  
+  // 更新合并的验证码
+  updateVerificationCode()
+  
+  // 如果输入了数字且不是最后一个输入框，自动跳到下一个
+  if (value && index < 5) {
+    const nextInput = codeInputRefs.value[index + 1]
+    if (nextInput) {
+      nextInput.focus()
+    }
+  }
+}
+
+const handleCodeKeydown = (index: number, event: KeyboardEvent) => {
+  const target = event.target as HTMLInputElement
+  
+  // 处理退格键
+  if (event.key === 'Backspace') {
+    if (!codeInputs.value[index] && index > 0) {
+      // 如果当前输入框为空且不是第一个，跳到上一个输入框
+      const prevInput = codeInputRefs.value[index - 1]
+      if (prevInput) {
+        prevInput.focus()
+        codeInputs.value[index - 1] = ''
+        updateVerificationCode()
+      }
+    } else {
+      // 清空当前输入框
+      codeInputs.value[index] = ''
+      updateVerificationCode()
+    }
+    return
+  }
+  
+  // 处理方向键
+  if (event.key === 'ArrowLeft' && index > 0) {
+    const prevInput = codeInputRefs.value[index - 1]
+    if (prevInput) {
+      prevInput.focus()
+    }
+  } else if (event.key === 'ArrowRight' && index < 5) {
+    const nextInput = codeInputRefs.value[index + 1]
+    if (nextInput) {
+      nextInput.focus()
+    }
+  }
+  
+  // 阻止非数字字符输入
+  if (!/\d/.test(event.key) && !['Backspace', 'Delete', 'Tab', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
+    event.preventDefault()
+  }
+}
+
+const handleCodePaste = (event: ClipboardEvent) => {
+  event.preventDefault()
+  const paste = (event.clipboardData || (window as any).clipboardData)?.getData('text')
+  
+  if (paste) {
+    const digits = paste.replace(/\D/g, '').slice(0, 6) // 只取前6个数字
+    
+    // 清空所有输入框先
+    for (let i = 0; i < 6; i++) {
+      codeInputs.value[i] = ''
+    }
+    
+    // 强制触发响应式更新
+    nextTick(() => {
+      // 填充到输入框中
+      for (let i = 0; i < 6; i++) {
+        if (digits[i]) {
+          codeInputs.value[i] = digits[i]
+          // 同时更新DOM元素的值
+          const input = codeInputRefs.value[i]
+          if (input) {
+            input.value = digits[i]
+          }
+        }
+      }
+      
+      updateVerificationCode()
+      
+      // 焦点移到最后一个有值的输入框
+      const lastFilledIndex = digits.length - 1
+      const focusIndex = lastFilledIndex >= 0 ? Math.min(lastFilledIndex, 5) : 0
+      const targetInput = codeInputRefs.value[focusIndex]
+      if (targetInput) {
+        targetInput.focus()
+        targetInput.select() // 选中文本以便用户知道焦点位置
+      }
+    })
+  }
+}
+
+const updateVerificationCode = () => {
+  const code = codeInputs.value.join('')
+  registerForm.verificationCode = code
+  
+  // 如果输入完整6位，自动触发验证
+  if (code.length === 6 && /^\d{6}$/.test(code)) {
+    // 使用nextTick确保DOM更新完成后再验证
+    nextTick(() => {
+      verifyCodeRealtime()
+    })
+  } else if (code.length < 6) {
+    // 重置验证状态
+    codeVerification.status = 'idle'
+    codeVerification.message = ''
+    codeVerification.isValid = false
+  }
+}
+
+const clearCodeInputs = () => {
+  codeInputs.value = ['', '', '', '', '', '']
+  registerForm.verificationCode = ''
+  codeVerification.status = 'idle'
+  codeVerification.message = ''
+  codeVerification.isValid = false
 }
 
 // Validation
@@ -341,6 +505,39 @@ const validateConfirmPassword = () => {
   } else if (registerForm.confirmPassword !== registerForm.password) {
     registerErrors.value.confirmPassword = 'Password confirmation does not match'
   }
+}
+
+const validatePrivacyAgreement = () => {
+  registerErrors.value.agreeToPrivacy = ''
+  
+  if (!registerForm.agreeToPrivacy) {
+    registerErrors.value.agreeToPrivacy = 'Please accept the Privacy Policy'
+  }
+}
+
+const validateTermsAgreement = () => {
+  registerErrors.value.agreeToTerms = ''
+  
+  if (!registerForm.agreeToTerms) {
+    registerErrors.value.agreeToTerms = 'Please accept the Terms of Service'
+  }
+}
+
+// Validate agreement checkboxes
+const validateAgreements = () => {
+  validatePrivacyAgreement()
+  validateTermsAgreement()
+  
+  return registerForm.agreeToPrivacy && registerForm.agreeToTerms
+}
+
+// Validate the entire registration form
+const validateCompleteRegistrationForm = () => {
+  const step1Valid = validateRegisterStep1()
+  const step2Valid = validateRegisterStep2()
+  const agreementsValid = validateAgreements()
+  
+  return step1Valid && step2Valid && agreementsValid
 }
 
 // Legacy validation function (traditional)
@@ -584,7 +781,9 @@ const getOptimalRecaptchaToken = async (action: string, email: string = ''): Pro
   // 需要新的v3验证
   console.log(`🆕 Generating new v3 token for action: ${action}`)
   const newV3Token = await executeRecaptcha(action)
-  cacheV3Token(newV3Token, action, email)
+  if (newV3Token) {
+    cacheV3Token(newV3Token, action, email)
+  }
   
   return {
     useV2: false,
@@ -613,7 +812,7 @@ const handleLogin = async () => {
     const success = await userSession.loginUser({
       email: loginForm.email,
       password: loginForm.password,
-      recaptcha_token: recaptchaToken
+      recaptcha_token: recaptchaToken || undefined
     })
 
     if (success) {
@@ -622,18 +821,27 @@ const handleLogin = async () => {
     }
   } catch (error: any) {
     console.error('Login failed:', error)
+    console.log('🔍 错误详情 - status:', error.status, 'response.status:', error.response?.status)
+    console.log('🔍 错误数据 - data:', error.data, 'response.data:', error.response?.data)
     
     // 检查是否是reCAPTCHA挑战响应（状态码423）
-    if (error.status === 423 && error.data?.challenge_type === 'recaptcha_v2') {
+    const isRecaptchaChallenge = (error.status === 423 || error.response?.status === 423) && 
+                                (error.data?.challenge_type === 'recaptcha_v2')
+    
+    console.log('🎯 是否为 reCAPTCHA 挑战:', isRecaptchaChallenge)
+    console.log('🔍 检查 challenge_type:', error.data?.challenge_type)
+    
+    if (isRecaptchaChallenge) {
       // 显示reCAPTCHA v2验证
       recaptchaV2Challenge.value = error.data
       showRecaptchaV2.value = true
+      console.log('🚀 设置挑战数据:', error.data)
       
       // 初始化reCAPTCHA v2 widget
       setTimeout(async () => {
         try {
           await initRecaptchaV2()
-          notyf.info('请完成安全验证后重新登录')
+          notyf.success('请完成安全验证后重新登录')
         } catch (initError) {
           console.error('Failed to initialize reCAPTCHA v2:', initError)
           notyf.error('安全验证初始化失败，请刷新页面重试')
@@ -674,12 +882,15 @@ const handleLoginWithV2Token = async (v2Token: string) => {
   errors.value = { email: '', password: '' }
 
   try {
+    // 缓存v2 token用于后续使用
+    cacheV2Token(v2Token, 'login', loginForm.email)
+    
     const success = await userSession.loginUser({
       email: loginForm.email,
       password: loginForm.password,
-      recaptcha_token: recaptchaV2Challenge.value?.recaptcha_result?.action ? 
-        await executeRecaptcha('login') : null, // 保持v3 token
-      recaptcha_v2_token: v2Token
+      recaptcha_token: recaptchaV2Challenge.value?.recaptcha_result ? 
+        (await executeRecaptcha('login')) || undefined : undefined, // 保持v3 token
+      recaptcha_v2_token: v2Token // 添加v2 token参数
     })
 
     if (success) {
@@ -727,9 +938,7 @@ const handleSendVerificationCode = async () => {
   registerErrors.value.email = ''
   
   // Reset verification status
-  codeVerification.status = 'idle'
-  codeVerification.message = ''
-  codeVerification.isValid = false
+  clearCodeInputs()
 
   try {
     // 使用智能验证选择
@@ -741,12 +950,12 @@ const handleSendVerificationCode = async () => {
       // notyf.info('使用之前的验证状态')
     }
     
-    const params: SendVerificationCodeParams = {
-      email: registerForm.email,
-      type: 'registration',
-      recaptcha_token: tokens.v3Token,
-      recaptcha_v2_token: tokens.v2Token
-    }
+         const params: SendVerificationCodeParams = {
+       email: registerForm.email,
+       type: 'registration',
+       recaptcha_token: tokens.v3Token || undefined,
+       recaptcha_v2_token: tokens.v2Token || undefined
+     }
 
     const result = await userSession.sendVerificationCode(params)
     if (result.success) {
@@ -762,16 +971,16 @@ const handleSendVerificationCode = async () => {
     console.error('Send verification code failed:', error)
     
     // 检查是否是reCAPTCHA v2挑战响应
-    if (error.status === 423 && error.data?.challenge_type === 'recaptcha_v2') {
+    if (error.response?.status === 423 && error.response?.data?.challenge_type === 'recaptcha_v2') {
       // 显示reCAPTCHA v2验证 for email sending
-      registerRecaptchaV2Challenge.value = error.data
+      registerRecaptchaV2Challenge.value = error.response.data
       showRegisterRecaptchaV2.value = true
       
       // 初始化reCAPTCHA v2 widget
       setTimeout(async () => {
         try {
           await initRegisterRecaptchaV2()
-          notyf.info('请完成安全验证后重新发送验证码')
+          notyf.success('请完成安全验证后重新发送验证码')
         } catch (initError) {
           console.error('Failed to initialize reCAPTCHA v2 for email:', initError)
           notyf.error('安全验证初始化失败，请刷新页面重试')
@@ -830,28 +1039,78 @@ const handleEnhancedRegister = async () => {
     return
   }
 
+  // 在提交之前进行完整验证
+  if (!validateCompleteRegistrationForm()) {
+    notyf.error('Please check all required fields and agreements')
+    return
+  }
+
   registerLoading.value = true
-  // 清除之前的reCAPTCHA v2挑战 (只有在需要旰验证时)
+  // 清除之前的reCAPTCHA v2挑战 (only when needed for revalidation)
   hideRegisterRecaptchaV2Challenge()
 
   try {
-    // 使用智能验证选择
-    const tokens = await getOptimalRecaptchaToken('registration', registerForm.email)
+    let tokens: { v3Token: string | null, v2Token: string | null, fromCache: boolean, cacheInfo: string } = { 
+      v3Token: null, 
+      v2Token: null, 
+      fromCache: false, 
+      cacheInfo: '' 
+    }
+    
+    // 智能验证策略：如果已通过邮箱验证码验证，可能跳过reCAPTCHA
+    const hasValidEmailVerification = codeVerification.isValid && 
+                                     recaptchaTokenCache.lastAction === 'send_email' &&
+                                     recaptchaTokenCache.lastEmail === registerForm.email
+    
+    if (hasValidEmailVerification) {
+      // 邮箱验证码已验证，检查是否有可用的验证token
+      if (recaptchaTokenCache.v2Token && isTokenValid(recaptchaTokenCache.v2Timestamp)) {
+        // 有有效的v2 token，直接使用
+        tokens = {
+          v3Token: null,
+          v2Token: recaptchaTokenCache.v2Token,
+          fromCache: true,
+          cacheInfo: '使用邮箱验证时的v2 token，跳过重复验证'
+        }
+        console.log('✅ 智能验证：使用邮箱验证的v2 token，跳过注册reCAPTCHA')
+      } else if (recaptchaTokenCache.v3Token && isTokenValid(recaptchaTokenCache.v3Timestamp)) {
+        // 有有效的v3 token，直接使用
+        tokens = {
+          v3Token: recaptchaTokenCache.v3Token,
+          v2Token: null,
+          fromCache: true,
+          cacheInfo: '使用邮箱验证时的v3 token，跳过重复验证'
+        }
+        console.log('✅ 智能验证：使用邮箱验证的v3 token，跳过注册reCAPTCHA')
+      } else {
+        // 没有可用token，但邮箱已验证，使用轻量级验证
+        console.log('✅ 智能验证：邮箱已验证，跳过注册reCAPTCHA验证')
+        tokens = { v3Token: null, v2Token: null, fromCache: true, cacheInfo: '邮箱已验证，跳过reCAPTCHA' }
+      }
+          } else {
+        // 邮箱未验证或token过期，正常进行reCAPTCHA验证
+        const optimalTokens = await getOptimalRecaptchaToken('registration', registerForm.email)
+        tokens = {
+          v3Token: optimalTokens.v3Token,
+          v2Token: optimalTokens.v2Token,
+          fromCache: optimalTokens.fromCache,
+          cacheInfo: optimalTokens.cacheInfo || ''
+        }
+      }
     
     if (tokens.fromCache && tokens.cacheInfo) {
       console.log(`💾 Smart registration: ${tokens.cacheInfo}`)
-      notyf.info('使用之前的验证状态，免重复验证')
     }
     
-    const params: EnhancedRegisterParams = {
-      username: registerForm.username,
-      email: registerForm.email,
-      password: registerForm.password,
-      phone: registerForm.phone || undefined,
-      verification_code: registerForm.verificationCode,
-      recaptcha_token: tokens.v3Token,
-      recaptcha_v2_token: tokens.v2Token
-    }
+         const params: EnhancedRegisterParams = {
+       username: registerForm.username,
+       email: registerForm.email,
+       password: registerForm.password,
+       phone: registerForm.phone || undefined,
+       verification_code: registerForm.verificationCode,
+       recaptcha_token: tokens.v3Token || undefined,
+       recaptcha_v2_token: tokens.v2Token || undefined
+     }
 
     const result = await userSession.enhancedRegisterUser(params)
     if (result.success) {
@@ -864,7 +1123,9 @@ const handleEnhancedRegister = async () => {
         phone: '',
         password: '',
         confirmPassword: '',
-        verificationCode: ''
+        verificationCode: '',
+        agreeToPrivacy: false,
+        agreeToTerms: false
       })
       
       // Reset verification status
@@ -888,17 +1149,17 @@ const handleEnhancedRegister = async () => {
     console.error('Registration failed:', error)
     
     // 只有在没有有效v2 token时才触发v2挑战
-    if (error.status === 423 && error.data?.challenge_type === 'recaptcha_v2' && 
+    if (error.response?.status === 423 && error.response?.data?.challenge_type === 'recaptcha_v2' && 
         (!recaptchaTokenCache.v2Token || !isTokenValid(recaptchaTokenCache.v2Timestamp))) {
       // 显示reCAPTCHA v2验证 for registration
-      registerRecaptchaV2Challenge.value = error.data
+      registerRecaptchaV2Challenge.value = error.response.data
       showRegisterRecaptchaV2.value = true
       
       // 初始化reCAPTCHA v2 widget for registration
       setTimeout(async () => {
         try {
           await initRegisterRecaptchaV2()
-          notyf.info('请完成安全验证后重新注册')
+          notyf.success('请完成安全验证后重新注册')
         } catch (initError) {
           console.error('Failed to initialize reCAPTCHA v2 for registration:', initError)
           notyf.error('安全验证初始化失败，请刷新页面重试')
@@ -939,15 +1200,15 @@ const handleEnhancedRegisterWithV2Token = async (v2Token: string) => {
       v3Token = await executeRecaptcha('registration')
     }
     
-    const params: EnhancedRegisterParams = {
-      username: registerForm.username,
-      email: registerForm.email,
-      password: registerForm.password,
-      phone: registerForm.phone || undefined,
-      verification_code: registerForm.verificationCode,
-      recaptcha_token: v3Token,
-      recaptcha_v2_token: v2Token
-    }
+         const params: EnhancedRegisterParams = {
+       username: registerForm.username,
+       email: registerForm.email,
+       password: registerForm.password,
+       phone: registerForm.phone || undefined,
+       verification_code: registerForm.verificationCode,
+       recaptcha_token: v3Token || undefined,
+       recaptcha_v2_token: v2Token
+     }
 
     const result = await userSession.enhancedRegisterUser(params)
     if (result.success) {
@@ -960,7 +1221,9 @@ const handleEnhancedRegisterWithV2Token = async (v2Token: string) => {
         phone: '',
         password: '',
         confirmPassword: '',
-        verificationCode: ''
+        verificationCode: '',
+        agreeToPrivacy: false,
+        agreeToTerms: false
       })
       
       // Reset verification status
@@ -1009,12 +1272,12 @@ const handleSendEmailWithV2Token = async (v2Token: string) => {
     const v3Token = registerRecaptchaV2Challenge.value?.recaptcha_result?.action ? 
       await executeRecaptcha('send_verification_code') : null
     
-    const params: SendVerificationCodeParams = {
-      email: registerForm.email,
-      type: 'registration',
-      recaptcha_token: v3Token,
-      recaptcha_v2_token: v2Token
-    }
+         const params: SendVerificationCodeParams = {
+       email: registerForm.email,
+       type: 'registration',
+       recaptcha_token: v3Token || undefined,
+       recaptcha_v2_token: v2Token
+     }
 
     const result = await userSession.sendVerificationCode(params)
     if (result.success) {
@@ -1063,7 +1326,10 @@ const handleRegister = async () => {
         email: '',
         phone: '',
         password: '',
-        confirmPassword: ''
+        confirmPassword: '',
+        verificationCode: '',
+        agreeToPrivacy: false,
+        agreeToTerms: false
       })
       
       // Auto-fill login form with new account info
@@ -1079,7 +1345,7 @@ const handleRegister = async () => {
 }
 
 useHead({
-  title: 'Login - EzCloud Device Management Platform',
+  title: 'Login - Ezen Cloud',
   script: [
     {
       src: `https://www.google.com/recaptcha/enterprise.js?render=${import.meta.env.VITE_RECAPTCHA_SITE_KEY}`,
@@ -1096,13 +1362,14 @@ useHead({
 
 <template>
   <div class="login-container">
-    <VCard class="login-card">
-      <template #header>
-        <div class="card-header">
-          <h2>EzCloud Device Management Platform</h2>
-          <p>User Login</p>
-        </div>
-      </template>
+    <div class="login-wrapper">
+      <!-- Logo -->
+      <div class="logo-container">
+        <img src="/src/assets/images/EzenCloud-Logo_v2.png" alt="EzCloud Logo" class="logo-image" />
+      </div>
+      
+      <!-- Login Card -->
+      <VCard class="login-card">
       
       <form @submit.prevent="handleLogin">
         <VField class="form-item">
@@ -1174,7 +1441,8 @@ useHead({
           </VButton>
         </VField>
       </form>
-    </VCard>
+      </VCard>
+    </div>
 
 
     <!-- Register Modal -->
@@ -1229,7 +1497,7 @@ useHead({
                         :disabled="!canSendCode"
                         :loading="verificationCodeLoading"
                         @click="handleSendVerificationCode"
-                        size="small"
+
                       >
                         {{ countdownText }}
                       </VButton>
@@ -1249,18 +1517,30 @@ useHead({
                       <VLabel class="verification-label">Verification Code</VLabel>
                       <span class="verification-hint">Enter the 6-digit code sent to {{ registerForm.email }}</span>
                     </div>
-                    <VControl class="verification-input-wrapper">
-                      <VInput
-                        v-model="registerForm.verificationCode"
-                        placeholder="000000"
-                        maxlength="6"
-                        class="verification-input"
-                        :class="{
-                          'is-danger': registerErrors.verificationCode,
-                          'is-success': codeVerification.isValid
-                        }"
-                      />
-                      <span class="icon is-small is-right verification-icon">
+                    <div class="verification-input-wrapper">
+                      <div class="code-inputs-container">
+                        <input
+                          v-for="(digit, index) in codeInputs"
+                          :key="index"
+                          :ref="(el) => { if (el) codeInputRefs[index] = el as HTMLInputElement }"
+                          v-model="codeInputs[index]"
+                          type="text"
+                          inputmode="numeric"
+                          pattern="[0-9]"
+                          maxlength="1"
+                          class="code-input"
+                          :class="{
+                            'is-danger': registerErrors.verificationCode,
+                            'is-success': codeVerification.isValid,
+                            'is-filled': codeInputs[index]
+                          }"
+                          @input="handleCodeInput(index, $event)"
+                          @keydown="handleCodeKeydown(index, $event)"
+                          @paste="handleCodePaste"
+                          autocomplete="off"
+                        />
+                      </div>
+                      <div class="verification-icon">
                         <iconify-icon 
                           v-if="codeVerification.status === 'verifying'" 
                           icon="lucide:loader-2" 
@@ -1276,8 +1556,8 @@ useHead({
                           icon="lucide:x-circle" 
                           class="has-text-danger"
                         />
-                      </span>
-                    </VControl>
+                      </div>
+                    </div>
                     <p v-if="registerErrors.verificationCode" class="help is-danger verification-error">
                       {{ registerErrors.verificationCode }}
                     </p>
@@ -1340,6 +1620,65 @@ useHead({
                   </VControl>
                 </VField>
               </div>
+            </div>
+
+            <!-- 用户协议和隐私政策 -->
+            <div class="form-section">
+              <h4 class="section-title">User Agreement</h4>
+              
+              <VField class="form-item agreement-field">
+                <VControl>
+                  <label class="checkbox-wrapper">
+                    <input
+                      v-model="registerForm.agreeToPrivacy"
+                      type="checkbox"
+                      class="agreement-checkbox"
+                      @blur="validatePrivacyAgreement"
+                    />
+                    <span class="checkbox-text">
+                      I have read and agree to the 
+                      <a 
+                        href="https://www.ezencloud.com/privacy" 
+                        target="_blank" 
+                        class="agreement-link"
+                        rel="noopener noreferrer"
+                      >
+                        Privacy Policy
+                      </a>
+                    </span>
+                  </label>
+                  <p v-if="registerErrors.agreeToPrivacy" class="help is-danger agreement-error">
+                    {{ registerErrors.agreeToPrivacy }}
+                  </p>
+                </VControl>
+              </VField>
+
+              <VField class="form-item agreement-field">
+                <VControl>
+                  <label class="checkbox-wrapper">
+                    <input
+                      v-model="registerForm.agreeToTerms"
+                      type="checkbox"
+                      class="agreement-checkbox"
+                      @blur="validateTermsAgreement"
+                    />
+                    <span class="checkbox-text">
+                      I have read and agree to the 
+                      <a 
+                        href="https://www.ezencloud.com/terms" 
+                        target="_blank" 
+                        class="agreement-link"
+                        rel="noopener noreferrer"
+                      >
+                        Terms of Service
+                      </a>
+                    </span>
+                  </label>
+                  <p v-if="registerErrors.agreeToTerms" class="help is-danger agreement-error">
+                    {{ registerErrors.agreeToTerms }}
+                  </p>
+                </VControl>
+              </VField>
             </div>
 
             <!-- reCAPTCHA v2 验证区域 (for registration) -->
@@ -1424,6 +1763,90 @@ useHead({
   font-weight: 400;
 }
 
+// Agreement checkbox styling
+.agreement-field {
+  margin-bottom: 1rem !important;
+  
+  .checkbox-wrapper {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    cursor: pointer;
+    line-height: 1.5;
+    
+    .agreement-checkbox {
+      margin-top: 0.1rem; // 微调以与文本对齐
+      width: 1rem;
+      height: 1rem;
+      min-width: 1rem;
+      flex-shrink: 0;
+      cursor: pointer;
+      accent-color: var(--primary);
+      
+      &:focus {
+        outline: 2px solid var(--primary-light);
+        outline-offset: 2px;
+      }
+    }
+    
+    .checkbox-text {
+      font-size: 0.9rem;
+      color: var(--dark-text);
+      line-height: 1.5;
+      
+      .agreement-link {
+        color: var(--primary);
+        text-decoration: underline;
+        font-weight: 500;
+        transition: color 0.2s ease;
+        
+        &:hover {
+          color: var(--primary-dark);
+          text-decoration: none;
+        }
+        
+        &:focus {
+          outline: 2px solid var(--primary-light);
+          outline-offset: 1px;
+          border-radius: 2px;
+        }
+      }
+    }
+    
+    &:hover .checkbox-text {
+      color: var(--dark-text-dark);
+    }
+  }
+  
+  .agreement-error {
+    margin-top: 0.5rem;
+    margin-left: 1.75rem; // 对齐checkbox文本
+  }
+}
+
+// Dark mode styles for agreement checkboxes
+.is-dark {
+  .agreement-field {
+    .checkbox-wrapper {
+      .checkbox-text {
+        color: var(--dark-dark-text);
+        
+        .agreement-link {
+          color: var(--primary-light);
+          
+          &:hover {
+            color: var(--primary);
+          }
+        }
+      }
+      
+      &:hover .checkbox-text {
+        color: var(--white);
+      }
+    }
+  }
+}
+
 // Compact verification field styles
 .verification-compact {
   margin-top: 0.75rem;
@@ -1447,39 +1870,98 @@ useHead({
     
     .verification-hint {
       color: var(--muted-grey);
-      font-size: 0.75rem;
+      font-size: 0.9rem;
       font-weight: 400;
+      line-height: 1.4;
     }
   }
   
   .verification-input-wrapper {
     position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
     
-    .verification-input {
-      font-family: 'Courier New', monospace;
-      font-size: 1rem;
-      text-align: center;
-      letter-spacing: 0.3em;
-      padding: 0.5rem 2rem 0.5rem 0.75rem;
-      height: 2.5rem;
+    .code-inputs-container {
+      display: flex !important;
+      gap: 0.5rem;
+      justify-content: center;
+      align-items: center;
+      flex-wrap: nowrap;
       
-      &.is-success {
-        border-color: var(--success);
-        background-color: var(--success-light);
-      }
-      
-      &.is-danger {
-        border-color: var(--danger);
-        background-color: var(--danger-light);
+      .code-input {
+        width: 2.5rem !important;
+        height: 2.5rem !important;
+        min-width: 2.5rem !important;
+        min-height: 2.5rem !important;
+        max-width: 2.5rem !important;
+        max-height: 2.5rem !important;
+        text-align: center !important;
+        font-family: 'Courier New', monospace !important;
+        font-size: 1.25rem !important;
+        font-weight: 600 !important;
+        border: 2px solid #ddd !important;
+        border-radius: 8px !important;
+        background: white !important;
+        transition: all 0.2s ease;
+        padding: 0 !important;
+        margin: 0 !important;
+        box-sizing: border-box !important;
+        display: block !important;
+        appearance: none !important;
+        -webkit-appearance: none !important;
+        -moz-appearance: textfield !important;
+        
+        &:focus {
+          outline: none !important;
+          border-color: var(--primary) !important;
+          box-shadow: 0 0 0 3px var(--primary-light);
+          transform: translateY(-1px);
+        }
+        
+        &.is-filled {
+          border-color: var(--primary) !important;
+          background-color: var(--primary-light) !important;
+          color: var(--primary);
+        }
+        
+        &.is-success {
+          border-color: var(--success) !important;
+          background-color: var(--success-light) !important;
+          color: var(--success);
+        }
+        
+        &.is-danger {
+          border-color: var(--danger) !important;
+          background-color: var(--danger-light) !important;
+          color: var(--danger);
+          animation: shake 0.3s ease-in-out;
+        }
+        
+        &:hover:not(:focus) {
+          border-color: var(--primary-light) !important;
+        }
       }
     }
     
     .verification-icon {
-      position: absolute;
-      right: 0.5rem;
-      top: 50%;
-      transform: translateY(-50%);
-      z-index: 2;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 1.5rem;
+      
+      .iconify-icon {
+        font-size: 1.25rem;
+        
+        &.has-text-success {
+          color: var(--success) !important;
+        }
+        
+        &.has-text-danger {
+          color: var(--danger) !important;
+        }
+      }
     }
   }
   
@@ -1492,6 +1974,22 @@ useHead({
   .is-dark & {
     background: var(--dark-sidebar-light-3);
     border-color: var(--dark-sidebar-light-12);
+    
+    .code-inputs-container .code-input {
+      background: var(--dark-sidebar-light-2);
+      border-color: var(--dark-sidebar-light-12);
+      color: var(--dark-dark-text);
+      
+      &:focus {
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px var(--primary-light);
+      }
+      
+      &.is-filled {
+        border-color: var(--primary);
+        background-color: var(--dark-sidebar-light-6);
+      }
+    }
   }
 }
 
@@ -1578,6 +2076,12 @@ useHead({
   to { transform: rotate(360deg); }
 }
 
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-3px); }
+  75% { transform: translateX(3px); }
+}
+
 // Status icons in input fields
 :deep(.icon) {
   &.is-right {
@@ -1610,35 +2114,47 @@ useHead({
   justify-content: center;
   align-items: center;
   min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(145deg,#92B9E0 0%,#80BBA1 100%);
   padding: 2rem;
+}
+
+.login-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2rem;
+  width: 100%;
+  max-width: 600px;
+}
+
+.logo-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  
+  .logo-image {
+    max-width: 300px;
+    max-height: 80px;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.15));
+    transition: transform 0.3s ease;
+    
+    &:hover {
+      transform: scale(1.02);
+    }
+  }
 }
 
 .login-card {
   width: 100%;
-  max-width: 400px;
+  max-width: 480px !important;
+  min-width: 420px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
   border-radius: var(--radius-large);
   border: none;
-}
-
-.card-header {
-  text-align: center;
-  padding: 1rem 0;
-
-  h2 {
-    margin: 0 0 8px 0;
-    color: var(--dark-text);
-    font-weight: 600;
-    font-size: 1.5rem;
-    line-height: 1.3;
-  }
-
-  p {
-    margin: 0;
-    color: var(--muted-grey);
-    font-size: 0.9rem;
-  }
+  padding: 2.5rem;
 }
 
 :deep(.form-icon) {
@@ -1680,12 +2196,6 @@ useHead({
 .is-dark {
   .login-container {
     background: linear-gradient(135deg, #2d3748 0%, #4a5568 100%);
-  }
-  
-  .card-header {
-    h2 {
-      color: var(--dark-dark-text);
-    }
   }
 }
 
@@ -1766,9 +2276,14 @@ useHead({
     padding: 1rem;
   }
 
-  .card-header {
-    h2 {
-      font-size: 1.25rem;
+  .login-wrapper {
+    gap: 1.5rem;
+  }
+
+  .logo-container {
+    .logo-image {
+      max-width: 250px;
+      max-height: 60px;
     }
   }
   
@@ -1777,6 +2292,33 @@ useHead({
     
     .recaptcha-container #recaptcha-v2-container {
       transform: scale(0.85);
+    }
+  }
+  
+  // 移动端验证码输入框优化
+  .verification-input-wrapper {
+    .code-inputs-container {
+      gap: 0.3rem !important;
+      
+      .code-input {
+        width: 2.2rem !important;
+        height: 2.2rem !important;
+        font-size: 1.1rem !important;
+      }
+    }
+  }
+  
+  .verification-compact {
+    padding: 0.6rem;
+    
+    .verification-header {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.25rem;
+      
+      .verification-hint {
+        font-size: 0.85rem;
+      }
     }
   }
 }

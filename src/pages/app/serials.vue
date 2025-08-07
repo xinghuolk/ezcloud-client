@@ -633,7 +633,7 @@ onMounted(async () => {
 })
 
 useHead({
-  title: 'Serial Numbers - EzCloud'
+  title: 'Serial Numbers - Ezen Cloud'
 })
 </script>
 

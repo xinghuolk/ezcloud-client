@@ -157,7 +157,7 @@ onMounted(() => {
 })
 
 useHead({
-  title: 'Vendor Management - EzCloud',
+  title: 'Vendor Management - Ezen Cloud',
 })
 </script>
 

@@ -241,73 +241,99 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="page-content-inner">
-    <div class="list-flex-toolbar">
-      <VField>
-        <VControl icon="lucide:search">
-          <VInput
-            v-model="searchForm.search"
-            class="is-rounded"
-            placeholder="Search users..."
-          />
-        </VControl>
-      </VField>
-
-      <VField grouped>
-        <VControl>
-          <VSelect v-model="searchForm.role" class="is-rounded">
-            <VOption value="">All Roles</VOption>
-            <VOption value="user">User</VOption>
-            <VOption value="admin">Admin</VOption>
-            <VOption value="super_admin">Super Admin</VOption>
-          </VSelect>
-        </VControl>
-
-        <VControl>
-          <VSelect v-model="searchForm.is_active" class="is-rounded">
-            <VOption value="">All Status</VOption>
-            <VOption :value="true">Active</VOption>
-            <VOption :value="false">Inactive</VOption>
-          </VSelect>
-        </VControl>
-      </VField>
-
-      <VField grouped>
-        <VControl>
-          <VButton
-            color="primary"
-            outlined
-            @click="handleRefresh"
-          >
-            <VIcon icon="lucide:refresh-cw" />
-            Refresh
-          </VButton>
-        </VControl>
-
-        <VControl>
-          <VButton
-            color="success"
-            @click="openCreateDialog"
-          >
-            <VIcon icon="lucide:plus" />
-            Add User
-          </VButton>
-        </VControl>
-
-        <VControl>
-          <VButton
-            color="light"
-            outlined
-            @click="handleReset"
-          >
-            Reset
-          </VButton>
-        </VControl>
-      </VField>
+  <div class="common-page-layout">
+    <!-- Page Header -->
+    <div class="common-page-header">
+      <div class="header-content">
+        <div class="header-info">
+          <h1 class="title is-3">User Management</h1>
+          <p class="subtitle is-6">Manage platform users and permissions</p>
+        </div>
+      </div>
     </div>
 
-    <!-- User List Table -->
-    <div class="page-content-body">
+    <!-- Controls and Table -->
+    <VCard>
+      <div class="card-content">
+        <!-- Filter Section -->
+        <div class="columns is-multiline mb-4">
+          <div class="column is-4">
+            <VField>
+              <VLabel>Search</VLabel>
+              <VControl>
+                <VInput
+                  v-model="searchForm.search"
+                  placeholder="Search users..."
+                  icon="lucide:search"
+                />
+              </VControl>
+            </VField>
+          </div>
+
+          <div class="column is-2">
+            <VField>
+              <VLabel>Role</VLabel>
+              <VControl>
+                <VSelect v-model="searchForm.role">
+                  <VOption value="">All Roles</VOption>
+                  <VOption value="user">User</VOption>
+                  <VOption value="admin">Admin</VOption>
+                  <VOption value="super_admin">Super Admin</VOption>
+                </VSelect>
+              </VControl>
+            </VField>
+          </div>
+
+          <div class="column is-2">
+            <VField>
+              <VLabel>Status</VLabel>
+              <VControl>
+                <VSelect v-model="searchForm.is_active">
+                  <VOption value="">All Status</VOption>
+                  <VOption :value="true">Active</VOption>
+                  <VOption :value="false">Inactive</VOption>
+                </VSelect>
+              </VControl>
+            </VField>
+          </div>
+
+          <div class="column is-4">
+            <VField>
+              <VLabel>&nbsp;</VLabel>
+              <VField grouped>
+                <VControl>
+                  <VButton @click="handleRefresh" :loading="loading">
+                    Refresh
+                  </VButton>
+                </VControl>
+
+                <VControl>
+                  <VButton
+                    color="success"
+                    @click="openCreateDialog"
+                  >
+                    <VIcon icon="lucide:plus" />
+                    Add User
+                  </VButton>
+                </VControl>
+
+                <VControl>
+                  <VButton
+                    color="light"
+                    outlined
+                    @click="handleReset"
+                  >
+                    Reset
+                  </VButton>
+                </VControl>
+              </VField>
+            </VField>
+          </div>
+        </div>
+      </div>
+
+      <!-- User List Table -->
+      <div class="card-content pt-0">
       <VFlexTableWrapper
         :columns="columns"
         :data="users"
@@ -413,17 +439,18 @@ onMounted(() => {
         </template>
       </VFlexTableWrapper>
 
-      <!-- Pagination -->
-      <VFlexPagination
-        v-if="pagination.total > 0"
-        v-model:current-page="pagination.page"
-        :item-per-page="pagination.limit"
-        :total-items="pagination.total"
-        :max-links-displayed="7"
-        no-router
-        @update:current-page="handlePageChange"
-      />
-    </div>
+        <!-- Pagination -->
+        <VFlexPagination
+          v-if="pagination.total > 0"
+          v-model:current-page="pagination.page"
+          :item-per-page="pagination.limit"
+          :total-items="pagination.total"
+          :max-links-displayed="7"
+          no-router
+          @update:current-page="handlePageChange"
+        />
+      </div>
+    </VCard>
 
     <!-- Create User Modal -->
     <VModal
@@ -593,20 +620,5 @@ onMounted(() => {
 </template>
 
 <style lang="scss" scoped>
-.page-content-inner {
-  position: relative;
-}
-
-.list-flex-toolbar {
-  display: flex;
-  align-items: center;
-  margin-bottom: 20px;
-  gap: 16px;
-
-  @media (max-width: 767px) {
-    flex-direction: column;
-    gap: 12px;
-  }
-}
-
+// Using common page layout styles - no custom styles needed
 </style>

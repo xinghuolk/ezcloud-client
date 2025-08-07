@@ -71,10 +71,12 @@ export const useUserSession = defineStore('userSession', () => {
       
       // 对于 423 reCAPTCHA 挑战响应，需要保留完整错误结构供上层组件处理
       if (error.response?.status === 423) {
-        // 构造包含挑战信息的错误对象，直接传递挑战数据（避免双重嵌套）
+        console.log('🔍 处理 423 reCAPTCHA 挑战响应:', error.response.data)
+        // 构造包含挑战信息的错误对象，传递整个响应数据
         const challengeError = new Error(error.response.data?.message || 'Security challenge required') as any
         challengeError.status = 423
-        challengeError.data = error.response.data?.data || error.response.data // 直接传递挑战数据
+        challengeError.data = error.response.data // 传递整个响应数据，challenge_type 现在在顶层
+        console.log('🚀 抛出挑战错误对象:', challengeError)
         throw challengeError
       }
       
@@ -132,6 +134,13 @@ export const useUserSession = defineStore('userSession', () => {
       return { success: false, error: response.message || 'Failed to send verification code' }
     } catch (error: any) {
       console.error('Send verification code error:', error)
+      
+      // 对于 423 reCAPTCHA 挑战响应，需要保留完整错误结构供上层组件处理
+      if (error.response?.status === 423) {
+        // 重新抛出423错误，保持原始结构
+        throw error
+      }
+      
       return { success: false, error: extractErrorMessage(error, 'Failed to send verification code') }
     }
   }
@@ -161,6 +170,13 @@ export const useUserSession = defineStore('userSession', () => {
       return { success: false, error: response.message || 'Registration failed' }
     } catch (error: any) {
       console.error('Enhanced register error:', error)
+      
+      // 对于 423 reCAPTCHA 挑战响应，需要保留完整错误结构供上层组件处理
+      if (error.response?.status === 423) {
+        // 重新抛出423错误，保持原始结构
+        throw error
+      }
+      
       return { success: false, error: extractErrorMessage(error, 'Registration failed') }
     } finally {
       loading.value = false

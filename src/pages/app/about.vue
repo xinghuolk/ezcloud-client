@@ -211,7 +211,7 @@ onMounted(async () => {
 })
 
 useHead({
-  title: 'About - EzCloud'
+  title: 'About - Ezen Cloud'
 })
 </script>
 
@@ -240,66 +240,6 @@ useHead({
     <!-- 系统信息内容（仅管理员可见） -->
     <template v-else>
 
-    <div class="columns">
-      <!-- App Information -->
-      <div class="column is-6">
-        <VCard radius="smooth" class="mb-6">
-          <h3 class="title is-5 mb-4">Application Information</h3>
-          
-          <div class="app-info-grid">
-            <div class="info-item">
-              <label>Application Name</label>
-              <span>{{ appInfo.name }}</span>
-            </div>
-            <div class="info-item">
-              <label>Version</label>
-              <VTag color="primary">v{{ appInfo.version }}</VTag>
-            </div>
-            <div class="info-item full-width">
-              <label>Description</label>
-              <span>{{ appInfo.description }}</span>
-            </div>
-          </div>
-        </VCard>
-
-        <!-- Features -->
-        <VCard radius="smooth">
-          <h3 class="title is-5 mb-4">Key Features</h3>
-          
-          <div class="features-list">
-            <div 
-              v-for="feature in appInfo.features" 
-              :key="feature"
-              class="feature-item"
-            >
-              <iconify-icon icon="lucide:check-circle" class="feature-icon" />
-              <span>{{ feature }}</span>
-            </div>
-          </div>
-        </VCard>
-      </div>
-
-      <!-- Technology Stack -->
-      <div class="column is-6">
-        <VCard radius="smooth">
-          <h3 class="title is-5 mb-4">Technology Stack</h3>
-          
-          <div class="tech-grid">
-            <div 
-              v-for="tech in appInfo.technologies" 
-              :key="tech.name"
-              class="tech-item"
-            >
-              <div class="tech-header">
-                <iconify-icon icon="lucide:code" class="tech-icon" />
-                <span class="tech-name">{{ tech.name }}</span>
-              </div>
-              <p class="tech-description">{{ tech.description }}</p>
-            </div>
-          </div>
-        </VCard>
-      </div>
-    </div>
 
     <!-- System Status -->
     <VCard radius="smooth" class="mb-6">

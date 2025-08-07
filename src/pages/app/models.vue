@@ -348,7 +348,7 @@ onMounted(async () => {
 })
 
 useHead({
-  title: 'Device Models - EzCloud'
+  title: 'Device Models - Ezen Cloud'
 })
 </script>
 

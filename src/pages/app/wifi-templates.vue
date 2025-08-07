@@ -502,7 +502,7 @@ onMounted(() => {
 })
 
 useHead({
-  title: 'WiFi Templates - EzCloud'
+  title: 'WiFi Templates - Ezen Cloud'
 })
 </script>
 

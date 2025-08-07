@@ -232,7 +232,7 @@ onUnmounted(() => {
 })
 
 useHead({
-  title: 'Dashboard - EzCloud',
+  title: 'Dashboard - Ezen Cloud',
 })
 </script>
 

@@ -192,7 +192,7 @@ onMounted(() => {
 })
 
 useHead({
-  title: 'Profile - EzCloud'
+  title: 'Profile - Ezen Cloud'
 })
 </script>
 

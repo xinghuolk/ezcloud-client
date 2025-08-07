@@ -1,12 +1,32 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import type { SideblockItem } from '/@src/components/layouts/sideblock/sideblock.types'
 import { useUserSession } from '/@src/stores/user-session'
+import { useDarkmode } from '/@src/composables/darkmode'
 import ToolbarUserProfile from '/@src/components/partials/layout/toolbar/ToolbarUserProfile.vue'
+// Import logos directly
+import logoLight from '/@src/assets/images/EzenCloud-Logo_v2.png'
+import logoDark from '/@src/assets/images/EzenCloud-Logo-v2-Dark.png'
 
 const router = useRouter()
 const userSession = useUserSession()
+const darkmode = useDarkmode()
+
+// 根据dark mode状态动态选择logo
+const logoSrc = computed(() => {
+  // 直接访问响应式值，确保能触发重新计算
+  const isDarkMode = darkmode.isDark.value
+  console.log('🌙 Dark mode status changed to:', isDarkMode)
+  
+  // 修正逻辑：暗色模式使用暗色logo，亮色模式使用亮色logo
+  const selectedLogo = isDarkMode ? logoDark : logoLight
+  
+  console.log('🎨 Selected logo:', selectedLogo)
+  console.log('🎨 Logic: darkmode =', isDarkMode, '-> using', isDarkMode ? 'dark logo' : 'light logo')
+  
+  return selectedLogo
+})
 
 const allLinks = ref<SideblockItem[]>([
   {
@@ -98,6 +118,12 @@ const links = computed(() => {
   })
 })
 
+// 调试：监听darkmode变化
+watch(() => darkmode.isDark.value, (newValue, oldValue) => {
+  console.log(`🔄 Darkmode changed: ${oldValue} → ${newValue}`)
+  console.log('🔄 Logo will change to:', logoSrc.value)
+}, { immediate: true })
+
 </script>
 
 <template>
@@ -109,9 +135,9 @@ const links = computed(() => {
     <slot />
 
     <template #logo>
-      <h3 class="is-hidden-mobile ml-2">
-        EzCloud
-      </h3>
+      <div class="is-hidden-mobile logo-container">
+        <img :src="logoSrc" alt="EzCloud" class="logo-image" />
+      </div>
     </template>
 
     <template #toolbar>
@@ -129,4 +155,31 @@ const links = computed(() => {
 </template>
 
 <style lang="scss" scoped>
+.logo-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 0 1rem;
+  
+  .logo-image {
+    width: 100%;
+    max-width: 200px;
+    height: auto;
+    max-height: 40px;
+    object-fit: contain;
+    transition: all 0.3s ease;
+    
+    &:hover {
+      transform: scale(1.02);
+    }
+  }
+}
+
+// 移动端隐藏时保持样式一致
+@media (max-width: 768px) {
+  .logo-container {
+    padding: 0 0.5rem;
+  }
+}
 </style>

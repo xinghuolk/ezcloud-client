@@ -84,6 +84,7 @@ export interface LoginParams {
   email: string
   password: string
   recaptcha_token?: string
+  recaptcha_v2_token?: string
 }
 
 export interface RegisterParams {

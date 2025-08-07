@@ -84,7 +84,7 @@ onUnmounted(() => {
 })
 
 useHead({
-  title: computed(() => device.value ? `${device.value.name || device.value.serial} - Device Workspace - EzCloud` : 'Device Workspace - EzCloud')
+  title: computed(() => device.value ? `${device.value.name || device.value.serial} - Device Workspace - Ezen Cloud` : 'Device Workspace - Ezen Cloud')
 })
 </script>
 

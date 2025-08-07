@@ -235,7 +235,7 @@ onMounted(() => {
 })
 
 useHead({
-  title: 'Device Binding - EzCloud Device Management Platform'
+  title: 'Device Binding - Ezen Cloud'
 })
 </script>
 

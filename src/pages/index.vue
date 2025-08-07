@@ -17,7 +17,7 @@ onMounted(() => {
 })
 
 useHead({
-  title: 'EzCloud - IoT Device Management Platform',
+  title: 'Ezen Cloud',
 })
 </script>
 

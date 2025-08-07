@@ -520,7 +520,7 @@ onMounted(() => {
 })
 
 useHead({
-  title: 'Device Management - EzCloud',
+  title: 'Device Management - Ezen Cloud',
 })
 </script>
 
