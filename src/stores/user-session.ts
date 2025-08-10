@@ -59,7 +59,6 @@ export const useUserSession = defineStore('userSession', () => {
         const token = useUserToken()
         token.value = response.data.token
         setUser(response.data.user)
-        notyf.success('Login successful')
         return true
       }
       return false

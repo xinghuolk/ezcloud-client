@@ -123,14 +123,22 @@ request.interceptors.response.use(
             return Promise.reject(new Error(errorMessage))
           }
           
-          // 其他401和403都是token无效导致的，统一处理
-          errorMessage = status === 401 ? 'Unauthorized, please login again' : 'Access denied, please login again'
-          notyf.error(errorMessage)
-          // 清除本地存储的认证信息
-          localStorage.removeItem('token')
-          localStorage.removeItem('user_info')
-          // 跳转到登录页面（使用window.location避免router问题）
-          window.location.href = '/auth'
+          // 区分真正的认证失败和普通权限不足
+          if (status === 401) {
+            // 401表示token无效，需要重新登录
+            errorMessage = 'Unauthorized, please login again'
+            notyf.error(errorMessage)
+            // 清除本地存储的认证信息
+            localStorage.removeItem('token')
+            localStorage.removeItem('user_info')
+            // 跳转到登录页面
+            window.location.href = '/auth'
+          } else if (status === 403) {
+            // 403表示权限不足，只在控制台记录，不强制退出
+            errorMessage = errorMessage || 'Access denied - insufficient permissions'
+            console.warn(`权限不足: ${error.config?.url} - ${errorMessage}`)
+            // 不显示通知，不跳转页面，让上层组件处理
+          }
           break
         case 404:
           // 对于某些预期的404（如开发中的API），不显示通知

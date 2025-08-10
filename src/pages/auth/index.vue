@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import { useUserSession } from '/@src/stores/user-session'
 import { useUserToken } from '/@src/composables/user-token'
 import { useDarkmode } from '/@src/composables/darkmode'
-import { Notyf } from 'notyf'
+import { notyf } from '/@src/api/request'
 import type { SendVerificationCodeParams, VerifyCodeParams, EnhancedRegisterParams } from '/@src/api/types'
 // Import logos directly  
 import logoLight from '/@src/assets/images/EzenCloud-Logo_v2.png'
@@ -40,7 +40,6 @@ definePage({
 const router = useRouter()
 const userSession = useUserSession()
 const darkmode = useDarkmode()
-const notyf = new Notyf()
 
 // 根据dark mode状态动态选择logo
 const logoSrc = computed(() => {
