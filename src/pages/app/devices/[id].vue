@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useDeviceStore } from '/@src/stores/devices'
 import { devicesApi } from '/@src/api'
 import type { Device, DeviceStatus } from '/@src/api/types'
-import { Notyf } from 'notyf'
+import { notyf } from '/@src/api/request'
 
 definePage({
   meta: {
@@ -15,8 +15,6 @@ definePage({
 const route = useRoute()
 const router = useRouter()
 const devicesStore = useDeviceStore()
-const notyf = new Notyf()
-
 // State
 const device = ref<Device | null>(null)
 const loading = ref(true)

@@ -2,7 +2,7 @@
 import { ref, onMounted, watch } from 'vue'
 import { wifiTemplatesApi } from '/@src/api'
 import type { WiFiTemplate } from '/@src/api/types'
-import { Notyf } from 'notyf'
+import { notyf } from '/@src/api/request'
 import type { VTagColor } from '/@src/components/base/VTag.vue'
 import VDateTimeSplit from '/@src/components/base/VDateTimeSplit.vue'
 
@@ -11,8 +11,6 @@ definePage({
     requiresAuth: true
   }
 })
-
-const notyf = new Notyf()
 
 // State
 const loading = ref(false)

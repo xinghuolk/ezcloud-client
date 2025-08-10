@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { useUserSession } from '/@src/stores/user-session'
-import { Notyf } from 'notyf'
+import { notyf } from '/@src/api/request'
 import { formatDateTime } from '/@src/utils/date-formatter'
 
 definePage({
@@ -11,8 +11,6 @@ definePage({
 })
 
 const userSession = useUserSession()
-const notyf = new Notyf()
-
 // State
 const activeTab = ref('profile')
 const profileLoading = ref(false)

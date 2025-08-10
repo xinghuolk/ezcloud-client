@@ -3,11 +3,8 @@ import { ref, computed } from 'vue'
 import { authApi } from '/@src/api'
 import type { User, LoginParams, RegisterParams, SendVerificationCodeParams, VerifyCodeParams, EnhancedRegisterParams } from '/@src/api/types'
 import { useUserToken } from '/@src/composables/user-token'
-import { Notyf } from 'notyf'
+import { notyf } from '/@src/api/request'
 import { extractErrorMessage } from '/@src/utils/error-utils'
-
-// 创建通知实例
-const notyf = new Notyf()
 
 export interface UserData extends User {
   // 继承API中的User类型，可以添加额外字段
@@ -114,7 +111,7 @@ export const useUserSession = defineStore('userSession', () => {
       return false
     } catch (error: any) {
       console.error('Register error:', error)
-      notyf.error(extractErrorMessage(error, 'Registration failed'))
+      // axios拦截器已处理错误提示)
       return false
     } finally {
       loading.value = false
@@ -221,7 +218,7 @@ export const useUserSession = defineStore('userSession', () => {
       return false
     } catch (error: any) {
       console.error('Update profile error:', error)
-      notyf.error(extractErrorMessage(error, 'Profile update failed'))
+      // axios拦截器已处理错误提示)
       return false
     } finally {
       loading.value = false
@@ -240,7 +237,7 @@ export const useUserSession = defineStore('userSession', () => {
       return false
     } catch (error: any) {
       console.error('Change password error:', error)
-      notyf.error(extractErrorMessage(error, 'Password change failed'))
+      // axios拦截器已处理错误提示)
       return false
     } finally {
       loading.value = false
@@ -298,7 +295,7 @@ export const useUserSession = defineStore('userSession', () => {
   // 检查管理员权限
   function requireAdmin(): void {
     if (!isAnyAdmin.value) {
-      notyf.error('Admin permission required')
+      // axios拦截器已处理错误提示
       throw new Error('Admin permission required')
     }
   }
@@ -306,7 +303,7 @@ export const useUserSession = defineStore('userSession', () => {
   // 检查超级管理员权限
   function requireSuperAdmin(): void {
     if (!isSuperAdmin.value) {
-      notyf.error('Super admin permission required')
+      // axios拦截器已处理错误提示
       throw new Error('Super admin permission required')
     }
   }

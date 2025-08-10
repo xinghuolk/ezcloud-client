@@ -6,7 +6,7 @@ import type { Device, DeviceQuery } from '/@src/api/types'
 import { deviceApi } from '/@src/api'
 import RemoteAccessButton from '/@src/components/RemoteAccessButton.vue'
 import DeviceTrustManager from '/@src/components/DeviceTrustManager.vue'
-import { Notyf } from 'notyf'
+import { notyf } from '/@src/api/request'
 import { formatDateTime } from '/@src/utils/date-formatter'
 
 definePage({
@@ -15,7 +15,6 @@ definePage({
   }
 })
 
-const notyf = new Notyf()
 const deviceStore = useDeviceStore()
 const userSession = useUserSession()
 

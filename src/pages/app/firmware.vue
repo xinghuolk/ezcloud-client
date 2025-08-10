@@ -4,7 +4,7 @@ import { useFirmwareStore } from '/@src/stores/firmware'
 import { modelApi } from '/@src/api'
 import type { FirmwareVersion, FirmwareQuery, DeviceModel, CreateFirmwareParams } from '/@src/api/types'
 import type { VTagColor } from '/@src/components/base/VTag.vue'
-import { Notyf } from 'notyf'
+import { notyf } from '/@src/api/request'
 
 definePage({
   meta: {
@@ -13,7 +13,6 @@ definePage({
   }
 })
 
-const notyf = new Notyf()
 const firmwareStore = useFirmwareStore()
 
 // 状态定义

@@ -11,11 +11,9 @@ import type {
   FirmwareTestProgress,
   AddTestDevicesParams
 } from '/@src/api/types'
-import { Notyf } from 'notyf'
 import { firmwareApi } from '/@src/api'
+import { notyf } from '/@src/api/request'
 import { extractErrorMessage } from '/@src/utils/error-utils'
-
-const notyf = new Notyf()
 
 export const useFirmwareStore = defineStore('firmware', () => {
   // State
@@ -77,11 +75,11 @@ export const useFirmwareStore = defineStore('firmware', () => {
         firmwareList.value = response.data.firmware
         pagination.value = response.data.pagination
       } else {
-        notyf.error(response.message || 'Failed to fetch firmware list')
+        // axios拦截器已处理错误提示
       }
     } catch (error) {
       console.error('Failed to fetch firmware list:', error)
-      notyf.error(extractErrorMessage(error, 'Failed to fetch firmware list'))
+      // axios拦截器已处理错误提示)
     } finally {
       loading.value = false
     }
@@ -95,12 +93,12 @@ export const useFirmwareStore = defineStore('firmware', () => {
         currentFirmware.value = response.data
         return response.data
       } else {
-        notyf.error(response.message || 'Failed to get firmware details')
+        // axios拦截器已处理错误提示
         return null
       }
     } catch (error) {
       console.error('Failed to get firmware details:', error)
-      notyf.error(extractErrorMessage(error, 'Failed to get firmware details'))
+      // axios拦截器已处理错误提示)
       return null
     } finally {
       loading.value = false
@@ -115,12 +113,12 @@ export const useFirmwareStore = defineStore('firmware', () => {
         // 返回数据，让页面组件处理成功提示和列表刷新
         return response.data
       } else {
-        notyf.error(response.message || 'Firmware upload failed')
+        // axios拦截器已处理错误提示
         return null
       }
     } catch (error) {
       console.error('Firmware upload failed:', error)
-      notyf.error(extractErrorMessage(error, 'Firmware upload failed'))
+      // axios拦截器已处理错误提示)
       return null
     } finally {
       uploading.value = false
@@ -143,12 +141,12 @@ export const useFirmwareStore = defineStore('firmware', () => {
         }
         return response.data
       } else {
-        notyf.error(response.message || 'Update failed')
+        // axios拦截器已处理错误提示
         return null
       }
     } catch (error) {
       console.error('Update firmware failed:', error)
-      notyf.error(extractErrorMessage(error, 'Update failed'))
+      // axios拦截器已处理错误提示)
       return null
     } finally {
       loading.value = false
@@ -172,12 +170,12 @@ export const useFirmwareStore = defineStore('firmware', () => {
         }
         return response.data
       } else {
-        notyf.error(response.message || 'Status update failed')
+        // axios拦截器已处理错误提示
         return null
       }
     } catch (error) {
       console.error('Status update failed:', error)
-      notyf.error(extractErrorMessage(error, 'Status update failed'))
+      // axios拦截器已处理错误提示)
       return null
     } finally {
       loading.value = false
@@ -200,12 +198,12 @@ export const useFirmwareStore = defineStore('firmware', () => {
         }
         return true
       } else {
-        notyf.error(response.message || 'Delete failed')
+        // axios拦截器已处理错误提示
         return false
       }
     } catch (error) {
       console.error('Delete firmware failed:', error)
-      notyf.error(extractErrorMessage(error, 'Delete failed'))
+      // axios拦截器已处理错误提示)
       return false
     } finally {
       loading.value = false
@@ -219,12 +217,12 @@ export const useFirmwareStore = defineStore('firmware', () => {
       if (response.success) {
         return response.data
       } else {
-        notyf.error(response.message || 'Failed to get compatibility settings')
+        // axios拦截器已处理错误提示
         return []
       }
     } catch (error) {
       console.error('Failed to get compatibility settings:', error)
-      notyf.error(extractErrorMessage(error, 'Failed to get compatibility settings'))
+      // axios拦截器已处理错误提示)
       return []
     } finally {
       loading.value = false
@@ -241,12 +239,12 @@ export const useFirmwareStore = defineStore('firmware', () => {
         await fetchFirmwareDetail(id)
         return true
       } else {
-        notyf.error(response.message || 'Save failed')
+        // axios拦截器已处理错误提示
         return false
       }
     } catch (error) {
       console.error('Save compatibility settings failed:', error)
-      notyf.error(extractErrorMessage(error, 'Save failed'))
+      // axios拦截器已处理错误提示)
       return false
     } finally {
       loading.value = false
@@ -311,12 +309,12 @@ export const useFirmwareStore = defineStore('firmware', () => {
         testDevices.value.set(firmwareId, response.data)
         return response.data
       } else {
-        notyf.error(response.message || 'Failed to get test devices')
+        // axios拦截器已处理错误提示
         return []
       }
     } catch (error) {
       console.error('Failed to get test devices:', error)
-      notyf.error(extractErrorMessage(error, 'Failed to get test devices'))
+      // axios拦截器已处理错误提示)
       return []
     } finally {
       testLoading.value = false
@@ -333,13 +331,13 @@ export const useFirmwareStore = defineStore('firmware', () => {
         await fetchTestDevices(firmwareId)
         return response.data
       } else {
-        notyf.error(response.message || 'Failed to add test devices')
+        // axios拦截器已处理错误提示
         return null
       }
     } catch (error) {
       console.error('Failed to add test devices:', error)
       const errorMessage = extractErrorMessage(error, 'Failed to add test devices')
-      notyf.error(errorMessage)
+      // axios拦截器已处理错误提示
       return null
     } finally {
       testLoading.value = false
@@ -356,12 +354,12 @@ export const useFirmwareStore = defineStore('firmware', () => {
         await fetchTestDevices(firmwareId)
         return true
       } else {
-        notyf.error(response.message || 'Failed to remove test device')
+        // axios拦截器已处理错误提示
         return false
       }
     } catch (error) {
       console.error('Failed to remove test device:', error)
-      notyf.error(extractErrorMessage(error, 'Failed to remove test device'))
+      // axios拦截器已处理错误提示)
       return false
     } finally {
       testLoading.value = false
@@ -399,12 +397,12 @@ export const useFirmwareStore = defineStore('firmware', () => {
         }
         return response.data
       } else {
-        notyf.error(response.message || 'Failed to start testing')
+        // axios拦截器已处理错误提示
         return null
       }
     } catch (error) {
       console.error('Failed to start testing:', error)
-      notyf.error(extractErrorMessage(error, 'Failed to start testing'))
+      // axios拦截器已处理错误提示)
       return null
     } finally {
       loading.value = false
@@ -427,12 +425,12 @@ export const useFirmwareStore = defineStore('firmware', () => {
         }
         return response.data
       } else {
-        notyf.error(response.message || 'Failed to finish testing')
+        // axios拦截器已处理错误提示
         return null
       }
     } catch (error) {
       console.error('Failed to finish testing:', error)
-      notyf.error(extractErrorMessage(error, 'Failed to finish testing'))
+      // axios拦截器已处理错误提示)
       return null
     } finally {
       loading.value = false
@@ -455,12 +453,12 @@ export const useFirmwareStore = defineStore('firmware', () => {
         }
         return response.data
       } else {
-        notyf.error(response.message || 'Failed to publish firmware')
+        // axios拦截器已处理错误提示
         return null
       }
     } catch (error) {
       console.error('Failed to publish firmware:', error)
-      notyf.error(extractErrorMessage(error, 'Failed to publish firmware'))
+      // axios拦截器已处理错误提示)
       return null
     } finally {
       loading.value = false

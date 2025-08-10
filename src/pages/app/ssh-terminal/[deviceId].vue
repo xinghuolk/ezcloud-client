@@ -3,7 +3,7 @@ import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { devicesApi } from '/@src/api'
 import type { Device } from '/@src/api/types'
-import { Notyf } from 'notyf'
+import { notyf } from '/@src/api/request'
 import WebSSHTerminal from '/@src/components/WebSSHTerminal.vue'
 
 definePage({
@@ -14,8 +14,6 @@ definePage({
 
 const route = useRoute()
 const router = useRouter()
-const notyf = new Notyf()
-
 // State
 const device = ref<Device | null>(null)
 const loading = ref(true)

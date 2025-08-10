@@ -3,7 +3,7 @@ import { ref, reactive, onMounted, computed, watch } from 'vue'
 import { useVendorStore } from '/@src/stores/vendors'
 import { useUserSession } from '/@src/stores/user-session'
 import type { Vendor, CreateVendorParams } from '/@src/api/types'
-import { Notyf } from 'notyf'
+import { notyf } from '/@src/api/request'
 
 definePage({
   meta: {
@@ -11,8 +11,6 @@ definePage({
     requiresAdmin: true
   }
 })
-
-const notyf = new Notyf()
 const vendorStore = useVendorStore()
 const userSession = useUserSession()
 

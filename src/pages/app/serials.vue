@@ -3,7 +3,7 @@ import { ref, reactive, onMounted, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { serialApi, modelApi } from '/@src/api'
 import type { SerialNumber, GenerateSerialParams, DeviceModel } from '/@src/api/types'
-import { Notyf } from 'notyf'
+import { notyf } from '/@src/api/request'
 import { formatDateTime } from '/@src/utils/date-formatter'
 
 definePage({
@@ -14,8 +14,6 @@ definePage({
 })
 
 const router = useRouter()
-const notyf = new Notyf()
-
 // State
 const loading = ref(false)
 const generating = ref(false)

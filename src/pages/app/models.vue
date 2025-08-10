@@ -4,7 +4,7 @@ import { useVendorStore } from '/@src/stores/vendors'
 import { modelApi } from '/@src/api'
 import type { DeviceModel, CreateDeviceModelParams } from '/@src/api/types'
 import type { VTagColor } from '/@src/components/base/VTag.vue'
-import { Notyf } from 'notyf'
+import { notyf } from '/@src/api/request'
 import { formatDateTime } from '/@src/utils/date-formatter'
 
 definePage({
@@ -15,8 +15,6 @@ definePage({
 })
 
 const vendorStore = useVendorStore()
-const notyf = new Notyf()
-
 // Device types
 const DEVICE_TYPES = [
   { value: 'router', label: 'Router' },

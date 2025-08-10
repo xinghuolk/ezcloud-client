@@ -1,10 +1,8 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { Vendor, CreateVendorParams } from '/@src/api/types'
-import { Notyf } from 'notyf'
 import { vendorApi } from '/@src/api'
-
-const notyf = new Notyf()
+import { notyf } from '/@src/api/request'
 
 export const useVendorStore = defineStore('vendors', () => {
   // State
@@ -47,11 +45,11 @@ export const useVendorStore = defineStore('vendors', () => {
           totalPages: response.data.pagination?.totalPages || 0
         }
       } else {
-        notyf.error(response.message || 'Failed to fetch vendors')
+        // axios拦截器已处理错误提示
       }
     } catch (error) {
       console.error('Failed to fetch vendors:', error)
-      notyf.error('Failed to fetch vendors')
+      // axios拦截器已处理错误提示
     } finally {
       loading.value = false
     }
@@ -64,12 +62,12 @@ export const useVendorStore = defineStore('vendors', () => {
         currentVendor.value = response.data
         return response.data
       } else {
-        notyf.error(response.message || 'Failed to fetch vendor details')
+        // axios拦截器已处理错误提示
         return null
       }
     } catch (error) {
       console.error('Failed to fetch vendor details:', error)
-      notyf.error('Failed to fetch vendor details')
+      // axios拦截器已处理错误提示
       return null
     }
   }
@@ -84,12 +82,12 @@ export const useVendorStore = defineStore('vendors', () => {
         notyf.success('Vendor created successfully')
         return response.data
       } else {
-        notyf.error(response.message || 'Failed to create vendor')
+        // axios拦截器已处理错误提示，这里不重复显示
         return null
       }
     } catch (error) {
       console.error('Failed to create vendor:', error)
-      notyf.error('Failed to create vendor')
+      // axios拦截器已处理错误提示，这里不重复显示
       return null
     }
   }
@@ -112,12 +110,12 @@ export const useVendorStore = defineStore('vendors', () => {
         notyf.success('Vendor updated successfully')
         return response.data
       } else {
-        notyf.error(response.message || 'Failed to update vendor')
+        // axios拦截器已处理错误提示，这里不重复显示
         return null
       }
     } catch (error) {
       console.error('Failed to update vendor:', error)
-      notyf.error('Failed to update vendor')
+      // axios拦截器已处理错误提示，这里不重复显示
       return null
     }
   }
@@ -141,12 +139,12 @@ export const useVendorStore = defineStore('vendors', () => {
         notyf.success('Vendor deleted successfully')
         return true
       } else {
-        notyf.error(response.message || 'Failed to delete vendor')
+        // axios拦截器已处理错误提示，这里不重复显示
         return false
       }
     } catch (error) {
       console.error('Failed to delete vendor:', error)
-      notyf.error('Failed to delete vendor')
+      // axios拦截器已处理错误提示，这里不重复显示
       return false
     }
   }
@@ -157,12 +155,12 @@ export const useVendorStore = defineStore('vendors', () => {
       if (response.success) {
         return response.data
       } else {
-        notyf.error(response.message || 'Failed to fetch active vendors')
+        // axios拦截器已处理错误提示
         return []
       }
     } catch (error) {
       console.error('Failed to fetch active vendors:', error)
-      notyf.error('Failed to fetch active vendors')
+      // axios拦截器已处理错误提示
       return []
     }
   }

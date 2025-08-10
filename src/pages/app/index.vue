@@ -5,7 +5,7 @@ import { useUserSession } from '/@src/stores/user-session'
 import { useDeviceStore } from '/@src/stores/devices'
 import { statsApi } from '/@src/api'
 import type { Device } from '/@src/api/types'
-import { Notyf } from 'notyf'
+import { notyf } from '/@src/api/request'
 
 definePage({
   meta: {
@@ -13,7 +13,6 @@ definePage({
   }
 })
 
-const notyf = new Notyf()
 const userSession = useUserSession()
 const deviceStore = useDeviceStore()
 const router = useRouter()

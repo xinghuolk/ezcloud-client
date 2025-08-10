@@ -1,11 +1,9 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { Device, DeviceQuery, DeviceTrustParams, DeviceTrustUpdateParams, DeviceTrusted } from '/@src/api/types'
-import { Notyf } from 'notyf'
 import { deviceApi } from '/@src/api'
+import { notyf } from '/@src/api/request'
 import { extractErrorMessage } from '/@src/utils/error-utils'
-
-const notyf = new Notyf()
 
 export const useDeviceStore = defineStore('devices', () => {
   // State
@@ -43,11 +41,11 @@ export const useDeviceStore = defineStore('devices', () => {
         devices.value = response.data.devices
         pagination.value = response.data.pagination
       } else {
-        notyf.error(response.message || 'Failed to fetch devices')
+        // axios拦截器已处理错误提示
       }
     } catch (error) {
       console.error('Failed to fetch devices:', error)
-      notyf.error(extractErrorMessage(error, 'Failed to fetch devices'))
+      // axios拦截器已处理错误提示)
     } finally {
       loading.value = false
     }
@@ -65,12 +63,12 @@ export const useDeviceStore = defineStore('devices', () => {
         return response.data
       } else {
         console.error('Store: API returned error:', response.message)
-        notyf.error(response.message || 'Failed to fetch device details')
+        // axios拦截器已处理错误提示
         return null
       }
     } catch (error) {
       console.error('Store: Exception when fetching device details:', error)
-      notyf.error(extractErrorMessage(error, 'Failed to fetch device details'))
+      // axios拦截器已处理错误提示)
       return null
     }
   }
@@ -84,12 +82,12 @@ export const useDeviceStore = defineStore('devices', () => {
         await fetchDevices()
         return true
       } else {
-        notyf.error(response.message || 'Failed to bind device')
+        // axios拦截器已处理错误提示
         return false
       }
     } catch (error) {
       console.error('Failed to bind device:', error)
-      notyf.error(extractErrorMessage(error, 'Failed to bind device'))
+      // axios拦截器已处理错误提示)
       return false
     }
   }
@@ -103,12 +101,12 @@ export const useDeviceStore = defineStore('devices', () => {
         await fetchDevices()
         return true
       } else {
-        notyf.error(response.message || 'Failed to unbind device')
+        // axios拦截器已处理错误提示
         return false
       }
     } catch (error) {
       console.error('Failed to unbind device:', error)
-      notyf.error(extractErrorMessage(error, 'Failed to unbind device'))
+      // axios拦截器已处理错误提示)
       return false
     }
   }
@@ -128,12 +126,12 @@ export const useDeviceStore = defineStore('devices', () => {
         }
         return true
       } else {
-        notyf.error(response.message || 'Failed to update device name')
+        // axios拦截器已处理错误提示
         return false
       }
     } catch (error) {
       console.error('Failed to update device name:', error)
-      notyf.error(extractErrorMessage(error, 'Failed to update device name'))
+      // axios拦截器已处理错误提示)
       return false
     }
   }
@@ -145,12 +143,12 @@ export const useDeviceStore = defineStore('devices', () => {
         notyf.success('Device reboot command sent successfully')
         return true
       } else {
-        notyf.error(response.message || 'Failed to send reboot command')
+        // axios拦截器已处理错误提示
         return false
       }
     } catch (error) {
       console.error('Failed to reboot device:', error)
-      notyf.error(extractErrorMessage(error, 'Failed to reboot device'))
+      // axios拦截器已处理错误提示)
       return false
     }
   }
@@ -162,12 +160,12 @@ export const useDeviceStore = defineStore('devices', () => {
         notyf.success(`SIM switch to slot ${slot} command sent successfully`)
         return true
       } else {
-        notyf.error(response.message || 'Failed to send SIM switch command')
+        // axios拦截器已处理错误提示
         return false
       }
     } catch (error) {
       console.error('Failed to switch SIM:', error)
-      notyf.error(extractErrorMessage(error, 'Failed to switch SIM'))
+      // axios拦截器已处理错误提示)
       return false
     }
   }
@@ -179,12 +177,12 @@ export const useDeviceStore = defineStore('devices', () => {
         notyf.success('Log collection command sent successfully')
         return true
       } else {
-        notyf.error(response.message || 'Failed to send log collection command')
+        // axios拦截器已处理错误提示
         return false
       }
     } catch (error) {
       console.error('Failed to collect logs:', error)
-      notyf.error(extractErrorMessage(error, 'Failed to collect logs'))
+      // axios拦截器已处理错误提示)
       return false
     }
   }
@@ -199,12 +197,12 @@ export const useDeviceStore = defineStore('devices', () => {
         notyf.success(`Batch ${operation} command sent successfully to ${deviceIds.length} devices`)
         return true
       } else {
-        notyf.error(response.message || `Failed to send batch ${operation} command`)
+        // axios拦截器已处理错误提示
         return false
       }
     } catch (error) {
       console.error(`Failed to perform batch ${operation}:`, error)
-      notyf.error(extractErrorMessage(error, `Failed to perform batch ${operation}`))
+      // axios拦截器已处理错误提示)
       return false
     }
   }
@@ -244,12 +242,12 @@ export const useDeviceStore = defineStore('devices', () => {
         await fetchDeviceDetails(deviceId)
         return true
       } else {
-        notyf.error(response.message || 'Failed to grant device trust')
+        // axios拦截器已处理错误提示
         return false
       }
     } catch (error) {
       console.error('Failed to trust device:', error)
-      notyf.error(extractErrorMessage(error, 'Failed to grant device trust'))
+      // axios拦截器已处理错误提示)
       return false
     }
   }
@@ -263,12 +261,12 @@ export const useDeviceStore = defineStore('devices', () => {
         await fetchDeviceDetails(deviceId)
         return true
       } else {
-        notyf.error(response.message || 'Failed to revoke device trust')
+        // axios拦截器已处理错误提示
         return false
       }
     } catch (error) {
       console.error('Failed to untrust device:', error)
-      notyf.error(extractErrorMessage(error, 'Failed to revoke device trust'))
+      // axios拦截器已处理错误提示)
       return false
     }
   }
@@ -279,12 +277,12 @@ export const useDeviceStore = defineStore('devices', () => {
       if (response.success) {
         return response.data.trustees
       } else {
-        notyf.error(response.message || 'Failed to get trustees list')
+        // axios拦截器已处理错误提示
         return []
       }
     } catch (error) {
       console.error('Failed to get device trustees:', error)
-      notyf.error(extractErrorMessage(error, 'Failed to get trustees list'))
+      // axios拦截器已处理错误提示)
       return []
     }
   }
@@ -298,12 +296,12 @@ export const useDeviceStore = defineStore('devices', () => {
         await fetchDeviceDetails(deviceId)
         return response.data
       } else {
-        notyf.error(response.message || 'Failed to update device trust relationship')
+        // axios拦截器已处理错误提示
         return null
       }
     } catch (error) {
       console.error('Failed to update device trust:', error)
-      notyf.error(extractErrorMessage(error, 'Failed to update device trust relationship'))
+      // axios拦截器已处理错误提示)
       return null
     }
   }

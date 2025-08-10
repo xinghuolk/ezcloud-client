@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
-import { Notyf } from 'notyf'
+import { notyf } from '/@src/api/request'
 import { formatDateTime } from '/@src/utils/date-formatter'
 import { useUserSession } from '/@src/stores/user-session'
 import request from '/@src/api/request'
@@ -15,8 +15,6 @@ const userSession = useUserSession()
 
 // 检查是否有系统查看权限
 const hasSystemAccess = computed(() => userSession.hasPermission('system:view'))
-
-const notyf = new Notyf()
 
 // 系统配置数据
 const systemConfig = ref<any>(null)

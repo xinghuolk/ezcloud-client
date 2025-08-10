@@ -3,7 +3,7 @@ import { ref, reactive, onMounted, computed, watch } from 'vue'
 import { useUserSession } from '/@src/stores/user-session'
 import { userManagementApi } from '/@src/api'
 import type { User, UserListParams } from '/@src/api/types'
-import { Notyf } from 'notyf'
+import { notyf } from '/@src/api/request'
 
 definePage({
   meta: {
@@ -12,7 +12,6 @@ definePage({
   }
 })
 
-const notyf = new Notyf()
 const userSession = useUserSession()
 
 // State

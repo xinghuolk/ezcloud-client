@@ -3,7 +3,7 @@ import { ref, reactive, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useDeviceStore } from '/@src/stores/devices'
 import { useUserSession } from '/@src/stores/user-session'
-import { Notyf } from 'notyf'
+import { notyf } from '/@src/api/request'
 import type { Device, DeviceQuery } from '/@src/api/types'
 import RemoteAccessButton from '/@src/components/RemoteAccessButton.vue'
 
@@ -16,8 +16,6 @@ definePage({
 const router = useRouter()
 const deviceStore = useDeviceStore()
 const userSession = useUserSession()
-const notyf = new Notyf()
-
 // State
 const loading = ref(false)
 const bindLoading = ref(false)

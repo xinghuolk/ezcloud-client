@@ -91,6 +91,10 @@ request.interceptors.response.use(
     return data
   },
   (error: AxiosError) => {
+    console.error('🚨 Request interceptor 捕获错误:', error)
+    console.error('🔍 error.config.url:', error.config?.url)
+    console.error('🔍 error.response:', error.response)
+    
     // 处理HTTP错误状态码
     if (error.response) {
       const { status, data } = error.response
@@ -98,7 +102,10 @@ request.interceptors.response.use(
       
       // 尝试从响应数据中获取错误消息
       if (data && typeof data === 'object') {
-        errorMessage = (data as any).message || errorMessage
+        const dataMessage = (data as any).message
+        console.error('🔍 data.message:', dataMessage, '类型:', typeof dataMessage)
+        errorMessage = dataMessage || errorMessage
+        console.error('🔍 最终errorMessage:', errorMessage, '类型:', typeof errorMessage)
       }
       
       switch (status) {
@@ -136,9 +143,14 @@ request.interceptors.response.use(
           notyf.error(errorMessage)
           break
         case 409:
-          // 冲突错误（如设备已绑定），让上层页面处理错误显示
+          // 冲突错误（如厂商重复等），显示具体错误信息
           errorMessage = errorMessage || 'Resource conflict'
-          // 不显示通知，让上层处理
+          notyf.error(errorMessage)
+          break
+        case 422:
+          // 不可处理的实体（如删除有关联的资源）
+          errorMessage = errorMessage || 'Cannot process request'
+          notyf.error(errorMessage)
           break
         case 423:
           // 423 Locked - 用于 reCAPTCHA 挑战响应
@@ -169,5 +181,8 @@ request.interceptors.response.use(
     return Promise.reject(error)
   }
 )
+
+// 导出统一的通知实例供其他模块使用
+export { notyf }
 
 export default request
