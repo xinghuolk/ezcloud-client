@@ -405,13 +405,32 @@ const savingCompatibility = ref(false)
 
 // 管理兼容性
 const manageCompatibility = async (firmware: FirmwareVersion) => {
+  console.log(`[FRONTEND] 🔧 开始管理兼容性`)
+  console.log(`[FRONTEND] 选择的固件:`, firmware.id, firmware.version)
+  
   selectedFirmware.value = firmware
   compatibilityDialogOpen.value = true
   
   // 加载当前兼容性设置
   loadingCompatibility.value = true
+  console.log(`[FRONTEND] 📡 加载当前兼容性设置...`)
+  
   const models = await firmwareStore.getCompatibility(firmware.id)
-  compatibilityForm.device_model_ids = models.map(model => model.id)
+  console.log(`[FRONTEND] 📊 获取到的兼容模型数据:`, models)
+  console.log(`[FRONTEND] models类型:`, typeof models)
+  console.log(`[FRONTEND] models是否为数组:`, Array.isArray(models))
+  console.log(`[FRONTEND] models长度:`, models?.length)
+  
+  if (Array.isArray(models)) {
+    const modelIds = models.map(model => model.id)
+    console.log(`[FRONTEND] 提取的model IDs:`, modelIds)
+    compatibilityForm.device_model_ids = modelIds
+  } else {
+    console.log(`[FRONTEND] ⚠️ models不是数组，设置为空数组`)
+    compatibilityForm.device_model_ids = []
+  }
+  
+  console.log(`[FRONTEND] 最终设置的device_model_ids:`, compatibilityForm.device_model_ids)
   loadingCompatibility.value = false
 }
 
@@ -419,10 +438,23 @@ const manageCompatibility = async (firmware: FirmwareVersion) => {
 const saveCompatibility = async () => {
   if (!selectedFirmware.value) return
   
-  savingCompatibility.value = true
-  const success = await firmwareStore.setCompatibility(selectedFirmware.value.id, {
+  console.log(`[FRONTEND] 🎯 开始保存兼容性设置`)
+  console.log(`[FRONTEND] 固件ID: ${selectedFirmware.value.id}`)
+  console.log(`[FRONTEND] 固件版本: ${selectedFirmware.value.version}`)
+  console.log(`[FRONTEND] 表单数据 device_model_ids:`, compatibilityForm.device_model_ids)
+  console.log(`[FRONTEND] device_model_ids类型:`, typeof compatibilityForm.device_model_ids)
+  console.log(`[FRONTEND] device_model_ids是否为数组:`, Array.isArray(compatibilityForm.device_model_ids))
+  console.log(`[FRONTEND] device_model_ids长度:`, compatibilityForm.device_model_ids?.length)
+  
+  const payload = {
     device_model_ids: compatibilityForm.device_model_ids
-  })
+  }
+  console.log(`[FRONTEND] 准备发送的payload:`, payload)
+  
+  savingCompatibility.value = true
+  const success = await firmwareStore.setCompatibility(selectedFirmware.value.id, payload)
+  
+  console.log(`[FRONTEND] 保存结果:`, success)
   
   if (success) {
     compatibilityDialogOpen.value = false
@@ -868,6 +900,7 @@ onUnmounted(() => {
                       View Details
                     </a>
                     <a 
+                      v-if="firmware.status === 'DRAFT'"
                       href="#" 
                       class="dropdown-item"
                       @click.prevent="manageCompatibility(firmware)"
@@ -875,6 +908,14 @@ onUnmounted(() => {
                       <iconify-icon icon="lucide:settings" class="mr-2" />
                       Compatibility Settings
                     </a>
+                    <span 
+                      v-else
+                      class="dropdown-item is-disabled"
+                      title="Only DRAFT firmware can modify compatibility settings"
+                    >
+                      <iconify-icon icon="lucide:settings" class="mr-2" />
+                      Compatibility Settings (Locked)
+                    </span>
                     <hr class="dropdown-divider" v-if="firmware.status !== 'ARCHIVED'">
                     <!-- 测试管理选项 -->
                     <a 
@@ -1144,6 +1185,13 @@ onUnmounted(() => {
         <div v-if="selectedFirmware">
           <div class="mb-4">
             <strong>Firmware Version:</strong> {{ selectedFirmware.version }}
+            <br>
+            <strong>Status:</strong> {{ statusTextMap[selectedFirmware.status] || selectedFirmware.status }}
+          </div>
+          
+          <div v-if="selectedFirmware.status !== 'DRAFT'" class="notification is-warning">
+            <iconify-icon icon="lucide:lock" class="mr-2" />
+            Compatibility settings can only be modified for DRAFT firmware. This firmware is in {{ statusTextMap[selectedFirmware.status] || selectedFirmware.status }} status.
           </div>
           
           <div v-if="loadingCompatibility" class="loading-placeholder">
@@ -1160,6 +1208,7 @@ onUnmounted(() => {
                   placeholder="Select compatible device models"
                   multiple
                   required
+                  :disabled="selectedFirmware.status !== 'DRAFT'"
                 >
                   <VOption 
                     v-for="model in deviceModels" 
@@ -1171,7 +1220,13 @@ onUnmounted(() => {
                 </VSelect>
               </VControl>
               <p class="help">
-                Select device models that can use this firmware version. Devices can only upgrade to firmware compatible with their model.
+                <span v-if="selectedFirmware.status === 'DRAFT'">
+                  Select device models that can use this firmware version. Devices can only upgrade to firmware compatible with their model.
+                </span>
+                <span v-else class="has-text-warning">
+                  <iconify-icon icon="lucide:lock" class="mr-1" />
+                  Compatibility settings are locked for {{ statusTextMap[selectedFirmware.status] || selectedFirmware.status }} firmware.
+                </span>
               </p>
             </VField>
             
@@ -1195,7 +1250,7 @@ onUnmounted(() => {
         <VButton 
           color="primary"
           :loading="savingCompatibility"
-          :disabled="loadingCompatibility || compatibilityForm.device_model_ids.length === 0"
+          :disabled="loadingCompatibility || compatibilityForm.device_model_ids.length === 0 || selectedFirmware?.status !== 'DRAFT'"
           @click="saveCompatibility"
         >
           Save
