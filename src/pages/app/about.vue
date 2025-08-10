@@ -123,24 +123,54 @@ const startOAuthAuthentication = async () => {
       )
       
       if (authWindow) {
-        // 监听认证窗口关闭事件
-        const checkClosed = setInterval(() => {
-          if (authWindow.closed) {
+        // 监听来自认证窗口的消息
+        const handleMessage = (event: MessageEvent) => {
+          if (event.data.type === 'oauth-success') {
+            console.log('OAuth认证成功:', event.data)
+            notyf.success('Google OAuth认证成功！')
+            // 清理监听器
+            window.removeEventListener('message', handleMessage)
             clearInterval(checkClosed)
-            console.log('OAuth认证窗口已关闭，刷新认证状态')
-            // 窗口关闭后刷新OAuth状态
+            // 刷新OAuth状态
             setTimeout(() => {
               fetchOAuthStatus()
-            }, 1000) // 延迟1秒确保后端处理完成
+            }, 500)
+          } else if (event.data.type === 'oauth-error') {
+            console.error('OAuth认证失败:', event.data.error)
+            notyf.error(`OAuth认证失败: ${event.data.error}`)
+            // 清理监听器
+            window.removeEventListener('message', handleMessage)
+            clearInterval(checkClosed)
+          }
+        }
+        
+        // 监听postMessage
+        window.addEventListener('message', handleMessage)
+        
+        // 监听认证窗口关闭事件（备用方案）
+        const checkClosed = setInterval(() => {
+          try {
+            if (authWindow.closed) {
+              clearInterval(checkClosed)
+              window.removeEventListener('message', handleMessage)
+              console.log('OAuth认证窗口已关闭，刷新认证状态')
+              // 窗口关闭后刷新OAuth状态
+              setTimeout(() => {
+                fetchOAuthStatus()
+              }, 1000) // 延迟1秒确保后端处理完成
+            }
+          } catch (e) {
+            // 忽略跨域访问错误
           }
         }, 1000)
         
         // 10分钟后自动停止检查（防止内存泄漏）
         setTimeout(() => {
           clearInterval(checkClosed)
+          window.removeEventListener('message', handleMessage)
         }, 600000)
         
-        notyf.info('请在新窗口中完成Google OAuth认证')
+        notyf.success('请在新窗口中完成Google OAuth认证')
       } else {
         notyf.error('无法打开认证窗口，请检查浏览器弹窗阻止设置')
       }

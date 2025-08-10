@@ -212,7 +212,7 @@ export const useUserSession = defineStore('userSession', () => {
       const response = await authApi.updateProfile(params)
       if (response.success && response.data) {
         setUser(response.data)
-        notyf.success('Profile updated successfully')
+        // 移除这里的提示，让调用方控制提示消息
         return true
       }
       return false
@@ -231,7 +231,7 @@ export const useUserSession = defineStore('userSession', () => {
     try {
       const response = await authApi.changePassword(params)
       if (response.success) {
-        notyf.success('Password changed successfully')
+        // 移除这里的提示，让调用方控制提示消息
         return true
       }
       return false
