@@ -28,8 +28,10 @@ let searchTimeout: NodeJS.Timeout | null = null
 // Dialog controls
 const generateDialogVisible = ref(false)
 const detailDialogVisible = ref(false)
+const batchDetailDialogVisible = ref(false)
 const deleteBatchConfirmOpen = ref(false)
 const selectedSerial = ref<SerialNumber | null>(null)
+const selectedBatch = ref<any>(null)
 const selectedBatchForDelete = ref<string>('')
 
 // Generate form
@@ -506,6 +508,11 @@ const handleViewDetails = (serial: SerialNumber) => {
   detailDialogVisible.value = true
 }
 
+const handleViewBatchDetails = (batch: any) => {
+  selectedBatch.value = batch
+  batchDetailDialogVisible.value = true
+}
+
 const handleExportBatch = async (batchId: string) => {
   try {
     const response = await serialApi.exportSerials(batchId)
@@ -729,9 +736,22 @@ useHead({
                 <span class="batch-id" :class="{ 'is-virtual': batch.is_virtual }">
                   {{ batch.is_virtual ? batch.display_name : batch.batch_id }}
                 </span>
-                <VDropdown v-if="!batch.is_virtual" spaced right icon="lucide:more-horizontal">
+                <VDropdown spaced right icon="lucide:more-horizontal">
                   <template #content>
                     <a 
+                      class="dropdown-item is-media"
+                      @click="handleViewBatchDetails(batch)"
+                    >
+                      <div class="icon">
+                        <iconify-icon icon="lucide:eye" />
+                      </div>
+                      <div class="meta">
+                        <span>View Details</span>
+                      </div>
+                    </a>
+                    <hr v-if="!batch.is_virtual" class="dropdown-divider">
+                    <a 
+                      v-if="!batch.is_virtual"
                       class="dropdown-item is-media"
                       @click="handleExportBatch(batch.batch_id)"
                     >
@@ -742,8 +762,9 @@ useHead({
                         <span>Export Excel</span>
                       </div>
                     </a>
-                    <hr class="dropdown-divider">
+                    <hr v-if="!batch.is_virtual" class="dropdown-divider">
                     <a 
+                      v-if="!batch.is_virtual"
                       class="dropdown-item is-media has-text-danger"
                       @click="handleDeleteBatch(batch.batch_id)"
                     >
@@ -1223,6 +1244,138 @@ useHead({
       </template>
     </VModal>
 
+    <!-- Batch Details Modal -->
+    <VModal
+      :open="batchDetailDialogVisible"
+      :title="selectedBatch?.is_virtual ? 'Virtual Batch Details' : 'Batch Details'"
+      size="medium"
+      actions="right"
+      cancel-label="Close"
+      @close="batchDetailDialogVisible = false"
+    >
+      <template #content>
+        <div v-if="selectedBatch" class="batch-details">
+          <!-- Virtual Batch Details -->
+          <div v-if="selectedBatch.is_virtual" class="virtual-batch-details">
+            <div class="common-info-grid">
+              <div class="common-info-item">
+                <label>Batch Type</label>
+                <VTag color="info" rounded>
+                  <iconify-icon icon="lucide:layers" class="mr-1" />
+                  Virtual Combined Batch
+                </VTag>
+              </div>
+              <div class="common-info-item">
+                <label>Display Name</label>
+                <span>{{ selectedBatch.display_name }}</span>
+              </div>
+              <div class="common-info-item">
+                <label>Combined Models</label>
+                <span>{{ selectedBatch.model_count }} device models</span>
+              </div>
+              <div class="common-info-item">
+                <label>Total Serials</label>
+                <span>{{ selectedBatch.total_count || 0 }}</span>
+              </div>
+              <div class="common-info-item">
+                <label>Unused Count</label>
+                <VTag color="success">{{ selectedBatch.unused_count || 0 }}</VTag>
+              </div>
+              <div class="common-info-item">
+                <label>Bound Count</label>
+                <VTag color="warning">{{ selectedBatch.bound_count || 0 }}</VTag>
+              </div>
+              <div class="common-info-item">
+                <label>Activated Count</label>
+                <VTag color="primary">{{ selectedBatch.activated_count || 0 }}</VTag>
+              </div>
+              <div class="common-info-item">
+                <label>First Created</label>
+                <VDateTimeSplit :date-string="selectedBatch.created_at" />
+              </div>
+            </div>
+            
+            <div class="virtual-batch-info mt-4">
+              <h5 class="title is-6">Virtual Batch Information</h5>
+              <VMessage color="info">
+                <iconify-icon icon="lucide:info" class="mr-2" />
+                This is a combined view of all auto-registered device serials grouped by device models. 
+                It aggregates statistics from {{ selectedBatch.model_count }} different device models 
+                that have been automatically registered in the system.
+              </VMessage>
+            </div>
+          </div>
+
+          <!-- Regular Batch Details -->
+          <div v-else class="regular-batch-details">
+            <div class="common-info-grid">
+              <div class="common-info-item">
+                <label>Batch ID</label>
+                <span class="batch-id">{{ selectedBatch.batch_id }}</span>
+              </div>
+              <div v-if="selectedBatch.deviceModel" class="common-info-item">
+                <label>Device Model</label>
+                <div class="device-model-detail">
+                  <div class="model-name">{{ selectedBatch.deviceModel.oemname }} {{ selectedBatch.deviceModel.stdname }}</div>
+                  <div class="model-type">{{ selectedBatch.deviceModel.devtype }}</div>
+                </div>
+              </div>
+              <div v-if="selectedBatch.deviceModel?.vendor" class="common-info-item">
+                <label>Vendor</label>
+                <span>{{ selectedBatch.deviceModel.vendor.name }}</span>
+              </div>
+              <div class="common-info-item">
+                <label>Total Serials</label>
+                <span>{{ selectedBatch.total_count || selectedBatch.count || 0 }}</span>
+              </div>
+              <div class="common-info-item">
+                <label>Unused Count</label>
+                <VTag color="success">{{ selectedBatch.unused_count || 0 }}</VTag>
+              </div>
+              <div class="common-info-item">
+                <label>Bound Count</label>
+                <VTag color="warning">{{ selectedBatch.bound_count || 0 }}</VTag>
+              </div>
+              <div class="common-info-item">
+                <label>Activated Count</label>
+                <VTag color="primary">{{ selectedBatch.activated_count || 0 }}</VTag>
+              </div>
+              <div class="common-info-item">
+                <label>Created At</label>
+                <VDateTimeSplit :date-string="selectedBatch.created_at" />
+              </div>
+            </div>
+
+            <!-- Batch Actions -->
+            <div v-if="!selectedBatch.is_virtual" class="batch-actions mt-4">
+              <h5 class="title is-6">Batch Actions</h5>
+              <div class="field is-grouped">
+                <div class="control">
+                  <VButton 
+                    color="info"
+                    @click="handleExportBatch(selectedBatch.batch_id); batchDetailDialogVisible = false"
+                  >
+                    <iconify-icon icon="lucide:download" class="mr-1" />
+                    Export Excel
+                  </VButton>
+                </div>
+                <div class="control">
+                  <VButton 
+                    color="danger"
+                    outlined
+                    @click="handleDeleteBatch(selectedBatch.batch_id); batchDetailDialogVisible = false"
+                  >
+                    <iconify-icon icon="lucide:trash-2" class="mr-1" />
+                    Delete Batch
+                  </VButton>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </template>
+    </VModal>
+
     <!-- Delete Batch Confirmation Dialog -->
     <VModal 
       :open="deleteBatchConfirmOpen"
@@ -1297,6 +1450,19 @@ useHead({
     &.is-active {
       border-color: var(--primary);
       background: var(--primary-light);
+      box-shadow: 0 4px 12px rgba(var(--primary-rgb), 0.15);
+      border-left: 4px solid var(--primary);
+      transform: translateY(-1px);
+      
+      .batch-id {
+        color: var(--primary);
+        font-weight: 700;
+      }
+      
+      .batch-info .model-info {
+        color: var(--primary-dark);
+        font-weight: 600;
+      }
     }
 
     &.is-virtual {
@@ -1306,6 +1472,26 @@ useHead({
       &.is-active {
         border-color: var(--info);
         background: linear-gradient(135deg, var(--info-light) 0%, var(--primary-light) 100%);
+        box-shadow: 0 4px 12px rgba(var(--info-rgb), 0.2);
+        border-left: 4px solid var(--info);
+        transform: translateY(-1px);
+        
+        .batch-id.is-virtual {
+          color: var(--info);
+          font-weight: 700;
+          
+          &::before {
+            content: '🔗';
+            margin-right: 0.5rem;
+            font-size: 1rem;
+            animation: pulse 2s infinite;
+          }
+        }
+        
+        .virtual-info {
+          color: var(--info-dark);
+          font-weight: 600;
+        }
       }
       
       .batch-id.is-virtual {
@@ -1476,6 +1662,65 @@ useHead({
   small {
     display: block;
     line-height: 1.4;
+  }
+}
+
+// 脉冲动画，用于选中的虚拟批次图标
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+// 批次详情样式
+.batch-details {
+  .device-model-detail {
+    .model-name {
+      font-weight: 600;
+      color: var(--primary);
+      margin-bottom: 0.25rem;
+    }
+    
+    .model-type {
+      font-size: 0.85rem;
+      color: var(--muted-grey);
+      text-transform: uppercase;
+      font-weight: 500;
+    }
+  }
+  
+  .virtual-batch-info {
+    .title {
+      color: var(--info);
+      display: flex;
+      align-items: center;
+      margin-bottom: 1rem;
+      
+      &::before {
+        content: '🔗';
+        margin-right: 0.5rem;
+      }
+    }
+    
+    :deep(.message-body) {
+      line-height: 1.6;
+    }
+  }
+  
+  .batch-actions {
+    .title {
+      margin-bottom: 1rem;
+      color: var(--dark-text);
+    }
   }
 }
 
