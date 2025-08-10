@@ -2,7 +2,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserSession } from '/@src/stores/user-session'
-import { Notyf } from 'notyf'
+import { notyf } from '/@src/api/request'
 import request from '/@src/api/request'
 
 definePage({
@@ -15,7 +15,6 @@ definePage({
 const route = useRoute()
 const router = useRouter()
 const userSession = useUserSession()
-const notyf = new Notyf()
 
 // State
 const loading = ref(false)
@@ -163,14 +162,8 @@ const handleBind = async () => {
 
     console.log('Full API response:', response)
     
-    // 处理设备已绑定的特殊情况
-    // 如果response直接是设备对象（有id, serial等字段），说明是"设备已绑定"的情况
-    if (response && typeof response === 'object' && 'id' in response && 'serial' in response) {
-      console.log('Device already bound case - got device object directly')
-      step.value = 'error'
-      errorMessage.value = 'Device is already bound to your account'
-      notyf.error('Device is already bound to your account')
-    } else if (response && typeof response === 'object' && 'success' in response) {
+    // 处理统一响应格式：{success, message, data}
+    if (response && typeof response === 'object' && 'success' in response) {
       // 标准响应格式：{success, message, data}
       const serverMessage = (response as any).message || ''
       console.log('Server message:', serverMessage)
@@ -180,7 +173,6 @@ const handleBind = async () => {
         if (serverMessage.includes('already bound')) {
           step.value = 'error'
           errorMessage.value = serverMessage
-          notyf.error('Device is already bound to your account')
           console.log('Device already bound case detected:', serverMessage)
         } else {
           step.value = 'success'
@@ -190,7 +182,6 @@ const handleBind = async () => {
       } else {
         step.value = 'error'
         errorMessage.value = serverMessage || 'Binding failed'
-        notyf.error(serverMessage || 'Binding failed')
       }
     } else {
       // 其他情况默认为成功
@@ -202,7 +193,7 @@ const handleBind = async () => {
     console.error('Device binding request failed:', error)
     step.value = 'error'
     
-    // 从axios网络异常中提取服务器返回的具体错误信息
+    // 从axios网络异常中提取服务器返回的具体错误信息，仅用于页面显示
     let serverErrorMessage = 'Network error or server unavailable'
     
     if (error.response && error.response.data) {
@@ -213,8 +204,8 @@ const handleBind = async () => {
       serverErrorMessage = error.message
     }
     
+    // 只设置页面显示的错误消息，不手动显示通知（由HTTP拦截器处理）
     errorMessage.value = serverErrorMessage
-    notyf.error(serverErrorMessage)
   } finally {
     bindLoading.value = false
   }

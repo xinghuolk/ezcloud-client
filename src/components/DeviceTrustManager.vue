@@ -3,7 +3,7 @@ import { ref, reactive, computed, watch } from 'vue'
 import { useDeviceStore } from '/@src/stores/devices'
 import { authApi } from '/@src/api'
 import type { Device, DeviceTrustParams, DeviceTrusteeInfo, User } from '/@src/api/types'
-import { Notyf } from 'notyf'
+import { notyf } from '/@src/api/request'
 
 interface Props {
   device: Device
@@ -18,7 +18,6 @@ interface Emits {
 const props = defineProps<Props>()
 const emit = defineEmits<Emits>()
 
-const notyf = new Notyf()
 const deviceStore = useDeviceStore()
 
 // State

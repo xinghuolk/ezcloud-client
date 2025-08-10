@@ -91,10 +91,6 @@ request.interceptors.response.use(
     return data
   },
   (error: AxiosError) => {
-    console.error('🚨 Request interceptor 捕获错误:', error)
-    console.error('🔍 error.config.url:', error.config?.url)
-    console.error('🔍 error.response:', error.response)
-    
     // 处理HTTP错误状态码
     if (error.response) {
       const { status, data } = error.response
@@ -102,10 +98,7 @@ request.interceptors.response.use(
       
       // 尝试从响应数据中获取错误消息
       if (data && typeof data === 'object') {
-        const dataMessage = (data as any).message
-        console.error('🔍 data.message:', dataMessage, '类型:', typeof dataMessage)
-        errorMessage = dataMessage || errorMessage
-        console.error('🔍 最终errorMessage:', errorMessage, '类型:', typeof errorMessage)
+        errorMessage = (data as any).message || errorMessage
       }
       
       switch (status) {
@@ -115,7 +108,6 @@ request.interceptors.response.use(
           notyf.error(errorMessage)
           break
         case 401:
-        case 403:
           // 对于登录API的401错误，不在这里显示错误消息（由上层处理）
           if (error.config?.url?.includes('/auth/login')) {
             // 登录失败的错误消息由登录逻辑处理，这里不显示重复消息
@@ -123,22 +115,19 @@ request.interceptors.response.use(
             return Promise.reject(new Error(errorMessage))
           }
           
-          // 区分真正的认证失败和普通权限不足
-          if (status === 401) {
-            // 401表示token无效，需要重新登录
-            errorMessage = 'Unauthorized, please login again'
-            notyf.error(errorMessage)
-            // 清除本地存储的认证信息
-            localStorage.removeItem('token')
-            localStorage.removeItem('user_info')
-            // 跳转到登录页面
-            window.location.href = '/auth'
-          } else if (status === 403) {
-            // 403表示权限不足，只在控制台记录，不强制退出
-            errorMessage = errorMessage || 'Access denied - insufficient permissions'
-            console.warn(`权限不足: ${error.config?.url} - ${errorMessage}`)
-            // 不显示通知，不跳转页面，让上层组件处理
-          }
+          // 401表示token无效或过期，需要重新登录
+          errorMessage = 'Unauthorized, please login again'
+          notyf.error(errorMessage)
+          // 清除本地存储的认证信息
+          localStorage.removeItem('token')
+          localStorage.removeItem('user_info')
+          // 跳转到登录页面（使用window.location避免router问题）
+          window.location.href = '/auth'
+          break
+        case 403:
+          // 403表示权限不足，但用户身份有效，不应该退出登录
+          errorMessage = errorMessage || 'Access denied - insufficient permissions'
+          notyf.error(errorMessage)
           break
         case 404:
           // 对于某些预期的404（如开发中的API），不显示通知
@@ -151,7 +140,7 @@ request.interceptors.response.use(
           notyf.error(errorMessage)
           break
         case 409:
-          // 冲突错误（如厂商重复等），显示具体错误信息
+          // 冲突错误（如设备重复绑定、厂商重复等），显示后端返回的具体错误信息
           errorMessage = errorMessage || 'Resource conflict'
           notyf.error(errorMessage)
           break

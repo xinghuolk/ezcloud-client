@@ -456,6 +456,8 @@ const getOwnershipType = (device: Device) => {
     return { type: 'owned', text: 'Owned', color: 'primary' }
   } else if (device.ownership?.isTrusted) {
     return { type: 'trusted', text: 'Trusted', color: 'info' }
+  } else if (device.ownership?.accessType === 'unbound') {
+    return { type: 'unbound', text: 'Unbound', color: 'warning' }
   }
   return { type: 'unknown', text: 'Unknown', color: 'light' }
 }

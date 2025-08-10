@@ -4,14 +4,12 @@ import { deviceApi, vendorApi, modelApi } from '/@src/api'
 import VTableFilters from './VTableFilters.vue'
 import { commonFilters, type FilterConfig } from '/@src/composables/useTableFilters'
 import type { Device, Vendor, DeviceModel } from '/@src/api/types'
-import { Notyf } from 'notyf'
+import { notyf } from '/@src/api/request'
 
 /**
  * 这是设备页面的改造示例
  * 原来的 devices.vue 有大量手动的过滤器逻辑，现在简化为使用可重用组件
  */
-
-const notyf = new Notyf()
 
 // State
 const loading = ref(false)

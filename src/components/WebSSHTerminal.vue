@@ -94,7 +94,7 @@ import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
 import type { Device } from '/@src/api/types'
 import { remoteAccessApi } from '/@src/api'
-import { Notyf } from 'notyf'
+import { notyf } from '/@src/api/request'
 
 interface Props {
   device: Device
@@ -112,8 +112,6 @@ const emit = defineEmits<{
   close: []
   statusChange: [status: 'connected' | 'disconnected' | 'error', message?: string]
 }>()
-
-const notyf = new Notyf()
 
 // Terminal related
 const terminalContainer = ref<HTMLElement>()

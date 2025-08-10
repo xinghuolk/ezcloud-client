@@ -3,7 +3,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { remoteAccessApi } from '/@src/api'
 import type { Device, RemoteAccessStatus } from '/@src/api/types'
-import { Notyf } from 'notyf'
+import { notyf } from '/@src/api/request'
 
 interface Props {
   device: Device
@@ -19,7 +19,6 @@ const emit = defineEmits<{
 }>()
 
 const router = useRouter()
-const notyf = new Notyf()
 
 // State
 const httpLoading = ref(false)
