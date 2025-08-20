@@ -4,7 +4,7 @@ import { useFirmwareStore } from '/@src/stores/firmware'
 import { modelApi } from '/@src/api'
 import type { FirmwareVersion, FirmwareQuery, DeviceModel, CreateFirmwareParams } from '/@src/api/types'
 import type { VTagColor } from '/@src/components/base/VTag.vue'
-import { notyf } from '/@src/api/request'
+import { useFormErrorHandler } from '/@src/composables/use-error-handler'
 
 definePage({
   meta: {
@@ -14,6 +14,10 @@ definePage({
 })
 
 const firmwareStore = useFirmwareStore()
+
+// Error handling
+const { createFormErrors, clearFormErrors, setFieldError, handleError, showSuccess } = useFormErrorHandler()
+const uploadFormErrors = createFormErrors()
 
 // 状态定义
 const deviceModels = ref<DeviceModel[]>([])
@@ -43,7 +47,6 @@ const testProgressDialogOpen = ref(false)
 const selectedFirmwareForTest = ref<FirmwareVersion | null>(null)
 const addTestDevicesDialogOpen = ref(false)
 const testDeviceSerials = ref('')
-const addTestDevicesError = ref('')
 const startTestConfirmOpen = ref(false)
 const finishTestConfirmOpen = ref(false)
 
@@ -245,25 +248,33 @@ const openUploadDialog = () => {
 const handleFileSelect = (event: Event) => {
   const target = event.target as HTMLInputElement
   if (target.files && target.files[0]) {
-    uploadForm.file = target.files[0]
+    const file = target.files[0]
+    uploadForm.file = file
+    
+    console.log('File selected:', {
+      filename: file.name,
+      fileSize: file.size
+    })
   }
 }
 
 // 上传固件
 const handleUpload = async () => {
   try {
+    clearFormErrors(uploadFormErrors)
+    
     if (!uploadForm.file) {
-      notyf.error('Please select firmware file')
+      setFieldError(uploadFormErrors, 'file', 'Please select firmware file')
       return
     }
     
     if (!uploadForm.version.trim()) {
-      notyf.error('Please enter version number')
+      setFieldError(uploadFormErrors, 'version', 'Please enter version number')
       return
     }
     
     if (uploadForm.device_model_ids.length === 0) {
-      notyf.error('Please select compatible device models')
+      setFieldError(uploadFormErrors, 'device_model_ids', 'Please select compatible device models')
       return
     }
 
@@ -273,6 +284,7 @@ const handleUpload = async () => {
       device_model_ids: uploadForm.device_model_ids
     })
 
+    // 直接使用原文件，让后端负责文件命名
     const result = await firmwareStore.uploadFirmware(uploadForm.file, {
       version: uploadForm.version,
       release_notes: uploadForm.release_notes,
@@ -291,7 +303,7 @@ const handleUpload = async () => {
     }
   } catch (error) {
     console.error('Upload error:', error)
-    notyf.error('Upload failed. Please try again.')
+    handleError(error, { fallbackMessage: 'Upload failed. Please try again.' })
   }
 }
 
@@ -335,7 +347,7 @@ const confirmPublish = async () => {
     selectedFirmwareForPublish.value = null
     // 刷新固件列表显示更新的状态
     await fetchFirmwareList()
-    notyf.success('Firmware published successfully!')
+    showSuccess('Firmware published successfully!')
   }
 }
 
@@ -349,7 +361,7 @@ const confirmArchive = async () => {
     selectedFirmwareForArchive.value = null
     // 刷新固件列表显示更新的状态
     await fetchFirmwareList()
-    notyf.success('Firmware archived successfully!')
+    showSuccess('Firmware archived successfully!')
   }
 }
 
@@ -369,7 +381,7 @@ const updateStatus = async (firmware: FirmwareVersion, newStatus: 'PUBLISHED' | 
 // 删除固件
 const deleteFirmware = (firmware: FirmwareVersion) => {
   if (firmware.status !== 'DRAFT') {
-    notyf.error('Only draft firmware can be deleted')
+    handleError(new Error('Only draft firmware can be deleted'))
     return
   }
   
@@ -393,7 +405,7 @@ const handleUploadSuccess = async () => {
   successDialogOpen.value = false
   // Refresh firmware list to show newly uploaded firmware
   await fetchFirmwareList()
-  notyf.success('Firmware uploaded successfully, list updated!')
+  showSuccess('Firmware uploaded successfully, list updated!')
 }
 
 // 兼容性管理状态
@@ -405,32 +417,21 @@ const savingCompatibility = ref(false)
 
 // 管理兼容性
 const manageCompatibility = async (firmware: FirmwareVersion) => {
-  console.log(`[FRONTEND] 🔧 开始管理兼容性`)
-  console.log(`[FRONTEND] 选择的固件:`, firmware.id, firmware.version)
-  
   selectedFirmware.value = firmware
   compatibilityDialogOpen.value = true
   
   // 加载当前兼容性设置
   loadingCompatibility.value = true
-  console.log(`[FRONTEND] 📡 加载当前兼容性设置...`)
   
   const models = await firmwareStore.getCompatibility(firmware.id)
-  console.log(`[FRONTEND] 📊 获取到的兼容模型数据:`, models)
-  console.log(`[FRONTEND] models类型:`, typeof models)
-  console.log(`[FRONTEND] models是否为数组:`, Array.isArray(models))
-  console.log(`[FRONTEND] models长度:`, models?.length)
   
   if (Array.isArray(models)) {
     const modelIds = models.map(model => model.id)
-    console.log(`[FRONTEND] 提取的model IDs:`, modelIds)
     compatibilityForm.device_model_ids = modelIds
   } else {
-    console.log(`[FRONTEND] ⚠️ models不是数组，设置为空数组`)
     compatibilityForm.device_model_ids = []
   }
   
-  console.log(`[FRONTEND] 最终设置的device_model_ids:`, compatibilityForm.device_model_ids)
   loadingCompatibility.value = false
 }
 
@@ -438,23 +439,12 @@ const manageCompatibility = async (firmware: FirmwareVersion) => {
 const saveCompatibility = async () => {
   if (!selectedFirmware.value) return
   
-  console.log(`[FRONTEND] 🎯 开始保存兼容性设置`)
-  console.log(`[FRONTEND] 固件ID: ${selectedFirmware.value.id}`)
-  console.log(`[FRONTEND] 固件版本: ${selectedFirmware.value.version}`)
-  console.log(`[FRONTEND] 表单数据 device_model_ids:`, compatibilityForm.device_model_ids)
-  console.log(`[FRONTEND] device_model_ids类型:`, typeof compatibilityForm.device_model_ids)
-  console.log(`[FRONTEND] device_model_ids是否为数组:`, Array.isArray(compatibilityForm.device_model_ids))
-  console.log(`[FRONTEND] device_model_ids长度:`, compatibilityForm.device_model_ids?.length)
-  
   const payload = {
     device_model_ids: compatibilityForm.device_model_ids
   }
-  console.log(`[FRONTEND] 准备发送的payload:`, payload)
   
   savingCompatibility.value = true
   const success = await firmwareStore.setCompatibility(selectedFirmware.value.id, payload)
-  
-  console.log(`[FRONTEND] 保存结果:`, success)
   
   if (success) {
     compatibilityDialogOpen.value = false
@@ -559,15 +549,11 @@ const showFinishTestConfirm = (firmware: FirmwareVersion) => {
 
 const openAddTestDevicesDialog = () => {
   testDeviceSerials.value = ''
-  addTestDevicesError.value = ''
   addTestDevicesDialogOpen.value = true
 }
 
 const addTestDevices = async () => {
   if (!selectedFirmwareForTest.value || !testDeviceSerials.value.trim()) return
-  
-  // 清除之前的错误信息
-  addTestDevicesError.value = ''
   
   const serials = testDeviceSerials.value
     .split('\n')
@@ -575,7 +561,9 @@ const addTestDevices = async () => {
     .filter(s => s.length > 0)
   
   if (serials.length === 0) {
-    addTestDevicesError.value = 'Please enter at least one device serial'
+    handleError(new Error('Please enter at least one device serial'), {
+      fallbackMessage: 'Please enter at least one device serial'
+    })
     return
   }
   
@@ -587,16 +575,12 @@ const addTestDevices = async () => {
     if (result) {
       addTestDevicesDialogOpen.value = false
       testDeviceSerials.value = ''
-      addTestDevicesError.value = ''
     }
   } catch (error: any) {
-    console.error('Failed to add test devices:', error)
-    if (error.response?.data) {
-      // 直接从服务器响应中提取错误信息显示在页面上
-      addTestDevicesError.value = error.response.data.message || 'Failed to add test devices'
-    } else {
-      addTestDevicesError.value = 'Failed to add test devices'
-    }
+    // 使用统一错误处理架构
+    handleError(error, {
+      fallbackMessage: 'Failed to add test devices'
+    })
   }
 }
 
@@ -1033,11 +1017,11 @@ onUnmounted(() => {
             <VControl>
               <VInput 
                 v-model="uploadForm.version"
-                placeholder="e.g. EV6260, 1.0.1"
+                placeholder="Enter version (e.g. EV4060, EV6260)"
                 required
               />
             </VControl>
-            <p class="help">Enter firmware version number (e.g. EV6260, 1.0.1)</p>
+            <p class="help">Please enter version manually following the standard format: EV + version numbers (e.g. EV4060, EV6260)</p>
           </VField>
           
           <VField>
@@ -1464,9 +1448,6 @@ onUnmounted(() => {
               rows="6"
             />
           </VControl>
-          <p v-if="addTestDevicesError" class="help is-danger" style="color: #dc3545; font-weight: 500;">
-            {{ addTestDevicesError }}
-          </p>
           <p class="help">Enter one device serial per line. Only online devices can be added for testing.</p>
         </VField>
       </template>

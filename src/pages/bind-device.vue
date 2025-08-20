@@ -1,9 +1,30 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, nextTick, onBeforeUnmount, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserSession } from '/@src/stores/user-session'
-import { notyf } from '/@src/api/request'
 import request from '/@src/api/request'
+import { useAppConfig } from '/@src/stores/app-config'
+import { useFormErrorHandler } from '/@src/composables/use-error-handler'
+
+// reCAPTCHA 类型声明
+declare global {
+  interface Window {
+    grecaptcha: {
+      ready: (callback: () => void) => void
+      execute: (siteKey: string, options: { action: string }) => Promise<string>
+      render: (element: string | Element, options: object) => number
+      reset: (widgetId?: number) => void
+      getResponse: (widgetId?: number) => string
+      enterprise: {
+        ready: (callback: () => void) => void
+        execute: (siteKey: string, options: { action: string }) => Promise<string>
+        render: (element: string | Element, options: object) => number
+        reset: (widgetId?: number) => void
+        getResponse: (widgetId?: number) => string
+      }
+    }
+  }
+}
 
 definePage({
   meta: {
@@ -15,6 +36,11 @@ definePage({
 const route = useRoute()
 const router = useRouter()
 const userSession = useUserSession()
+const appConfig = useAppConfig()
+
+// Error handling
+const { createFormErrors, clearFormErrors, setFieldError, handleError, showSuccess } = useFormErrorHandler()
+const loginErrors = createFormErrors()
 
 // State
 const loading = ref(false)
@@ -24,16 +50,182 @@ const deviceInfo = ref<any>(null)
 const bindToken = ref<string>('')
 const errorMessage = ref<string>('')
 
+// reCAPTCHA v2 相关状态 (设备绑定登录)
+const showRecaptchaV2 = ref(false)
+const recaptchaV2WidgetId = ref<number | null>(null)
+const recaptchaV2Challenge = ref<any>(null)
+
+// reCAPTCHA Token缓存系统
+const recaptchaTokenCache = reactive({
+  v3Token: null as string | null,
+  v3Timestamp: 0,
+  v2Token: null as string | null,
+  v2Timestamp: 0,
+  lastAction: null as string | null,
+  lastEmail: ''
+})
+
+// Token有效期 (5分钟)
+const TOKEN_VALIDITY_PERIOD = 5 * 60 * 1000
+
 // Login form
 const loginForm = reactive({
   email: '',
   password: ''
 })
 
-const errors = ref({
-  email: '',
-  password: ''
-})
+// reCAPTCHA 配置（从预加载的store同步访问）
+const recaptchaSiteKey = computed(() => appConfig.recaptchaSiteKey)
+
+// === reCAPTCHA 相关函数 ===
+
+// 缓存v3 token
+const cacheV3Token = (token: string, action: string, email: string) => {
+  recaptchaTokenCache.v3Token = token
+  recaptchaTokenCache.v3Timestamp = Date.now()
+  recaptchaTokenCache.lastAction = action
+  recaptchaTokenCache.lastEmail = email
+}
+
+// 缓存v2 token
+const cacheV2Token = (token: string, action: string, email: string) => {
+  recaptchaTokenCache.v2Token = token
+  recaptchaTokenCache.v2Timestamp = Date.now()
+  recaptchaTokenCache.lastAction = action
+  recaptchaTokenCache.lastEmail = email
+}
+
+// 检查缓存的token是否仍然有效
+const isCachedTokenValid = (type: 'v3' | 'v2', action: string, email: string) => {
+  const timestamp = type === 'v3' ? recaptchaTokenCache.v3Timestamp : recaptchaTokenCache.v2Timestamp
+  const token = type === 'v3' ? recaptchaTokenCache.v3Token : recaptchaTokenCache.v2Token
+  
+  return token && 
+         (Date.now() - timestamp < TOKEN_VALIDITY_PERIOD) &&
+         recaptchaTokenCache.lastAction === action &&
+         recaptchaTokenCache.lastEmail === email
+}
+
+// 执行reCAPTCHA v3验证
+const executeRecaptcha = async (action: string) => {
+  try {
+    // 检查是否有有效的缓存token
+    if (isCachedTokenValid('v3', action, loginForm.email)) {
+      return recaptchaTokenCache.v3Token
+    }
+    
+    if (typeof window.grecaptcha === 'undefined') {
+      console.warn('reCAPTCHA not loaded yet')
+      return null
+    }
+
+    // 检查配置是否可用
+    if (!recaptchaSiteKey.value) {
+      console.error('reCAPTCHA Site Key not configured')
+      return null
+    }
+
+    return new Promise<string>((resolve) => {
+      window.grecaptcha.ready(async () => {
+        try {
+          // 首先尝试使用 Enterprise API
+          if (window.grecaptcha.enterprise) {
+            console.log(`🔐 Executing reCAPTCHA Enterprise v3 for ${action}...`)
+            const token = await window.grecaptcha.enterprise.execute(recaptchaSiteKey.value, { action })
+            cacheV3Token(token, action, loginForm.email)
+            resolve(token)
+          } else {
+            console.log(`🔐 Executing reCAPTCHA v3 for ${action}...`)
+            const token = await window.grecaptcha.execute(recaptchaSiteKey.value, { action })
+            cacheV3Token(token, action, loginForm.email)
+            resolve(token)
+          }
+        } catch (error) {
+          console.error('reCAPTCHA execution failed:', error)
+          resolve('')
+        }
+      })
+    })
+  } catch (error) {
+    console.error('executeRecaptcha error:', error)
+    return null
+  }
+}
+
+// reCAPTCHA v2 相关函数
+const showRecaptchaV2Challenge = (challengeData: any) => {
+  console.log('🔥 Showing reCAPTCHA v2 challenge')
+  recaptchaV2Challenge.value = challengeData
+  showRecaptchaV2.value = true
+  
+  nextTick(() => {
+    initRecaptchaV2()
+  })
+}
+
+const hideRecaptchaV2Challenge = () => {
+  console.log('🔒 Hiding reCAPTCHA v2 challenge')
+  showRecaptchaV2.value = false
+  recaptchaV2Challenge.value = null
+  if (recaptchaV2WidgetId.value !== null) {
+    recaptchaV2WidgetId.value = null
+  }
+}
+
+const initRecaptchaV2 = () => {
+  if (typeof window.grecaptcha === 'undefined') {
+    console.warn('reCAPTCHA not available for v2 widget')
+    return
+  }
+
+  const recaptchaContainer = document.getElementById('bind-recaptcha-v2-container')
+  if (!recaptchaContainer) {
+    console.warn('reCAPTCHA v2 container not found')
+    return
+  }
+
+  // 清除可能存在的旧widget
+  recaptchaContainer.innerHTML = ''
+
+  try {
+    window.grecaptcha.ready(() => {
+      recaptchaV2WidgetId.value = window.grecaptcha.render('bind-recaptcha-v2-container', {
+        sitekey: recaptchaSiteKey.value,
+        theme: 'light',
+        size: 'normal',
+        callback: onRecaptchaV2Success,
+        'expired-callback': onRecaptchaV2Expired,
+        'error-callback': onRecaptchaV2Error
+      })
+    })
+  } catch (error) {
+    console.error('Failed to initialize reCAPTCHA v2:', error)
+  }
+}
+
+const onRecaptchaV2Success = (token: string) => {
+  console.log('reCAPTCHA v2 completed successfully for device binding')
+  // 自动提交登录表单
+  handleLoginWithV2Token(token)
+}
+
+const onRecaptchaV2Expired = () => {
+  console.log('reCAPTCHA v2 expired')
+  handleError(new Error('Verification expired, please try again'))
+  resetRecaptchaV2()
+}
+
+const onRecaptchaV2Error = () => {
+  console.error('reCAPTCHA v2 error')
+  handleError(new Error('Verification error, please try again'))
+  resetRecaptchaV2()
+}
+
+const resetRecaptchaV2 = () => {
+  if (recaptchaV2WidgetId.value !== null && typeof window.grecaptcha !== 'undefined') {
+    window.grecaptcha.reset(recaptchaV2WidgetId.value)
+  }
+}
 
 // Parse token from URL and decode device info
 const parseDeviceToken = () => {
@@ -91,61 +283,131 @@ const parseDeviceToken = () => {
 
 // Login validation
 const validateLoginForm = () => {
-  errors.value = { email: '', password: '' }
+  clearFormErrors(loginErrors)
   let isValid = true
 
   if (!loginForm.email) {
-    errors.value.email = 'Please enter your email'
+    setFieldError(loginErrors, 'email', 'Please enter your email')
     isValid = false
   } else if (!/\S+@\S+\.\S+/.test(loginForm.email)) {
-    errors.value.email = 'Please enter a valid email address'
+    setFieldError(loginErrors, 'email', 'Please enter a valid email address')
     isValid = false
   }
 
   if (!loginForm.password) {
-    errors.value.password = 'Please enter your password'
+    setFieldError(loginErrors, 'password', 'Please enter your password')
     isValid = false
   } else if (loginForm.password.length < 6) {
-    errors.value.password = 'Password must be at least 6 characters'
+    setFieldError(loginErrors, 'password', 'Password must be at least 6 characters')
     isValid = false
   }
 
   return isValid
 }
 
-// Handle login for device binding
+// Handle login for device binding with reCAPTCHA
 const handleLogin = async () => {
   if (!validateLoginForm()) {
     return
   }
 
   loading.value = true
-  errors.value = { email: '', password: '' }
+  // 清除之前的错误信息和reCAPTCHA v2挑战
+  clearFormErrors(loginErrors)
+  hideRecaptchaV2Challenge()
 
   try {
+    // 执行 reCAPTCHA v3 验证
+    const recaptchaToken = await executeRecaptcha('login')
+    
     const success = await userSession.loginUser({
       email: loginForm.email,
-      password: loginForm.password
+      password: loginForm.password,
+      recaptcha_token: recaptchaToken || undefined
     })
 
     if (success) {
-      notyf.success('Login successful!')
+      showSuccess('Login successful!')
       step.value = 'bind'
     }
   } catch (error: any) {
     console.error('Login failed:', error)
+    console.log('🔍 错误详情 - status:', error.status, 'response.status:', error.response?.status)
+    console.log('🔍 错误数据 - data:', error.data, 'response.data:', error.response?.data)
+    
+    // 检查是否是reCAPTCHA挑战响应（状态码423）
+    const isRecaptchaChallenge = (error.status === 423 || error.response?.status === 423) && 
+                                (error.data?.challenge_type === 'recaptcha_v2')
+    
+    if (isRecaptchaChallenge) {
+      console.log('🔥 reCAPTCHA challenge detected - showing v2 verification')
+      console.log('Challenge data:', error.data)
+      handleError(error, { fallbackMessage: 'Please complete security verification and login again' })
+      showRecaptchaV2Challenge(error.data)
+    } else {
+      // 处理其他错误
+      const errorMessage = error.message || 'Login failed'
+      
+      if (errorMessage.includes('Invalid email or password') || 
+          errorMessage.includes('password') || errorMessage.includes('Password') ||
+          errorMessage.includes('Invalid credentials') || errorMessage.includes('Authentication failed')) {
+        setFieldError(loginErrors, 'password', errorMessage)
+      } else if (errorMessage.includes('email') || errorMessage.includes('Email') || 
+                 errorMessage.includes('user not found') || errorMessage.includes('User not found')) {
+        setFieldError(loginErrors, 'email', errorMessage)
+      } else {
+        setFieldError(loginErrors, 'password', errorMessage)
+      }
+    }
+  } finally {
+    loading.value = false
+  }
+}
+
+// Handle login with reCAPTCHA v2 token
+const handleLoginWithV2Token = async (v2Token: string) => {
+  if (!validateLoginForm()) {
+    return
+  }
+
+  loading.value = true
+  // 清除之前的错误信息
+  clearFormErrors(loginErrors)
+
+  try {
+    // 缓存v2 token用于后续使用
+    cacheV2Token(v2Token, 'login', loginForm.email)
+    
+    const success = await userSession.loginUser({
+      email: loginForm.email,
+      password: loginForm.password,
+      recaptcha_token: recaptchaV2Challenge.value?.recaptcha_result ? 
+        (await executeRecaptcha('login')) || undefined : undefined, // 保持v3 token
+      recaptcha_v2_token: v2Token // 添加v2 token参数
+    })
+
+    if (success) {
+      showSuccess('Login successful!')
+      hideRecaptchaV2Challenge() // 隐藏挑战界面
+      step.value = 'bind'
+    }
+  } catch (error: any) {
+    console.error('Login with v2 token failed:', error)
     const errorMessage = error.message || 'Login failed'
     
     if (errorMessage.includes('Invalid email or password') || 
         errorMessage.includes('password') || errorMessage.includes('Password') ||
         errorMessage.includes('Invalid credentials') || errorMessage.includes('Authentication failed')) {
-      errors.value.password = errorMessage
+      setFieldError(loginErrors, 'password', errorMessage)
     } else if (errorMessage.includes('email') || errorMessage.includes('Email') || 
                errorMessage.includes('user not found') || errorMessage.includes('User not found')) {
-      errors.value.email = errorMessage
+      setFieldError(loginErrors, 'email', errorMessage)
     } else {
-      errors.value.password = errorMessage
+      setFieldError(loginErrors, 'password', errorMessage)
     }
+    
+    // 重置v2验证
+    resetRecaptchaV2()
   } finally {
     loading.value = false
   }
@@ -176,7 +438,7 @@ const handleBind = async () => {
           console.log('Device already bound case detected:', serverMessage)
         } else {
           step.value = 'success'
-          notyf.success('Device bound successfully!')
+          showSuccess('Device bound successfully!')
           console.log('Device binding successful:', serverMessage)
         }
       } else {
@@ -187,7 +449,7 @@ const handleBind = async () => {
       // 其他情况默认为成功
       console.log('Device binding completed:', response)
       step.value = 'success'
-      notyf.success('Device bound successfully!')
+      showSuccess('Device bound successfully!')
     }
   } catch (error: any) {
     console.error('Device binding request failed:', error)
@@ -223,6 +485,11 @@ const retryBinding = () => {
 
 onMounted(() => {
   parseDeviceToken()
+})
+
+onBeforeUnmount(() => {
+  // 清理定时器和资源
+  hideRecaptchaV2Challenge()
 })
 
 useHead({
@@ -270,11 +537,11 @@ useHead({
               type="email"
               placeholder="Please enter your email"
               size="large"
-              :class="{ 'is-danger': errors.email }"
+              :class="{ 'is-danger': loginErrors.email }"
             />
             <iconify-icon icon="lucide:user" class="form-icon" />
-            <p v-if="errors.email" class="help is-danger">
-              {{ errors.email }}
+            <p v-if="loginErrors.email" class="help is-danger">
+              {{ loginErrors.email }}
             </p>
           </VControl>
         </VField>
@@ -287,11 +554,11 @@ useHead({
               type="password"
               placeholder="Please enter your password"
               size="large"
-              :class="{ 'is-danger': errors.password }"
+              :class="{ 'is-danger': loginErrors.password }"
             />
             <iconify-icon icon="lucide:lock" class="form-icon" />
-            <p v-if="errors.password" class="help is-danger">
-              {{ errors.password }}
+            <p v-if="loginErrors.password" class="help is-danger">
+              {{ loginErrors.password }}
             </p>
           </VControl>
         </VField>
@@ -304,11 +571,36 @@ useHead({
             fullwidth
             raised
             :loading="loading"
+            :disabled="showRecaptchaV2"
           >
             {{ loading ? 'Logging in...' : 'Login & Continue' }}
           </VButton>
         </VField>
       </form>
+      
+      <!-- reCAPTCHA v2 Challenge -->
+      <Transition name="fade">
+        <div v-if="showRecaptchaV2" class="recaptcha-challenge">
+          <div class="challenge-header">
+            <iconify-icon icon="lucide:shield-check" class="challenge-icon" />
+            <h3>Additional Security Verification</h3>
+            <p>{{ recaptchaV2Challenge?.data?.message || 'Please complete the verification below to continue' }}</p>
+          </div>
+          
+          <div class="recaptcha-widget">
+            <div id="bind-recaptcha-v2-container"></div>
+          </div>
+          
+          <VButton
+            color="light"
+            fullwidth
+            outlined
+            @click="hideRecaptchaV2Challenge"
+          >
+            Cancel
+          </VButton>
+        </div>
+      </Transition>
     </VCard>
 
     <!-- Bind Step -->
@@ -615,6 +907,63 @@ useHead({
   margin-bottom: 0.5rem;
 }
 
+// reCAPTCHA v2 Challenge 样式
+.recaptcha-challenge {
+  margin-top: 1.5rem;
+  padding: 1.5rem;
+  background: var(--fade-grey-light-2);
+  border-radius: var(--radius);
+  border: 2px solid var(--primary);
+
+  .challenge-header {
+    text-align: center;
+    margin-bottom: 1rem;
+
+    .challenge-icon {
+      font-size: 2rem;
+      color: var(--primary);
+      margin-bottom: 0.5rem;
+    }
+
+    h3 {
+      margin: 0 0 0.5rem 0;
+      color: var(--dark-text);
+      font-weight: 600;
+      font-size: 1.1rem;
+    }
+
+    p {
+      margin: 0 0 1rem 0;
+      color: var(--muted-grey);
+      font-size: 0.9rem;
+      line-height: 1.4;
+    }
+  }
+
+  .recaptcha-widget {
+    display: flex;
+    justify-content: center;
+    margin: 1.5rem 0;
+
+    #bind-recaptcha-v2-container {
+      transform: scale(1);
+      transform-origin: center;
+    }
+  }
+}
+
+// Transition animations
+.fade-enter-active,
+.fade-leave-active {
+  transition: all 0.3s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+  transform: translateY(-20px);
+}
+
 .is-dark {
   .bind-container {
     background: linear-gradient(135deg, #2d3748 0%, #4a5568 100%);
@@ -630,6 +979,21 @@ useHead({
   .device-info,
   .device-preview {
     background: var(--dark-sidebar-light-8);
+  }
+
+  .recaptcha-challenge {
+    background: var(--dark-sidebar-light-8);
+    border-color: var(--primary);
+
+    .challenge-header {
+      h3 {
+        color: var(--dark-dark-text);
+      }
+
+      p {
+        color: var(--light-text);
+      }
+    }
   }
 }
 
@@ -652,6 +1016,33 @@ useHead({
     .success-icon,
     .error-icon {
       font-size: 2.5rem;
+    }
+  }
+
+  .recaptcha-challenge {
+    padding: 1rem;
+
+    .challenge-header {
+      .challenge-icon {
+        font-size: 1.75rem;
+      }
+
+      h3 {
+        font-size: 1rem;
+      }
+
+      p {
+        font-size: 0.85rem;
+      }
+    }
+
+    .recaptcha-widget {
+      margin: 1rem 0;
+
+      #bind-recaptcha-v2-container {
+        transform: scale(0.9);
+        transform-origin: center;
+      }
     }
   }
 }

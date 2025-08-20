@@ -49,7 +49,7 @@ export const useVendorStore = defineStore('vendors', () => {
       }
     } catch (error) {
       console.error('Failed to fetch vendors:', error)
-      // axios拦截器已处理错误提示
+      throw error
     } finally {
       loading.value = false
     }
@@ -67,8 +67,7 @@ export const useVendorStore = defineStore('vendors', () => {
       }
     } catch (error) {
       console.error('Failed to fetch vendor details:', error)
-      // axios拦截器已处理错误提示
-      return null
+      throw error
     }
   }
 
@@ -87,8 +86,7 @@ export const useVendorStore = defineStore('vendors', () => {
       }
     } catch (error) {
       console.error('Failed to create vendor:', error)
-      // axios拦截器已处理错误提示，这里不重复显示
-      return null
+      throw error
     }
   }
 
@@ -115,8 +113,7 @@ export const useVendorStore = defineStore('vendors', () => {
       }
     } catch (error) {
       console.error('Failed to update vendor:', error)
-      // axios拦截器已处理错误提示，这里不重复显示
-      return null
+      throw error
     }
   }
 
@@ -139,13 +136,12 @@ export const useVendorStore = defineStore('vendors', () => {
         notyf.success('Vendor deleted successfully')
         return true
       } else {
-        // axios拦截器已处理错误提示，这里不重复显示
         return false
       }
     } catch (error) {
       console.error('Failed to delete vendor:', error)
-      // axios拦截器已处理错误提示，这里不重复显示
-      return false
+      // 重新抛出错误以便组件可以正确处理
+      throw error
     }
   }
 
@@ -160,8 +156,7 @@ export const useVendorStore = defineStore('vendors', () => {
       }
     } catch (error) {
       console.error('Failed to fetch active vendors:', error)
-      // axios拦截器已处理错误提示
-      return []
+      throw error
     }
   }
 

@@ -62,7 +62,8 @@ const themeClasses = computed(() => {
     align-items: center;
     height: 60px;
     width: 100%;
-    padding: 0 2.5rem;
+    height: 100px;
+    padding: 0 2.2rem;
     background: var(--header-bg);
 
     .sidebar-block-logo {

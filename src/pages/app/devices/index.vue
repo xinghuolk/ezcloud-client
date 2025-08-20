@@ -29,6 +29,13 @@ const detailsDialogVisible = ref(false)
 const showBatchOperationDialog = ref(false)
 const activeTab = ref('basic')
 
+// Define tabs for VTabs component
+const deviceDetailTabs = [
+  { label: 'Basic Info', value: 'basic' },
+  { label: 'Network', value: 'network' },
+  { label: 'Status', value: 'status' }
+]
+
 // Unbind confirmation
 const unbindConfirmOpen = ref(false)
 const selectedDeviceForUnbind = ref<Device | null>(null)
@@ -423,14 +430,14 @@ useHead({
               <VTag 
                 :color="device.is_online ? 'success' : 'danger'"
                 outlined
-                size="small"
+                size="tiny"
               >
                 {{ device.is_online ? 'Online' : 'Offline' }}
               </VTag>
               <VTag 
                 :color="device.is_activate ? 'success' : 'light'"
                 outlined
-                size="small"
+                size="tiny"
               >
                 {{ device.is_activate ? 'Activated' : 'Not Activated' }}
               </VTag>
@@ -452,7 +459,7 @@ useHead({
           <VFlexTableCell>
             <VDropdown class="is-right">
               <template #button>
-                <VButton size="small" outlined>
+                <VButton outlined>
                   <iconify-icon icon="lucide:more-horizontal" />
                 </VButton>
               </template>
@@ -594,20 +601,7 @@ useHead({
     >
       <template #content>
         <div v-if="selectedDevice" class="device-details">
-          <VTabs v-model="activeTab">
-            <div class="tabs is-boxed">
-              <ul>
-                <li :class="{ 'is-active': activeTab === 'basic' }">
-                  <a @click="activeTab = 'basic'">Basic Info</a>
-                </li>
-                <li :class="{ 'is-active': activeTab === 'network' }">
-                  <a @click="activeTab = 'network'">Network</a>
-                </li>
-                <li :class="{ 'is-active': activeTab === 'status' }">
-                  <a @click="activeTab = 'status'">Status</a>
-                </li>
-              </ul>
-            </div>
+          <VTabs :tabs="deviceDetailTabs" v-model:selected="activeTab">
             
             <div class="tab-content">
               <div v-show="activeTab === 'basic'" class="tab-pane">
@@ -695,7 +689,7 @@ useHead({
                     >
                       <div class="wifi-header">
                         <span class="wifi-interface">{{ wifi.interface }}</span>
-                        <VTag :color="wifi.status === 'up' ? 'success' : 'danger'" size="small">
+                        <VTag :color="wifi.status === 'up' ? 'success' : 'danger'" size="tiny">
                           {{ wifi.status }}
                         </VTag>
                       </div>

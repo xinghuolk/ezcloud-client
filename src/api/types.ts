@@ -6,6 +6,41 @@ export interface ApiResponse<T = any> {
   timestamp?: string
 }
 
+// 错误响应结构（用于更详细的错误信息）
+export interface ErrorResponse {
+  success: false
+  message: string
+  error?: string
+  code?: string
+  details?: ValidationError[]
+  statusCode?: number
+  timestamp?: string
+}
+
+// 验证错误详情
+export interface ValidationError {
+  field: string
+  message: string
+  code?: string
+  value?: any
+}
+
+// reCAPTCHA挑战响应
+export interface RecaptchaChallengeResponse {
+  challenge_type: 'recaptcha_v2' | 'recaptcha_enterprise'
+  message: string
+  site_key?: string
+  action?: string
+}
+
+// 速率限制错误响应
+export interface RateLimitErrorResponse extends ErrorResponse {
+  error: 'RATE_LIMITED' | 'RATE_LIMITED_STRICT' | 'DAILY_LIMIT_EXCEEDED'
+  retryAfter: number // seconds
+  limitType: 'per_minute' | 'per_hour' | 'per_day'
+  remainingAttempts?: number
+}
+
 // 分页参数
 export interface PaginationParams {
   page?: number
@@ -118,6 +153,7 @@ export interface EnhancedRegisterParams {
   recaptcha_v2_token?: string
 }
 
+
 // 用户管理相关类型
 export interface CreateUserParams {
   username: string
@@ -163,11 +199,13 @@ export interface RemoteAccessStatus {
     url?: string
     port?: number
     host?: string
+    message?: string
   }
   ssh: {
     status: 'disconnected' | 'connecting' | 'connected' | 'error'
     port?: number
     host?: string
+    message?: string
   }
 }
 
@@ -383,6 +421,7 @@ export interface DeviceTrusted {
 
 export interface DeviceTrusteeInfo {
   id: number
+  trustee_id: number
   username: string
   email: string
   trusted_at: string

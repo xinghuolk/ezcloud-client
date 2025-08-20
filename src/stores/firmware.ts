@@ -13,7 +13,7 @@ import type {
 } from '/@src/api/types'
 import { firmwareApi } from '/@src/api'
 import { notyf } from '/@src/api/request'
-import { extractErrorMessage } from '/@src/utils/error-utils'
+import { extractErrorMessage } from '/@src/utils/error-handler'
 
 export const useFirmwareStore = defineStore('firmware', () => {
   // State
@@ -79,7 +79,7 @@ export const useFirmwareStore = defineStore('firmware', () => {
       }
     } catch (error) {
       console.error('Failed to fetch firmware list:', error)
-      // axios拦截器已处理错误提示)
+      throw error
     } finally {
       loading.value = false
     }
@@ -98,8 +98,7 @@ export const useFirmwareStore = defineStore('firmware', () => {
       }
     } catch (error) {
       console.error('Failed to get firmware details:', error)
-      // axios拦截器已处理错误提示)
-      return null
+      throw error
     } finally {
       loading.value = false
     }
@@ -118,8 +117,7 @@ export const useFirmwareStore = defineStore('firmware', () => {
       }
     } catch (error) {
       console.error('Firmware upload failed:', error)
-      // axios拦截器已处理错误提示)
-      return null
+      throw error
     } finally {
       uploading.value = false
     }
@@ -146,14 +144,13 @@ export const useFirmwareStore = defineStore('firmware', () => {
       }
     } catch (error) {
       console.error('Update firmware failed:', error)
-      // axios拦截器已处理错误提示)
-      return null
+      throw error
     } finally {
       loading.value = false
     }
   }
 
-  const updateFirmwareStatus = async (id: number, status: 'DRAFT' | 'TESTING' | 'PUBLISHED' | 'ARCHIVED') => {
+  const updateFirmwareStatus = async (id: number, status: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED') => {
     loading.value = true
     try {
       const response = await firmwareApi.updateStatus(id, status)
@@ -175,8 +172,7 @@ export const useFirmwareStore = defineStore('firmware', () => {
       }
     } catch (error) {
       console.error('Status update failed:', error)
-      // axios拦截器已处理错误提示)
-      return null
+      throw error
     } finally {
       loading.value = false
     }
@@ -203,8 +199,7 @@ export const useFirmwareStore = defineStore('firmware', () => {
       }
     } catch (error) {
       console.error('Delete firmware failed:', error)
-      // axios拦截器已处理错误提示)
-      return false
+      throw error
     } finally {
       loading.value = false
     }
@@ -222,8 +217,7 @@ export const useFirmwareStore = defineStore('firmware', () => {
       }
     } catch (error) {
       console.error('Failed to get compatibility settings:', error)
-      // axios拦截器已处理错误提示)
-      return []
+      throw error
     } finally {
       loading.value = false
     }
@@ -244,8 +238,7 @@ export const useFirmwareStore = defineStore('firmware', () => {
       }
     } catch (error) {
       console.error('Save compatibility settings failed:', error)
-      // axios拦截器已处理错误提示)
-      return false
+      throw error
     } finally {
       loading.value = false
     }
@@ -314,8 +307,7 @@ export const useFirmwareStore = defineStore('firmware', () => {
       }
     } catch (error) {
       console.error('Failed to get test devices:', error)
-      // axios拦截器已处理错误提示)
-      return []
+      throw error
     } finally {
       testLoading.value = false
     }
@@ -336,9 +328,8 @@ export const useFirmwareStore = defineStore('firmware', () => {
       }
     } catch (error) {
       console.error('Failed to add test devices:', error)
-      const errorMessage = extractErrorMessage(error, 'Failed to add test devices')
-      // axios拦截器已处理错误提示
-      return null
+      // 重新抛出错误以便组件可以正确处理
+      throw error
     } finally {
       testLoading.value = false
     }
@@ -359,8 +350,7 @@ export const useFirmwareStore = defineStore('firmware', () => {
       }
     } catch (error) {
       console.error('Failed to remove test device:', error)
-      // axios拦截器已处理错误提示)
-      return false
+      throw error
     } finally {
       testLoading.value = false
     }
@@ -377,7 +367,7 @@ export const useFirmwareStore = defineStore('firmware', () => {
       }
     } catch (error) {
       console.error('Failed to get test progress:', error)
-      return null
+      throw error
     }
   }
 
@@ -402,8 +392,7 @@ export const useFirmwareStore = defineStore('firmware', () => {
       }
     } catch (error) {
       console.error('Failed to start testing:', error)
-      // axios拦截器已处理错误提示)
-      return null
+      throw error
     } finally {
       loading.value = false
     }
@@ -430,8 +419,7 @@ export const useFirmwareStore = defineStore('firmware', () => {
       }
     } catch (error) {
       console.error('Failed to finish testing:', error)
-      // axios拦截器已处理错误提示)
-      return null
+      throw error
     } finally {
       loading.value = false
     }
@@ -458,8 +446,7 @@ export const useFirmwareStore = defineStore('firmware', () => {
       }
     } catch (error) {
       console.error('Failed to publish firmware:', error)
-      // axios拦截器已处理错误提示)
-      return null
+      throw error
     } finally {
       loading.value = false
     }

@@ -166,7 +166,7 @@ watch([searchTerm, sort], () => {
           </div>
           
           <!-- 空状态 -->
-          <div v-else-if="wrapperState.data.length === 0" class="flex-list-inner">
+          <div v-else-if="wrapperState.data?.length === 0" class="flex-list-inner">
             <VPlaceholderSection
               title="暂无数据"
               subtitle="没有找到匹配的记录"
@@ -183,11 +183,11 @@ watch([searchTerm, sort], () => {
 
       <!-- 分页 -->
       <VFlexPagination
-        v-if="pagination && wrapperState.total > wrapperState.limit"
+        v-if="pagination && (wrapperState.total || 0) > (wrapperState.limit || 10)"
         v-model:current-page="wrapperState.page"
         class="mt-6"
-        :item-per-page="wrapperState.limit"
-        :total-items="wrapperState.total"
+        :item-per-page="wrapperState.limit || 10"
+        :total-items="wrapperState.total || 0"
         :max-links-displayed="maxLinksDisplayed"
         no-router
       />

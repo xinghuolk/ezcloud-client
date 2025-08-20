@@ -25,7 +25,7 @@ const loading = ref(false)
 const trustees = ref<DeviceTrusteeInfo[]>([])
 const activeTab = ref('current')
 const emailValidating = ref(false)
-const emailExists = ref<boolean | null>(null)
+const emailExists = ref<boolean | 'already_trusted' | null>(null)
 const emailCheckTimeout = ref<NodeJS.Timeout | null>(null)
 
 // Form data
@@ -37,12 +37,16 @@ const trustForm = reactive({
 })
 
 // Computed
-const isOwner = computed(() => props.device?.ownership?.isOwner)
-const canManageTrust = computed(() => isOwner.value)
+const isOwner = computed(() => {
+  return props.device?.ownership?.isOwner
+})
+const canManageTrust = computed(() => {
+  return isOwner.value
+})
 
 // Methods
 const fetchTrustees = async () => {
-  if (!props.device?.id) return
+  if (!props.device?.id || loading.value) return
   
   loading.value = true
   try {
@@ -65,13 +69,19 @@ const checkEmailExists = async (email: string) => {
   emailValidating.value = true
   try {
     // 检查用户邮箱是否存在的API调用
-    // const response = await authApi.checkUserExists({ email })
-    // emailExists.value = response.data.exists
-    // trustForm.trustee_id = response.data.user_id || 0
+    const response = await authApi.checkUserExists({ email })
+    emailExists.value = response.data.exists
+    trustForm.trustee_id = response.data.user_id || 0
     
-    // 临时模拟逻辑
-    await new Promise(resolve => setTimeout(resolve, 500))
-    emailExists.value = email.endsWith('@example.com') // 简单的模拟逻辑
+    // 如果用户存在，再检查是否已经被托管
+    if (response.data.exists) {
+      const existingTrustee = trustees.value.find(trustee => 
+        trustee.email === email
+      )
+      if (existingTrustee) {
+        emailExists.value = 'already_trusted'
+      }
+    }
   } catch (error) {
     console.error('Failed to check email:', error)
     emailExists.value = false
@@ -92,8 +102,14 @@ const debouncedEmailCheck = (email: string) => {
 }
 
 const handleAddTrustee = async () => {
-  if (!trustForm.email || !emailExists.value || !props.device?.id) {
+  if (!trustForm.email || emailExists.value !== true || !props.device?.id) {
     notyf.error('Please enter a valid email address')
+    return
+  }
+
+  // 检查是否已经存在托管关系
+  if (emailExists.value === 'already_trusted') {
+    notyf.error('This user is already trusted for this device')
     return
   }
 
@@ -118,6 +134,8 @@ const handleAddTrustee = async () => {
       // 刷新托管列表
       await fetchTrustees()
       emit('updated')
+      // 成功设置托管后关闭窗口
+      emit('close')
     }
   } catch (error) {
     console.error('Failed to add trustee:', error)
@@ -131,10 +149,12 @@ const handleRemoveTrustee = async (trustee: DeviceTrusteeInfo) => {
 
   loading.value = true
   try {
-    const success = await deviceStore.untrustDevice(props.device.id, trustee.id)
+    const success = await deviceStore.untrustDevice(props.device.id, trustee.trustee_id)
     if (success) {
       await fetchTrustees()
       emit('updated')
+      // 成功删除托管后关闭窗口，保持与添加操作的一致性
+      emit('close')
     }
   } catch (error) {
     console.error('Failed to remove trustee:', error)
@@ -184,6 +204,7 @@ const getStatusText = (status: string) => {
 const emailValidationIcon = computed(() => {
   if (emailValidating.value) return 'lucide:loader-2'
   if (emailExists.value === true) return 'lucide:check'
+  if (emailExists.value === 'already_trusted') return 'lucide:alert-circle'
   if (emailExists.value === false) return 'lucide:x'
   return null
 })
@@ -191,6 +212,7 @@ const emailValidationIcon = computed(() => {
 const emailValidationColor = computed(() => {
   if (emailValidating.value) return 'info'
   if (emailExists.value === true) return 'success'
+  if (emailExists.value === 'already_trusted') return 'warning'
   if (emailExists.value === false) return 'danger'
   return null
 })
@@ -208,19 +230,35 @@ watch(() => trustForm.email, (newEmail) => {
   }
 })
 
-// Refresh trustees when device changes
-watch(() => props.device?.id, (newId) => {
-  if (newId && props.open) {
-    fetchTrustees()
-  }
+// 统一的数据获取条件监听
+const shouldFetchTrustees = computed(() => {
+  return !!(props.open && props.device?.id && props.device?.ownership)
 })
 
-// Fetch data when dialog opens
-watch(() => props.open, (isOpen) => {
-  if (isOpen && props.device?.id) {
+// 当满足获取条件时自动获取数据
+watch(shouldFetchTrustees, (should) => {
+  if (should) {
     fetchTrustees()
   }
-})
+}, { immediate: true })
+
+// 当托管列表变化时，重新验证当前输入的邮箱
+watch(trustees, () => {
+  if (trustForm.email && (emailExists.value === true || emailExists.value === 'already_trusted')) {
+    // 重新检查是否已被托管
+    const existingTrustee = trustees.value.find(trustee => 
+      trustee.email === trustForm.email
+    )
+    
+    if (existingTrustee && emailExists.value === true) {
+      // 如果找到了但之前是true，改为already_trusted
+      emailExists.value = 'already_trusted'
+    } else if (!existingTrustee && emailExists.value === 'already_trusted') {
+      // 如果没找到但之前是already_trusted，改为true
+      emailExists.value = true
+    }
+  }
+}, { deep: true })
 </script>
 
 <template>
@@ -256,7 +294,7 @@ watch(() => props.open, (isOpen) => {
             <div class="tab-content">
               <!-- Trustees list -->
               <div v-if="loading" class="has-text-centered py-6">
-                <VLoader size="medium" />
+                <VLoader />
               </div>
               
               <div v-else-if="trustees.length === 0" class="has-text-centered py-6">
@@ -281,16 +319,16 @@ watch(() => props.open, (isOpen) => {
                           <div class="tags">
                             <VTag 
                               :color="getStatusColor(trustee.status)"
-                              size="small"
+                              size="tiny"
                             >
                               {{ getStatusText(trustee.status) }}
                             </VTag>
-                            <VTag size="small" color="light">
+                            <VTag size="tiny" color="light">
                               Trusted: {{ formatDate(trustee.trusted_at) }}
                             </VTag>
                             <VTag 
                               v-if="trustee.expires_at" 
-                              size="small" 
+                              size="tiny" 
                               color="light"
                             >
                               Expires: {{ formatDate(trustee.expires_at) }}
@@ -304,7 +342,6 @@ watch(() => props.open, (isOpen) => {
                       <div class="media-right">
                         <VButton 
                           color="danger" 
-                          size="small"
                           outlined
                           @click="handleRemoveTrustee(trustee)"
                           :loading="loading"
@@ -345,6 +382,9 @@ watch(() => props.open, (isOpen) => {
                   <p v-if="emailExists === false" class="help is-danger">
                     User with this email does not exist
                   </p>
+                  <p v-else-if="emailExists === 'already_trusted'" class="help is-warning">
+                    This user is already trusted for this device
+                  </p>
                   <p v-else-if="emailExists === true" class="help is-success">
                     User found and can be trusted
                   </p>
@@ -382,7 +422,7 @@ watch(() => props.open, (isOpen) => {
                       type="submit" 
                       color="primary"
                       :loading="loading"
-                      :disabled="!emailExists"
+                      :disabled="emailExists !== true"
                     >
                       Create Trust
                     </VButton>
@@ -448,6 +488,15 @@ watch(() => props.open, (isOpen) => {
   .text-info {
     color: var(--info);
   }
+  
+  .text-warning {
+    color: var(--warning);
+  }
+}
+
+// 本地样式现在使用全局设置，只需要确保warning颜色正确
+.help.is-warning {
+  color: var(--warning) !important;
 }
 
 @keyframes spin {

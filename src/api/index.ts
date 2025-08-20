@@ -76,6 +76,7 @@ export const authApi = {
     return request.post('/auth/verify-code', params)
   },
 
+
   // 增强注册（包含验证码）
   enhancedRegister: (params: EnhancedRegisterParams): Promise<ApiResponse<User>> => {
     return request.post('/auth/enhanced-register', params)
@@ -104,6 +105,11 @@ export const authApi = {
   // 用户登出
   logout: (): Promise<ApiResponse<null>> => {
     return request.post('/auth/logout')
+  },
+
+  // 检查用户是否存在（根据邮箱）
+  checkUserExists: (params: { email: string }): Promise<ApiResponse<{ exists: boolean; user_id: number | null; username: string | null }>> => {
+    return request.post('/auth/check-user-exists', params)
   }
 }
 
@@ -270,9 +276,14 @@ export const deviceApi = {
     return request.post('/devices/batch-operation', { device_ids: deviceIds, operation, parameters })
   },
 
-  // 获取设备WiFi状态
+  // 获取设备WiFi状态和配置（综合视图）
   getDeviceWiFi: (id: number): Promise<ApiResponse<WiFiData>> => {
     return request.get(`/devices/${id}/wifi`)
+  },
+
+  // 获取设备WiFi状态（仅状态数据）
+  getDeviceWiFiStatus: (id: number): Promise<ApiResponse<WiFiData>> => {
+    return request.get(`/devices/${id}/wifi/status`)
   },
 
   // 更新设备WiFi配置
@@ -280,9 +291,14 @@ export const deviceApi = {
     return request.put(`/devices/${id}/wifi`, params)
   },
 
-  // 获取设备Modem状态
+  // 获取设备Modem状态（配置和状态混合 - 待弃用）
   getDeviceModem: (id: number): Promise<ApiResponse<ModemStatus>> => {
     return request.get(`/devices/${id}/modem`)
+  },
+
+  // 获取设备Modem状态（仅状态数据）
+  getDeviceModemStatus: (id: number): Promise<ApiResponse<ModemStatus>> => {
+    return request.get(`/devices/${id}/modem/status`)
   },
 
   // 获取SIM卡切换历史

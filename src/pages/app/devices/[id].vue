@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useDeviceStore } from '/@src/stores/devices'
 import { devicesApi } from '/@src/api'
 import type { Device, DeviceStatus } from '/@src/api/types'
-import { notyf } from '/@src/api/request'
+import { useFormErrorHandler } from '/@src/composables/use-error-handler'
 
 definePage({
   meta: {
@@ -15,6 +15,9 @@ definePage({
 const route = useRoute()
 const router = useRouter()
 const devicesStore = useDeviceStore()
+
+// Error handling
+const { handleError, showSuccess } = useFormErrorHandler()
 // State
 const device = ref<Device | null>(null)
 const loading = ref(true)
@@ -26,12 +29,10 @@ const actionLoading = ref(false)
 // Computed MAC addresses
 const calculatedMacAddresses = computed(() => {
   if (!device.value?.serialNumber) {
-    console.log('No serialNumber data for MAC calculation')
     return []
   }
   
   const { mac_start, mac_count, mac_interval } = device.value.serialNumber
-  console.log('MAC calculation data:', { mac_start, mac_count, mac_interval })
   const addresses = []
   
   // Convert MAC address to number for calculation
@@ -88,11 +89,11 @@ const saveDeviceName = async () => {
     const success = await devicesStore.updateDeviceName(device.value.id, editName.value)
     if (success && device.value) {
       device.value.name = editName.value
-      notyf.success('Device name updated successfully')
+      showSuccess('Device name updated successfully')
     }
   } catch (error) {
     console.error('Failed to update device name:', error)
-    notyf.error('Failed to update device name')
+    handleError(error, { fallbackMessage: 'Failed to update device name' })
   } finally {
     editingName.value = false
   }
@@ -102,38 +103,33 @@ const saveDeviceName = async () => {
 const resetEditingState = () => {
   editingName.value = false
   editName.value = ''
-  console.log('Editing state reset - editingName:', editingName.value)
 }
 
 // Load device details
 const loadDeviceDetails = async () => {
-  const rawId = String(route.params.id || '')
+  const rawId = String((route.params as { id?: string }).id || '')
   const deviceId = Number(rawId)
   if (!rawId || !deviceId || isNaN(deviceId)) {
     console.error('Invalid device ID:', rawId)
-    notyf.error('Invalid device ID')
+    handleError(new Error('Invalid device ID'), { fallbackMessage: 'Invalid device ID' })
     router.push('/app/devices')
     return
   }
 
   loading.value = true
-  console.log('Loading device details for ID:', deviceId)
   
   try {
     device.value = await devicesStore.fetchDeviceDetails(deviceId)
-    console.log('Device details loaded:', device.value)
     
     // Force reset editing state after device loads
     resetEditingState()
     
     if (device.value) {
       await loadStatusHistory()
-    } else {
-      console.warn('No device data returned from store')
     }
   } catch (error) {
     console.error('Failed to load device details:', error)
-    notyf.error('Failed to load device details')
+    handleError(error, { fallbackMessage: 'Failed to load device details' })
   } finally {
     loading.value = false
   }
@@ -144,13 +140,10 @@ const loadStatusHistory = async () => {
   if (!device.value) return
   
   try {
-    console.log('Loading status history for device ID:', device.value.id)
     const response = await devicesApi.getDeviceStatus(device.value.id, { limit: 10 })
-    console.log('Status history response:', response)
     
     if (response.success) {
       statusHistory.value = response.data
-      console.log('Status history loaded:', statusHistory.value)
     } else {
       console.warn('Failed to load status history:', response.message)
     }
@@ -167,11 +160,11 @@ const restartDevice = async () => {
   try {
     const response = await devicesApi.operateDevice(device.value.id, 'restart')
     if (response.success) {
-      notyf.success('Restart command sent successfully')
+      showSuccess('Restart command sent successfully')
     }
   } catch (error) {
     console.error('Failed to restart device:', error)
-    notyf.error('Failed to restart device')
+    handleError(error, { fallbackMessage: 'Failed to restart device' })
   } finally {
     actionLoading.value = false
   }
@@ -179,7 +172,7 @@ const restartDevice = async () => {
 
 // Configure device
 const configureDevice = () => {
-  notyf.success('Configuration feature coming soon')
+  showSuccess('Configuration feature coming soon')
 }
 
 // Unbind device
@@ -190,12 +183,12 @@ const unbindDevice = async () => {
   try {
     const success = await devicesStore.unbindDevice(device.value.id)
     if (success) {
-      notyf.success('Device unbound successfully')
+      showSuccess('Device unbound successfully')
       router.push('/app/devices')
     }
   } catch (error) {
     console.error('Failed to unbind device:', error)
-    notyf.error('Failed to unbind device')
+    handleError(error, { fallbackMessage: 'Failed to unbind device' })
   } finally {
     actionLoading.value = false
   }

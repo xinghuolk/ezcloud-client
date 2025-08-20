@@ -585,7 +585,8 @@ select {
     display: block;
     color: var(--muted-grey);
     margin-top: 10px;
-    font-size: 0.8rem;
+    font-size: 0.9rem;
+    line-height: 1.4;
 
     span {
       &.info {

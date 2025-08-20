@@ -304,10 +304,15 @@ Help Text Classes (Form Validation)
 ========================================================================== */
 
 .help {
-  font-size: 0.8rem;
+  font-size: 0.9rem;
+  line-height: 1.4;
   color: var(--light-text);
   margin-top: 0.25rem;
-  line-height: 1.4;
+  
+  // 状态类提示稍大一些
+  &.is-danger, &.is-warning, &.is-success, &.is-info {
+    font-size: 0.925rem;
+  }
 
   &.is-danger {
     color: var(--danger);

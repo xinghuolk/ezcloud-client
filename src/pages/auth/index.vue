@@ -1,11 +1,15 @@
 <script setup lang="ts">
-import { ref, reactive, computed, watch, onBeforeUnmount, nextTick } from 'vue'
+import { ref, reactive, computed, onBeforeUnmount, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserSession } from '/@src/stores/user-session'
 import { useUserToken } from '/@src/composables/user-token'
 import { useDarkmode } from '/@src/composables/darkmode'
+import { useFormErrorHandler } from '/@src/composables/use-error-handler'
+import { isRecaptchaError } from '/@src/utils/error-handler'
 import { notyf } from '/@src/api/request'
 import type { SendVerificationCodeParams, VerifyCodeParams, EnhancedRegisterParams } from '/@src/api/types'
+import { getReCaptchaConfigSync } from '/@src/utils/config'
+import { useAppConfig } from '/@src/stores/app-config'
 // Import logos directly  
 import logoLight from '/@src/assets/images/EzenCloud-Logo_v2.png'
 import logoDark from '/@src/assets/images/EzenCloud-Logo-v2-Dark.png'
@@ -40,6 +44,16 @@ definePage({
 const router = useRouter()
 const userSession = useUserSession()
 const darkmode = useDarkmode()
+const appConfig = useAppConfig()
+
+// 错误处理器
+const { 
+  handleFormError, 
+  createFormErrors, 
+  clearFormErrors,
+  showSuccess,
+  showWarning 
+} = useFormErrorHandler()
 
 // 根据dark mode状态动态选择logo
 const logoSrc = computed(() => {
@@ -77,6 +91,12 @@ const TOKEN_VALIDITY_PERIOD = 5 * 60 * 1000
 
 // Verification code states
 const verificationCodeLoading = ref(false)
+// 分离两个不同的倒计时概念
+const resendCooldown = ref(0)        // 重发冷却时间 (60秒)
+const codeExpiration = ref(0)        // 验证码有效期 (15分钟)
+const resendTimer = ref<number | null>(null)
+const expirationTimer = ref<number | null>(null)
+// 保持向后兼容性
 const codeCountdown = ref(0)
 const countdownTimer = ref<number | null>(null)
 
@@ -109,35 +129,48 @@ const registerForm = reactive({
   agreeToTerms: false
 })
 
-const errors = ref({
-  email: '',
-  password: ''
-})
+// 使用新的错误处理架构
+const loginErrors = createFormErrors()
+const registerErrors = createFormErrors()
 
-const registerErrors = ref({
-  username: '',
-  email: '',
-  password: '',
-  confirmPassword: '',
-  verificationCode: '',
-  agreeToPrivacy: '',
-  agreeToTerms: ''
-})
 
 // Computed
 const canSendCode = computed(() => {
   return registerForm.email && 
          /\S+@\S+\.\S+/.test(registerForm.email) && 
-         codeCountdown.value === 0 &&
+         resendCooldown.value === 0 &&  // 使用重发冷却时间
          !verificationCodeLoading.value
 })
 
 const countdownText = computed(() => {
-  return codeCountdown.value > 0 ? `${codeCountdown.value}s` : 'Send Code'
+  if (resendCooldown.value > 0) {
+    return `Resend (${resendCooldown.value}s)`
+  } else if (verificationCodeLoading.value) {
+    return 'Sending...'
+  } else {
+    return 'Send Code'
+  }
 })
 
 const showVerificationField = computed(() => {
-  return codeCountdown.value > 0 || codeVerification.isValid
+  return codeExpiration.value > 0 || codeVerification.isValid  // 使用验证码有效期
+})
+
+// 验证码状态提示
+const codeStatusText = computed(() => {
+  if (registerErrors.email) {
+    return null  // 有错误时不显示状态
+  } else if (codeExpiration.value > 0) {
+    const minutes = Math.floor(codeExpiration.value / 60)
+    const seconds = codeExpiration.value % 60
+    if (minutes > 0) {
+      return `Code sent! Check your email. Valid for ${minutes}m ${seconds}s`
+    } else {
+      return `Code sent! Check your email. Valid for ${seconds}s`
+    }
+  } else {
+    return null
+  }
 })
 
 const canSubmitRegistration = computed(() => {
@@ -157,9 +190,52 @@ const canSubmitRegistration = computed(() => {
 // Watch verification code input for auto-validation
 // 现在由 updateVerificationCode 函数处理，不再需要这个 watcher
 
-// 倒计时管理
+
+// 倒计时管理 - 分离重发冷却和验证码有效期
+const startResendCooldown = (seconds: number = 60) => {
+  resendCooldown.value = seconds
+  if (resendTimer.value) {
+    clearInterval(resendTimer.value)
+  }
+  
+  resendTimer.value = setInterval(() => {
+    resendCooldown.value--
+    if (resendCooldown.value <= 0) {
+      clearInterval(resendTimer.value!)
+      resendTimer.value = null
+    }
+  }, 1000) as unknown as number
+}
+
+const startCodeExpiration = (seconds: number = 900) => {
+  codeExpiration.value = seconds
+  if (expirationTimer.value) {
+    clearInterval(expirationTimer.value)
+  }
+  
+  expirationTimer.value = setInterval(() => {
+    codeExpiration.value--
+    if (codeExpiration.value <= 0) {
+      clearInterval(expirationTimer.value!)
+      expirationTimer.value = null
+      // 验证码过期时清除验证状态
+      codeVerification.status = 'idle'
+      codeVerification.isValid = false
+    }
+  }, 1000) as unknown as number
+}
+
+// 兼容性函数 - 保持现有代码正常工作
 const startCountdown = (seconds: number = 60) => {
-  codeCountdown.value = seconds
+  // 旧的实现：将总时间当作重发冷却时间使用，现在改为合理的60秒
+  const resendSeconds = Math.min(seconds, 60)  // 最多60秒重发冷却
+  const expirationSeconds = seconds > 60 ? seconds : 900  // 如果原来是小时间，给默认15分钟有效期
+  
+  startResendCooldown(resendSeconds)
+  startCodeExpiration(expirationSeconds)
+  
+  // 向后兼容
+  codeCountdown.value = resendSeconds
   if (countdownTimer.value) {
     clearInterval(countdownTimer.value)
   }
@@ -174,6 +250,21 @@ const startCountdown = (seconds: number = 60) => {
 }
 
 const clearCountdown = () => {
+  // 清除重发冷却
+  if (resendTimer.value) {
+    clearInterval(resendTimer.value)
+    resendTimer.value = null
+  }
+  resendCooldown.value = 0
+  
+  // 清除验证码有效期
+  if (expirationTimer.value) {
+    clearInterval(expirationTimer.value)
+    expirationTimer.value = null
+  }
+  codeExpiration.value = 0
+  
+  // 兼容性清除
   if (countdownTimer.value) {
     clearInterval(countdownTimer.value)
     countdownTimer.value = null
@@ -181,9 +272,7 @@ const clearCountdown = () => {
   codeCountdown.value = 0
 }
 
-onBeforeUnmount(() => {
-  clearCountdown()
-})
+// onBeforeUnmount 在下面统一处理
 
 // Clean up function when modal closes
 const handleModalClose = () => {
@@ -203,15 +292,7 @@ const handleModalClose = () => {
   })
   
   // Reset errors
-  Object.assign(registerErrors.value, {
-    username: '',
-    email: '',
-    password: '',
-    confirmPassword: '',
-    verificationCode: '',
-    agreeToPrivacy: '',
-    agreeToTerms: ''
-  })
+  clearFormErrors(registerErrors)
   
   // Reset verification status and clear code inputs
   clearCodeInputs()
@@ -228,40 +309,53 @@ const handleCodeInput = (index: number, event: Event) => {
   const target = event.target as HTMLInputElement
   const value = target.value.replace(/\D/g, '') // 只允许数字
   
-  // 检查是否是粘贴操作（输入了多个字符）
+  console.log(`⌨️ [DEBUG] Input event - Index: ${index}, Value: "${value}", Length: ${value.length}`)
+  
+  // 检查是否是多字符输入（类似粘贴）
   if (value.length > 1) {
-    // 直接处理多字符输入（类似粘贴）
+    console.log(`📥 [DEBUG] Multi-character input detected: "${value}"`)
+    // 处理多字符输入，从第一个输入框开始填充
     const digits = value.slice(0, 6) // 只取前6个数字
+    console.log(`🔢 [DEBUG] Extracted digits from input: "${digits}"`)
     
-    // 清空所有输入框
+    // 清空所有输入框并填充新数据
     for (let i = 0; i < 6; i++) {
-      codeInputs.value[i] = ''
-    }
-    
-    // 填充数字
-    for (let i = 0; i < 6; i++) {
-      if (digits[i]) {
-        codeInputs.value[i] = digits[i]
-        const input = codeInputRefs.value[i]
-        if (input) {
-          input.value = digits[i]
-        }
+      const newValue = digits[i] || ''
+      const oldValue = codeInputs.value[i]
+      codeInputs.value[i] = newValue
+      
+      console.log(`📝 [DEBUG] Multi-input Index ${i}: ${oldValue} -> ${newValue}`)
+      
+      // 同时更新DOM元素的值
+      const input = codeInputRefs.value[i]
+      if (input) {
+        input.value = newValue
       }
     }
     
+    // 立即更新验证码
     updateVerificationCode()
+    console.log(`📧 [DEBUG] Multi-input verification code updated: ${registerForm.verificationCode}`)
     
-    // 焦点移到最后一个有值的输入框
-    const lastFilledIndex = digits.length - 1
-    const focusIndex = lastFilledIndex >= 0 ? Math.min(lastFilledIndex, 5) : 0
-    const targetInput = codeInputRefs.value[focusIndex]
-    if (targetInput) {
-      targetInput.focus()
-    }
+    // 焦点移到合适的位置
+    nextTick(() => {
+      const lastFilledIndex = Math.min(digits.length - 1, 5)
+      const focusIndex = digits.length >= 6 ? 5 : lastFilledIndex
+      const targetInput = codeInputRefs.value[focusIndex]
+      if (targetInput) {
+        targetInput.focus()
+        if (digits.length < 6) {
+          targetInput.select()
+        } else {
+          targetInput.setSelectionRange(1, 1)
+        }
+      }
+    })
     return
   }
   
   // 正常单个字符输入
+  console.log(`✏️ [DEBUG] Single character input - Index: ${index}, Value: "${value}"`)
   codeInputs.value[index] = value
   target.value = value // 确保DOM同步
   
@@ -272,6 +366,7 @@ const handleCodeInput = (index: number, event: Event) => {
   if (value && index < 5) {
     const nextInput = codeInputRefs.value[index + 1]
     if (nextInput) {
+      console.log(`➡️ [DEBUG] Moving focus from ${index} to ${index + 1}`)
       nextInput.focus()
     }
   }
@@ -279,6 +374,37 @@ const handleCodeInput = (index: number, event: Event) => {
 
 const handleCodeKeydown = (index: number, event: KeyboardEvent) => {
   const target = event.target as HTMLInputElement
+  
+  // 处理Ctrl+V粘贴快捷键
+  if (event.ctrlKey && event.key === 'v') {
+    console.log('⌨️ [DEBUG] Ctrl+V detected, preventing default and triggering paste logic')
+    event.preventDefault()
+    
+    // 从剪贴板读取数据
+    navigator.clipboard.readText().then(text => {
+      console.log('📋 [DEBUG] Clipboard text from Ctrl+V:', text)
+      console.log('📋 [DEBUG] Text length:', text?.length, 'Content preview:', text?.slice(0, 20))
+      // 创建模拟的粘贴事件
+      const mockPasteEvent = {
+        preventDefault: () => {},
+        clipboardData: {
+          getData: (type: string) => type === 'text' ? text : ''
+        }
+      } as ClipboardEvent
+      
+      handleCodePaste(mockPasteEvent)
+    }).catch(error => {
+      console.error('❌ [DEBUG] Failed to read clipboard:', error)
+      // 如果剪贴板API失败，尝试监听下一个paste事件
+      const tempPasteHandler = (e: ClipboardEvent) => {
+        console.log('🔄 [DEBUG] Fallback paste event after Ctrl+V')
+        handleCodePaste(e)
+        document.removeEventListener('paste', tempPasteHandler)
+      }
+      document.addEventListener('paste', tempPasteHandler)
+    })
+    return
+  }
   
   // 处理退格键
   if (event.key === 'Backspace') {
@@ -318,42 +444,82 @@ const handleCodeKeydown = (index: number, event: KeyboardEvent) => {
 }
 
 const handleCodePaste = (event: ClipboardEvent) => {
+  console.log('🎯 [DEBUG] Paste event triggered:', event)
+  
   event.preventDefault()
   const paste = (event.clipboardData || (window as any).clipboardData)?.getData('text')
   
+  console.log('📋 [DEBUG] Raw paste data:', paste)
+  
   if (paste) {
     const digits = paste.replace(/\D/g, '').slice(0, 6) // 只取前6个数字
+    console.log('🔢 [DEBUG] Extracted digits:', digits)
+    console.log('📏 [DEBUG] Digits length:', digits.length)
     
-    // 清空所有输入框先
-    for (let i = 0; i < 6; i++) {
-      codeInputs.value[i] = ''
-    }
-    
-    // 强制触发响应式更新
-    nextTick(() => {
-      // 填充到输入框中
+    if (digits.length > 0) {
+      console.log('🧹 [DEBUG] Before clearing - codeInputs:', [...codeInputs.value])
+      
+      // 清空所有输入框并填充新数据（同步操作）
       for (let i = 0; i < 6; i++) {
-        if (digits[i]) {
-          codeInputs.value[i] = digits[i]
-          // 同时更新DOM元素的值
-          const input = codeInputRefs.value[i]
-          if (input) {
-            input.value = digits[i]
-          }
+        const newValue = digits[i] || ''
+        const oldValue = codeInputs.value[i]
+        codeInputs.value[i] = newValue
+        
+        console.log(`📝 [DEBUG] Index ${i}: ${oldValue} -> ${newValue}`)
+        
+        // 同时更新DOM元素的值以确保同步
+        const input = codeInputRefs.value[i]
+        if (input) {
+          console.log(`🔄 [DEBUG] Updating DOM input ${i}: ${input.value} -> ${newValue}`)
+          input.value = newValue
+        } else {
+          console.warn(`⚠️ [DEBUG] Input ref ${i} is null/undefined`)
         }
       }
       
-      updateVerificationCode()
+      console.log('✅ [DEBUG] After filling - codeInputs:', [...codeInputs.value])
+      console.log('🔍 [DEBUG] DOM values:', codeInputRefs.value.map((input, i) => input?.value || 'null'))
       
-      // 焦点移到最后一个有值的输入框
-      const lastFilledIndex = digits.length - 1
-      const focusIndex = lastFilledIndex >= 0 ? Math.min(lastFilledIndex, 5) : 0
-      const targetInput = codeInputRefs.value[focusIndex]
-      if (targetInput) {
-        targetInput.focus()
-        targetInput.select() // 选中文本以便用户知道焦点位置
-      }
-    })
+      // 立即更新验证码（同步调用）
+      const oldVerificationCode = registerForm.verificationCode
+      updateVerificationCode()
+      console.log(`📧 [DEBUG] Verification code: ${oldVerificationCode} -> ${registerForm.verificationCode}`)
+      
+      // 使用 nextTick 来处理焦点，确保DOM已更新
+      nextTick(() => {
+        console.log('⏰ [DEBUG] nextTick - Setting focus')
+        // 焦点移到最后一个有值的输入框，如果填满了就移到最后一个
+        const lastFilledIndex = Math.min(digits.length - 1, 5)
+        const focusIndex = digits.length >= 6 ? 5 : lastFilledIndex
+        console.log(`🎯 [DEBUG] Focus index: ${focusIndex}`)
+        
+        const targetInput = codeInputRefs.value[focusIndex]
+        if (targetInput) {
+          console.log(`👆 [DEBUG] Focusing on input ${focusIndex}`)
+          targetInput.focus()
+          // 如果没填满就选中文本，填满了就光标放到末尾
+          if (digits.length < 6) {
+            targetInput.select()
+            console.log(`📄 [DEBUG] Selected text in input ${focusIndex}`)
+          } else {
+            targetInput.setSelectionRange(1, 1)
+            console.log(`💎 [DEBUG] Set cursor position in input ${focusIndex}`)
+          }
+        } else {
+          console.error(`❌ [DEBUG] Target input ${focusIndex} is null`)
+        }
+        
+        console.log('🏁 [DEBUG] Final DOM state:', codeInputRefs.value.map((input, i) => ({
+          index: i,
+          value: input?.value || 'null',
+          focused: document.activeElement === input
+        })))
+      })
+    } else {
+      console.warn('⚠️ [DEBUG] No valid digits found in paste data')
+    }
+  } else {
+    console.warn('⚠️ [DEBUG] No paste data available')
   }
 }
 
@@ -361,13 +527,18 @@ const updateVerificationCode = () => {
   const code = codeInputs.value.join('')
   registerForm.verificationCode = code
   
+  console.log(`📧 [DEBUG] updateVerificationCode - Code: "${code}", Length: ${code.length}`)
+  console.log(`📊 [DEBUG] Current codeInputs state:`, codeInputs.value)
+  
   // 如果输入完整6位，自动触发验证
   if (code.length === 6 && /^\d{6}$/.test(code)) {
+    console.log('✅ [DEBUG] Full 6-digit code detected, triggering verification')
     // 使用nextTick确保DOM更新完成后再验证
     nextTick(() => {
       verifyCodeRealtime()
     })
   } else if (code.length < 6) {
+    console.log('⏳ [DEBUG] Incomplete code, resetting verification status')
     // 重置验证状态
     codeVerification.status = 'idle'
     codeVerification.message = ''
@@ -376,7 +547,17 @@ const updateVerificationCode = () => {
 }
 
 const clearCodeInputs = () => {
+  // 清空响应式数组
   codeInputs.value = ['', '', '', '', '', '']
+  
+  // 同时清空DOM元素，确保同步
+  codeInputRefs.value.forEach((input, index) => {
+    if (input) {
+      input.value = ''
+    }
+  })
+  
+  // 重置相关状态
   registerForm.verificationCode = ''
   codeVerification.status = 'idle'
   codeVerification.message = ''
@@ -385,22 +566,22 @@ const clearCodeInputs = () => {
 
 // Validation
 const validateLoginForm = () => {
-  errors.value = { email: '', password: '' }
+  clearFormErrors(loginErrors)
   let isValid = true
 
   if (!loginForm.email) {
-    errors.value.email = 'Please enter your email'
+    loginErrors.email = 'Please enter your email'
     isValid = false
   } else if (!/\S+@\S+\.\S+/.test(loginForm.email)) {
-    errors.value.email = 'Please enter a valid email address'
+    loginErrors.email = 'Please enter a valid email address'
     isValid = false
   }
 
   if (!loginForm.password) {
-    errors.value.password = 'Please enter your password'
+    loginErrors.password = 'Please enter your password'
     isValid = false
   } else if (loginForm.password.length < 6) {
-    errors.value.password = 'Password must be at least 6 characters'
+    loginErrors.password = 'Password must be at least 6 characters'
     isValid = false
   }
 
@@ -409,47 +590,44 @@ const validateLoginForm = () => {
 
 // Validate registration form step 1 (basic information)
 const validateRegisterStep1 = () => {
-  registerErrors.value.username = ''
-  registerErrors.value.email = ''
-  registerErrors.value.password = ''
-  registerErrors.value.confirmPassword = ''
+  clearFormErrors(registerErrors)
   let isValid = true
 
   if (!registerForm.username) {
-    registerErrors.value.username = 'Please enter username'
+    registerErrors.username = 'Please enter username'
     isValid = false
   } else if (registerForm.username.length < 3 || registerForm.username.length > 50) {
-    registerErrors.value.username = 'Username must be between 3-50 characters'
+    registerErrors.username = 'Username must be between 3-50 characters'
     isValid = false
   } else if (!/^[a-zA-Z0-9_]+$/.test(registerForm.username)) {
-    registerErrors.value.username = 'Username can only contain letters, numbers and underscores'
+    registerErrors.username = 'Username can only contain letters, numbers and underscores'
     isValid = false
   }
 
   if (!registerForm.email) {
-    registerErrors.value.email = 'Please enter email address'
+    registerErrors.email = 'Please enter email address'
     isValid = false
   } else if (!/\S+@\S+\.\S+/.test(registerForm.email)) {
-    registerErrors.value.email = 'Please enter a valid email address'
+    registerErrors.email = 'Please enter a valid email address'
     isValid = false
   }
 
   if (!registerForm.password) {
-    registerErrors.value.password = 'Please enter password'
+    registerErrors.password = 'Please enter password'
     isValid = false
   } else if (registerForm.password.length < 6) {
-    registerErrors.value.password = 'Password must be at least 6 characters'
+    registerErrors.password = 'Password must be at least 6 characters'
     isValid = false
-  } else if (!/^(?=.*[a-zA-Z])(?=.*\d)/.test(registerForm.password)) {
-    registerErrors.value.password = 'Password must contain at least one letter and one number'
+  } else if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(registerForm.password)) {
+    registerErrors.password = 'Password must contain at least one uppercase letter, one lowercase letter, and one number'
     isValid = false
   }
 
   if (!registerForm.confirmPassword) {
-    registerErrors.value.confirmPassword = 'Please confirm password'
+    registerErrors.confirmPassword = 'Please confirm password'
     isValid = false
   } else if (registerForm.confirmPassword !== registerForm.password) {
-    registerErrors.value.confirmPassword = 'Password confirmation does not match'
+    registerErrors.confirmPassword = 'Password confirmation does not match'
     isValid = false
   }
 
@@ -458,14 +636,14 @@ const validateRegisterStep1 = () => {
 
 // Validate registration form step 2 (verification code)
 const validateRegisterStep2 = () => {
-  registerErrors.value.verificationCode = ''
+  registerErrors.verificationCode = ''
   let isValid = true
 
   if (!registerForm.verificationCode) {
-    registerErrors.value.verificationCode = 'Please enter verification code'
+    registerErrors.verificationCode = 'Please enter verification code'
     isValid = false
   } else if (!/^\d{6}$/.test(registerForm.verificationCode)) {
-    registerErrors.value.verificationCode = 'Verification code must be 6 digits'
+    registerErrors.verificationCode = 'Verification code must be 6 digits'
     isValid = false
   }
 
@@ -474,62 +652,63 @@ const validateRegisterStep2 = () => {
 
 // Individual field validation functions (called on blur)
 const validateUsername = () => {
-  registerErrors.value.username = ''
+  registerErrors.username = ''
   
   if (!registerForm.username) {
-    registerErrors.value.username = 'Please enter username'
+    registerErrors.username = 'Please enter username'
   } else if (registerForm.username.length < 3 || registerForm.username.length > 50) {
-    registerErrors.value.username = 'Username must be between 3-50 characters'
+    registerErrors.username = 'Username must be between 3-50 characters'
   } else if (!/^[a-zA-Z0-9_]+$/.test(registerForm.username)) {
-    registerErrors.value.username = 'Username can only contain letters, numbers and underscores'
+    registerErrors.username = 'Username can only contain letters, numbers and underscores'
   }
 }
 
 const validateEmail = () => {
-  registerErrors.value.email = ''
+  registerErrors.email = ''
   
   if (!registerForm.email) {
-    registerErrors.value.email = 'Please enter email address'
+    registerErrors.email = 'Please enter email address'
   } else if (!/\S+@\S+\.\S+/.test(registerForm.email)) {
-    registerErrors.value.email = 'Please enter a valid email address'
+    registerErrors.email = 'Please enter a valid email address'
   }
 }
 
+
 const validatePassword = () => {
-  registerErrors.value.password = ''
+  registerErrors.password = ''
   
   if (!registerForm.password) {
-    registerErrors.value.password = 'Please enter password'
+    registerErrors.password = 'Please enter password'
   } else if (registerForm.password.length < 6) {
-    registerErrors.value.password = 'Password must be at least 6 characters'
-  } else if (!/^(?=.*[a-zA-Z])(?=.*\d)/.test(registerForm.password)) {
-    registerErrors.value.password = 'Password must contain at least one letter and one number'
+    registerErrors.password = 'Password must be at least 6 characters'
+  } else if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(registerForm.password)) {
+    registerErrors.password = 'Password must contain at least one uppercase letter, one lowercase letter, and one number'
   }
 }
 
 const validateConfirmPassword = () => {
-  registerErrors.value.confirmPassword = ''
+  registerErrors.confirmPassword = ''
   
   if (!registerForm.confirmPassword) {
-    registerErrors.value.confirmPassword = 'Please confirm password'
+    registerErrors.confirmPassword = 'Please confirm password'
   } else if (registerForm.confirmPassword !== registerForm.password) {
-    registerErrors.value.confirmPassword = 'Password confirmation does not match'
+    registerErrors.confirmPassword = 'Password confirmation does not match'
   }
 }
 
 const validatePrivacyAgreement = () => {
-  registerErrors.value.agreeToPrivacy = ''
+  registerErrors.agreeToPrivacy = ''
   
   if (!registerForm.agreeToPrivacy) {
-    registerErrors.value.agreeToPrivacy = 'Please accept the Privacy Policy'
+    registerErrors.agreeToPrivacy = 'Please accept the Privacy Policy'
   }
 }
 
 const validateTermsAgreement = () => {
-  registerErrors.value.agreeToTerms = ''
+  registerErrors.agreeToTerms = ''
   
   if (!registerForm.agreeToTerms) {
-    registerErrors.value.agreeToTerms = 'Please accept the Terms of Service'
+    registerErrors.agreeToTerms = 'Please accept the Terms of Service'
   }
 }
 
@@ -557,7 +736,7 @@ const validateRegisterForm = () => {
 
 
 // reCAPTCHA v3 验证函数
-const executeRecaptcha = async (action: string): Promise<string | null> => {
+const executeRecaptcha = (action: string): Promise<string | null> => {
   return new Promise((resolve) => {
     if (typeof window.grecaptcha?.enterprise === 'undefined') {
       console.warn('reCAPTCHA Enterprise not loaded, skipping verification')
@@ -565,10 +744,10 @@ const executeRecaptcha = async (action: string): Promise<string | null> => {
       return
     }
 
-    // 从环境变量获取 Site Key（不使用硬编码 fallback）
-    const siteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY
+    // 从预加载的配置获取 Site Key（同步访问）
+    const siteKey = appConfig.recaptchaSiteKey
     if (!siteKey) {
-      console.error('VITE_RECAPTCHA_SITE_KEY 环境变量未配置')
+      console.error('RECAPTCHA_SITE_KEY 环境变量未配置')
       resolve(null)
       return
     }
@@ -589,7 +768,7 @@ const executeRecaptcha = async (action: string): Promise<string | null> => {
 
 // reCAPTCHA v2 处理函数
 const initRecaptchaV2 = (): Promise<void> => {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     if (typeof window.grecaptcha === 'undefined') {
       console.error('reCAPTCHA not loaded')
       resolve()
@@ -597,8 +776,13 @@ const initRecaptchaV2 = (): Promise<void> => {
     }
 
     window.grecaptcha.ready(() => {
-      // 获取 v2 site key
-      const v2SiteKey = import.meta.env.VITE_RECAPTCHA_V2_SITE_KEY || '6LexK5wrAAAAAMchqZ_TsZBWzZV6MBwVgjbBMlsb'
+      // 获取 v2 site key（同步访问）
+      const v2SiteKey = appConfig.recaptchaV2SiteKey
+      if (!v2SiteKey) {
+        console.error('RECAPTCHA_V2_SITE_KEY 环境变量未配置')
+        reject(new Error('reCAPTCHA v2 配置缺失'))
+        return
+      }
       
       // 渲染 reCAPTCHA v2 widget
       recaptchaV2WidgetId.value = window.grecaptcha.render('recaptcha-v2-container', {
@@ -646,7 +830,7 @@ const hideRecaptchaV2Challenge = () => {
 
 // 注册专用的reCAPTCHA v2处理函数
 const initRegisterRecaptchaV2 = (): Promise<void> => {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     if (typeof window.grecaptcha === 'undefined') {
       console.error('reCAPTCHA not loaded')
       resolve()
@@ -654,8 +838,13 @@ const initRegisterRecaptchaV2 = (): Promise<void> => {
     }
 
     window.grecaptcha.ready(() => {
-      // 获取 v2 site key
-      const v2SiteKey = import.meta.env.VITE_RECAPTCHA_V2_SITE_KEY || '6LexK5wrAAAAAMchqZ_TsZBWzZV6MBwVgjbBMlsb'
+      // 获取 v2 site key（同步访问）
+      const v2SiteKey = appConfig.recaptchaV2SiteKey
+      if (!v2SiteKey) {
+        console.error('RECAPTCHA_V2_SITE_KEY 环境变量未配置')
+        reject(new Error('reCAPTCHA v2 配置缺失'))
+        return
+      }
       
       // 渲染 reCAPTCHA v2 widget for registration
       registerRecaptchaV2WidgetId.value = window.grecaptcha.render('register-recaptcha-v2-container', {
@@ -689,13 +878,13 @@ const onRegisterRecaptchaV2Success = (token: string) => {
 
 const onRegisterRecaptchaV2Expired = () => {
   console.log('reCAPTCHA v2 expired for registration')
-  notyf.error('验证已过期，请重新验证')
+  notyf.error('Verification expired, please verify again')
   resetRegisterRecaptchaV2()
 }
 
 const onRegisterRecaptchaV2Error = () => {
   console.error('reCAPTCHA v2 error for registration')
-  notyf.error('验证出现错误，请重试')
+  notyf.error('Verification error, please try again')
   resetRegisterRecaptchaV2()
 }
 
@@ -738,6 +927,26 @@ const clearTokenCache = () => {
     lastEmail: ''
   })
   console.log('🗑️ Cleared token cache')
+}
+
+// 检测并处理 reCAPTCHA DUPE 错误的辅助函数
+const handleRecaptchaDupeError = (error: any): boolean => {
+  const isDupeError = error.response?.status === 400 && 
+                     error.response?.data?.error === 'TOKEN_EXPIRED' &&
+                     error.response?.data?.requirePageRefresh &&
+                     error.response?.data?.data?.error_type === 'recaptcha_token_reused'
+  
+  if (isDupeError) {
+    console.warn('🔄 Detected reCAPTCHA DUPE error, clearing token cache')
+    clearTokenCache()
+    
+    // 显示用户友好的错误消息
+    notyf.error('安全令牌已过期，请刷新页面重新验证')
+    
+    return true
+  }
+  
+  return false
 }
 
 const isTokenValid = (timestamp: number): boolean => {
@@ -812,7 +1021,7 @@ const handleLogin = async () => {
 
   loading.value = true
   // 清除之前的错误信息和reCAPTCHA v2挑战
-  errors.value = { email: '', password: '' }
+  clearFormErrors(loginErrors)
   hideRecaptchaV2Challenge()
 
   try {
@@ -826,35 +1035,26 @@ const handleLogin = async () => {
     })
 
     if (success) {
-      notyf.success('Login successful!')
+      showSuccess('Login successful!')
       await router.push('/app')
     }
   } catch (error: any) {
     console.error('Login failed:', error)
-    console.log('🔍 错误详情 - status:', error.status, 'response.status:', error.response?.status)
-    console.log('🔍 错误数据 - data:', error.data, 'response.data:', error.response?.data)
     
-    // 检查是否是reCAPTCHA挑战响应（状态码423）
-    const isRecaptchaChallenge = (error.status === 423 || error.response?.status === 423) && 
-                                (error.data?.challenge_type === 'recaptcha_v2')
-    
-    console.log('🎯 是否为 reCAPTCHA 挑战:', isRecaptchaChallenge)
-    console.log('🔍 检查 challenge_type:', error.data?.challenge_type)
-    
-    if (isRecaptchaChallenge) {
+    // 检查是否是reCAPTCHA挑战响应
+    if (isRecaptchaError(error)) {
       // 显示reCAPTCHA v2验证
       recaptchaV2Challenge.value = error.data
       showRecaptchaV2.value = true
-      console.log('🚀 设置挑战数据:', error.data)
       
       // 初始化reCAPTCHA v2 widget
       setTimeout(async () => {
         try {
           await initRecaptchaV2()
-          notyf.success('请完成安全验证后重新登录')
+          showSuccess('Please complete security verification and login again')
         } catch (initError) {
           console.error('Failed to initialize reCAPTCHA v2:', initError)
-          notyf.error('安全验证初始化失败，请刷新页面重试')
+          showWarning('Security verification initialization failed, please refresh the page and try again')
         }
       }, 100)
       
@@ -862,20 +1062,11 @@ const handleLogin = async () => {
       return
     }
     
-    const errorMessage = error.message || 'Login failed'
+    // 使用新的错误处理架构
+    handleFormError(error, loginErrors, {
+      fallbackMessage: 'Login failed. Please check your credentials and try again.'
+    })
     
-    // 根据错误消息类型设置到相应的输入框下方
-    if (errorMessage.includes('Invalid email or password') || 
-        errorMessage.includes('password') || errorMessage.includes('Password') ||
-        errorMessage.includes('Invalid credentials') || errorMessage.includes('Authentication failed')) {
-      errors.value.password = errorMessage
-    } else if (errorMessage.includes('email') || errorMessage.includes('Email') || 
-               errorMessage.includes('user not found') || errorMessage.includes('User not found')) {
-      errors.value.email = errorMessage
-    } else {
-      // 对于其他错误，显示在密码框下方（通常是认证错误）
-      errors.value.password = errorMessage
-    }
   } finally {
     loading.value = false
   }
@@ -889,7 +1080,7 @@ const handleLoginWithV2Token = async (v2Token: string) => {
 
   loading.value = true
   // 清除之前的错误信息
-  errors.value = { email: '', password: '' }
+  clearFormErrors(loginErrors)
 
   try {
     // 缓存v2 token用于后续使用
@@ -904,29 +1095,18 @@ const handleLoginWithV2Token = async (v2Token: string) => {
     })
 
     if (success) {
-      notyf.success('Login successful!')
+      showSuccess('Login successful!')
       hideRecaptchaV2Challenge()
       await router.push('/app')
     }
   } catch (error: any) {
     console.error('Login with v2 token failed:', error)
-    const errorMessage = error.message || 'Login failed'
     
     // 重置reCAPTCHA v2以允许重试
     resetRecaptchaV2()
     
-    // 根据错误消息类型设置到相应的输入框下方
-    if (errorMessage.includes('Invalid email or password') || 
-        errorMessage.includes('password') || errorMessage.includes('Password') ||
-        errorMessage.includes('Invalid credentials') || errorMessage.includes('Authentication failed')) {
-      errors.value.password = errorMessage
-    } else if (errorMessage.includes('email') || errorMessage.includes('Email') || 
-               errorMessage.includes('user not found') || errorMessage.includes('User not found')) {
-      errors.value.email = errorMessage
-    } else {
-      // 对于其他错误，显示在密码框下方（通常是认证错误）
-      errors.value.password = errorMessage
-    }
+    // 使用新的统一错误处理架构
+    handleFormError(error, ref(loginErrors))
   } finally {
     loading.value = false
   }
@@ -936,16 +1116,16 @@ const handleLoginWithV2Token = async (v2Token: string) => {
 const handleSendVerificationCode = async () => {
   // Validate email first
   if (!registerForm.email) {
-    registerErrors.value.email = 'Please enter email address'
+    registerErrors.email = 'Please enter email address'
     return
   }
   if (!/\S+@\S+\.\S+/.test(registerForm.email)) {
-    registerErrors.value.email = 'Please enter a valid email address'
+    registerErrors.email = 'Please enter a valid email address'
     return
   }
 
   verificationCodeLoading.value = true
-  registerErrors.value.email = ''
+  registerErrors.email = ''
   
   // Reset verification status
   clearCodeInputs()
@@ -970,15 +1150,50 @@ const handleSendVerificationCode = async () => {
     const result = await userSession.sendVerificationCode(params)
     if (result.success) {
       notyf.success('Verification code sent, please check your email')
-      startCountdown(result.expires_in || 300) // Default 5 minutes
+      
+      // 使用新的分离倒计时：60秒重发冷却 + 15分钟验证码有效期
+      const expirationTime = result.expires_in || 900  // 默认15分钟
+      startResendCooldown(60)  // 60秒重发冷却
+      startCodeExpiration(expirationTime)  // 验证码有效期
       
       // 成功后更新缓存状态
       recaptchaTokenCache.lastAction = 'send_email'
     } else {
-      registerErrors.value.email = result.error || 'Failed to send verification code'
+      registerErrors.email = result.error || 'Failed to send verification code'
     }
   } catch (error: any) {
     console.error('Send verification code failed:', error)
+    
+    // 首先检查是否是频率限制错误（新增）
+    if (error.response?.status === 429) {
+      const errorData = error.response.data
+      const retryAfter = errorData.retryAfter || 60
+      
+      // 设置相应的冷却时间
+      startResendCooldown(retryAfter)
+      
+      // 显示友好的错误消息
+      if (errorData.error === 'RATE_LIMITED') {
+        registerErrors.email = `Too frequent. Please wait ${retryAfter} seconds before retry`
+      } else if (errorData.error === 'RATE_LIMITED_STRICT') {
+        const minutes = Math.ceil(retryAfter / 60)
+        registerErrors.email = `Rate limit exceeded. Please wait ${minutes} minutes before retry`
+      } else if (errorData.error === 'DAILY_LIMIT_EXCEEDED') {
+        const hours = Math.ceil(retryAfter / 3600)
+        registerErrors.email = `Daily limit reached. Please wait ${hours} hours before retry`
+      } else {
+        registerErrors.email = errorData.message || 'Too frequent, please try again later'
+      }
+      
+      verificationCodeLoading.value = false
+      return
+    }
+    
+    // 检查是否是 reCAPTCHA DUPE 错误
+    if (handleRecaptchaDupeError(error)) {
+      verificationCodeLoading.value = false
+      return
+    }
     
     // 检查是否是reCAPTCHA v2挑战响应
     if (error.response?.status === 423 && error.response?.data?.challenge_type === 'recaptcha_v2') {
@@ -990,10 +1205,10 @@ const handleSendVerificationCode = async () => {
       setTimeout(async () => {
         try {
           await initRegisterRecaptchaV2()
-          notyf.success('请完成安全验证后重新发送验证码')
+          notyf.success('Please complete security verification and send verification code again')
         } catch (initError) {
           console.error('Failed to initialize reCAPTCHA v2 for email:', initError)
-          notyf.error('安全验证初始化失败，请刷新页面重试')
+          notyf.error('Security verification initialization failed, please refresh the page and try again')
         }
       }, 100)
       
@@ -1001,7 +1216,7 @@ const handleSendVerificationCode = async () => {
       return
     }
     
-    registerErrors.value.email = 'Failed to send verification code, please try again later'
+    registerErrors.email = 'Failed to send verification code, please try again later'
   } finally {
     verificationCodeLoading.value = false
   }
@@ -1010,8 +1225,19 @@ const handleSendVerificationCode = async () => {
 // Real-time verification code validation
 const verifyCodeRealtime = async () => {
   if (!registerForm.verificationCode || registerForm.verificationCode.length !== 6) {
+    console.log('🚫 [DEBUG] verifyCodeRealtime - Invalid code length:', {
+      code: registerForm.verificationCode,
+      length: registerForm.verificationCode?.length
+    })
     return
   }
+
+  console.log('🔍 [DEBUG] Starting real-time verification:', {
+    email: registerForm.email,
+    code: registerForm.verificationCode,
+    codeLength: registerForm.verificationCode.length,
+    codeInputsState: [...codeInputs.value]
+  })
 
   codeVerification.status = 'verifying'
   codeVerification.message = 'Verifying...'
@@ -1022,24 +1248,52 @@ const verifyCodeRealtime = async () => {
     type: 'registration'
   }
 
+  console.log('📤 [DEBUG] Sending verification request:', params)
+
   try {
     const result = await userSession.verifyCode(params)
+    console.log('📥 [DEBUG] Verification response:', result)
     if (result.success) {
       codeVerification.status = 'success'
       codeVerification.message = 'Code verified!'
       codeVerification.isValid = true
-      registerErrors.value.verificationCode = ''
+      registerErrors.verificationCode = ''
     } else {
       codeVerification.status = 'error'
       codeVerification.message = result.error || 'Invalid verification code'
       codeVerification.isValid = false
-      registerErrors.value.verificationCode = codeVerification.message
+      registerErrors.verificationCode = codeVerification.message
     }
-  } catch (error) {
+  } catch (error: any) {
+    console.error('❌ [DEBUG] Verification code error:', error)
+    console.error('❌ [DEBUG] Error details:', {
+      status: error.response?.status,
+      data: error.response?.data,
+      message: error.message
+    })
     codeVerification.status = 'error'
-    codeVerification.message = 'Verification failed'
     codeVerification.isValid = false
-    registerErrors.value.verificationCode = codeVerification.message
+    
+    // 根据具体错误状态码提供友好的错误提示
+    if (error.response?.status === 400) {
+      // 400错误通常是验证码错误或过期
+      const errorMessage = error.response?.data?.error || error.response?.data?.message
+      if (errorMessage && errorMessage.includes('verification code')) {
+        codeVerification.message = 'Invalid verification code, please try again'
+      } else if (errorMessage && errorMessage.includes('expired')) {
+        codeVerification.message = 'Verification code expired, please get a new one'
+      } else {
+        codeVerification.message = 'Invalid verification code, please check and try again'
+      }
+    } else if (error.response?.status === 429) {
+      codeVerification.message = 'Too many verification attempts, please try again later'
+    } else if (error.response?.status >= 500) {
+      codeVerification.message = 'Server error, please try again later'
+    } else {
+      codeVerification.message = error.message || 'Verification failed, please try again'
+    }
+    
+    registerErrors.verificationCode = codeVerification.message
   }
 }
 
@@ -1080,22 +1334,22 @@ const handleEnhancedRegister = async () => {
           v3Token: null,
           v2Token: recaptchaTokenCache.v2Token,
           fromCache: true,
-          cacheInfo: '使用邮箱验证时的v2 token，跳过重复验证'
+          cacheInfo: 'Using v2 token for email verification, skipping duplicate verification'
         }
-        console.log('✅ 智能验证：使用邮箱验证的v2 token，跳过注册reCAPTCHA')
+        console.log('✅ Smart verification: Using v2 token for email verification, skipping registration reCAPTCHA')
       } else if (recaptchaTokenCache.v3Token && isTokenValid(recaptchaTokenCache.v3Timestamp)) {
         // 有有效的v3 token，直接使用
         tokens = {
           v3Token: recaptchaTokenCache.v3Token,
           v2Token: null,
           fromCache: true,
-          cacheInfo: '使用邮箱验证时的v3 token，跳过重复验证'
+          cacheInfo: 'Using v3 token for email verification, skipping registration reCAPTCHA'
         }
-        console.log('✅ 智能验证：使用邮箱验证的v3 token，跳过注册reCAPTCHA')
+        console.log('✅ Smart verification: Using v3 token for email verification, skipping registration reCAPTCHA')
       } else {
         // 没有可用token，但邮箱已验证，使用轻量级验证
-        console.log('✅ 智能验证：邮箱已验证，跳过注册reCAPTCHA验证')
-        tokens = { v3Token: null, v2Token: null, fromCache: true, cacheInfo: '邮箱已验证，跳过reCAPTCHA' }
+        console.log('✅ Smart verification: Email verified, skipping registration reCAPTCHA verification')
+        tokens = { v3Token: null, v2Token: null, fromCache: true, cacheInfo: 'Email verified, skipping registration reCAPTCHA' }
       }
           } else {
         // 邮箱未验证或token过期，正常进行reCAPTCHA验证
@@ -1153,7 +1407,49 @@ const handleEnhancedRegister = async () => {
       loginForm.email = params.email
       loginForm.password = ''
     } else {
-      notyf.error(result.error || 'Registration failed')
+      // 处理详细的验证错误
+      if (result.validationErrors && Array.isArray(result.validationErrors)) {
+        console.log('Processing validation errors:', result.validationErrors)
+        
+        // 清除之前的错误
+        clearFormErrors(registerErrors)
+        
+        // 逐个处理验证错误
+        result.validationErrors.forEach((error: any) => {
+          console.log('Processing error:', error)
+          if (error.path) {
+            const fieldName = error.path
+            const message = error.msg || error.message || 'Validation failed'
+            
+            // 映射字段名到前端字段
+            switch (fieldName) {
+              case 'username':
+                registerErrors.username = message
+                break
+              case 'email':
+                registerErrors.email = message
+                break  
+              case 'password':
+                registerErrors.password = message
+                break
+              case 'phone':
+                registerErrors.phone = message
+                break
+              case 'verification_code':
+                registerErrors.verificationCode = message
+                break
+              default:
+                console.warn('Unknown validation field:', fieldName)
+            }
+          }
+        })
+        
+        // 显示通用错误消息
+        notyf.error('Please check the highlighted fields and fix the errors')
+      } else {
+        // 显示通用错误
+        notyf.error(result.error || 'Registration failed')
+      }
     }
   } catch (error: any) {
     console.error('Registration failed:', error)
@@ -1169,10 +1465,10 @@ const handleEnhancedRegister = async () => {
       setTimeout(async () => {
         try {
           await initRegisterRecaptchaV2()
-          notyf.success('请完成安全验证后重新注册')
+          notyf.success('Please complete security verification and register again')
         } catch (initError) {
           console.error('Failed to initialize reCAPTCHA v2 for registration:', initError)
-          notyf.error('安全验证初始化失败，请刷新页面重试')
+          notyf.error('Security verification initialization failed, please refresh the page and try again')
         }
       }, 100)
       
@@ -1252,7 +1548,49 @@ const handleEnhancedRegisterWithV2Token = async (v2Token: string) => {
       loginForm.email = params.email
       loginForm.password = ''
     } else {
-      notyf.error(result.error || 'Registration failed')
+      // 处理详细的验证错误
+      if (result.validationErrors && Array.isArray(result.validationErrors)) {
+        console.log('Processing validation errors (v2 flow):', result.validationErrors)
+        
+        // 清除之前的错误
+        clearFormErrors(registerErrors)
+        
+        // 逐个处理验证错误
+        result.validationErrors.forEach((error: any) => {
+          console.log('Processing error (v2 flow):', error)
+          if (error.path) {
+            const fieldName = error.path
+            const message = error.msg || error.message || 'Validation failed'
+            
+            // 映射字段名到前端字段
+            switch (fieldName) {
+              case 'username':
+                registerErrors.username = message
+                break
+              case 'email':
+                registerErrors.email = message
+                break  
+              case 'password':
+                registerErrors.password = message
+                break
+              case 'phone':
+                registerErrors.phone = message
+                break
+              case 'verification_code':
+                registerErrors.verificationCode = message
+                break
+              default:
+                console.warn('Unknown validation field (v2 flow):', fieldName)
+            }
+          }
+        })
+        
+        // 显示通用错误消息
+        notyf.error('Please check the highlighted fields and fix the errors')
+      } else {
+        // 显示通用错误
+        notyf.error(result.error || 'Registration failed')
+      }
     }
   } catch (error: any) {
     console.error('Registration with v2 token failed:', error)
@@ -1270,12 +1608,12 @@ const handleEnhancedRegisterWithV2Token = async (v2Token: string) => {
 // 处理reCAPTCHA v2验证后的邮件发送
 const handleSendEmailWithV2Token = async (v2Token: string) => {
   if (!registerForm.email) {
-    registerErrors.value.email = 'Please enter email address'
+    registerErrors.email = 'Please enter email address'
     return
   }
 
   verificationCodeLoading.value = true
-  registerErrors.value.email = ''
+  registerErrors.email = ''
 
   try {
     // 同时使用v3和v2 token
@@ -1292,7 +1630,11 @@ const handleSendEmailWithV2Token = async (v2Token: string) => {
     const result = await userSession.sendVerificationCode(params)
     if (result.success) {
       notyf.success('Verification code sent, please check your email')
-      startCountdown(result.expires_in || 300)
+      
+      // 使用新的分离倒计时：60秒重发冷却 + 15分钟验证码有效期
+      const expirationTime = result.expires_in || 900  // 默认15分钟
+      startResendCooldown(60)  // 60秒重发冷却
+      startCodeExpiration(expirationTime)  // 验证码有效期
       
       // 隐藏v2挑战界面
       hideRegisterRecaptchaV2Challenge()
@@ -1300,7 +1642,7 @@ const handleSendEmailWithV2Token = async (v2Token: string) => {
       // 更新缓存状态
       recaptchaTokenCache.lastAction = 'send_email'
     } else {
-      registerErrors.value.email = result.error || 'Failed to send verification code'
+      registerErrors.email = result.error || 'Failed to send verification code'
     }
   } catch (error: any) {
     console.error('Send email with v2 token failed:', error)
@@ -1309,7 +1651,7 @@ const handleSendEmailWithV2Token = async (v2Token: string) => {
     // 重置reCAPTCHA v2以允许重试
     resetRegisterRecaptchaV2()
     
-    registerErrors.value.email = errorMessage
+    registerErrors.email = errorMessage
   } finally {
     verificationCodeLoading.value = false
   }
@@ -1354,19 +1696,72 @@ const handleRegister = async () => {
   }
 }
 
-useHead({
-  title: 'Login - Ezen Cloud',
-  script: [
-    {
-      src: `https://www.google.com/recaptcha/enterprise.js?render=${import.meta.env.VITE_RECAPTCHA_SITE_KEY}`,
-      defer: true
-    },
-    {
-      src: 'https://www.google.com/recaptcha/api.js',
-      async: true,
-      defer: true
+// 动态加载reCAPTCHA脚本（使用同步配置访问）
+const loadRecaptchaScripts = () => {
+  const siteKey = appConfig.recaptchaSiteKey
+  
+  if (siteKey) {
+    // 加载reCAPTCHA Enterprise脚本
+    const enterpriseScript = document.createElement('script')
+    enterpriseScript.src = `https://www.google.com/recaptcha/enterprise.js?render=${siteKey}`
+    enterpriseScript.defer = true
+    document.head.appendChild(enterpriseScript)
+    console.log('✅ reCAPTCHA Enterprise脚本已加载')
+  } else {
+    console.warn('⚠️ reCAPTCHA Site Key未配置，跳过Enterprise脚本加载')
+  }
+  
+  // 加载reCAPTCHA v2脚本
+  const v2Script = document.createElement('script')
+  v2Script.src = 'https://www.google.com/recaptcha/api.js'
+  v2Script.async = true
+  v2Script.defer = true
+  document.head.appendChild(v2Script)
+  console.log('✅ reCAPTCHA v2脚本已加载')
+}
+
+// 全局粘贴监听器 - 备用方案
+let globalPasteListener: ((event: ClipboardEvent) => void) | null = null
+
+// 页面加载时初始化脚本
+onMounted(() => {
+  loadRecaptchaScripts()
+  
+  // 设置全局粘贴监听器作为备用
+  globalPasteListener = (event: ClipboardEvent) => {
+    // 检查是否在验证码输入区域内
+    const target = event.target as HTMLElement
+    const isInVerificationArea = target?.closest?.('.verification-compact') != null
+    
+    console.log('🌐 [DEBUG] Global paste detected:', {
+      target: target?.tagName,
+      className: target?.className,
+      isInVerificationArea,
+      activeElement: document.activeElement?.tagName
+    })
+    
+    if (isInVerificationArea && showVerificationField.value) {
+      console.log('🎯 [DEBUG] Global paste - redirecting to handleCodePaste')
+      handleCodePaste(event)
     }
-  ]
+  }
+  
+  document.addEventListener('paste', globalPasteListener)
+  console.log('📋 [DEBUG] Global paste listener registered')
+})
+
+onBeforeUnmount(() => {
+  clearCountdown()
+  
+  // 清理全局粘贴监听器
+  if (globalPasteListener) {
+    document.removeEventListener('paste', globalPasteListener)
+    console.log('📋 [DEBUG] Global paste listener removed')
+  }
+})
+
+useHead({
+  title: 'Login - Ezen Cloud'
 })
 </script>
 
@@ -1390,11 +1785,11 @@ useHead({
               type="email"
               placeholder="Please enter your email"
               size="large"
-              :class="{ 'is-danger': errors.email }"
+              :class="{ 'is-danger': loginErrors.email }"
             />
             <iconify-icon icon="lucide:user" class="form-icon" />
-            <p v-if="errors.email" class="help is-danger">
-              {{ errors.email }}
+            <p v-if="loginErrors.email" class="help is-danger">
+              {{ loginErrors.email }}
             </p>
           </VControl>
         </VField>
@@ -1407,13 +1802,20 @@ useHead({
               type="password"
               placeholder="Please enter your password"
               size="large"
-              :class="{ 'is-danger': errors.password }"
+              :class="{ 'is-danger': loginErrors.password }"
             />
             <iconify-icon icon="lucide:lock" class="form-icon" />
-            <p v-if="errors.password" class="help is-danger">
-              {{ errors.password }}
+            <p v-if="loginErrors.password" class="help is-danger">
+              {{ loginErrors.password }}
             </p>
           </VControl>
+        </VField>
+
+        <!-- 通用错误信息显示 -->
+        <VField v-if="loginErrors.general" class="form-item">
+          <VMessage color="danger" class="is-fullwidth">
+            {{ loginErrors.general }}
+          </VMessage>
         </VField>
         
         <!-- reCAPTCHA v2 验证区域 -->
@@ -1516,9 +1918,14 @@ useHead({
                   <p v-if="registerErrors.email" class="help is-danger">
                     {{ registerErrors.email }}
                   </p>
-                  <p v-else-if="codeCountdown > 0" class="help is-success">
+                  <p v-else-if="codeStatusText" class="help is-success">
                     <iconify-icon icon="lucide:check-circle" />
-                    Code sent! Check your email. Resend in {{ codeCountdown }}s
+                    {{ codeStatusText }}
+                  </p>
+                  <!-- 显示重发冷却时间 -->
+                  <p v-else-if="resendCooldown > 0" class="help is-info">
+                    <iconify-icon icon="lucide:clock" />
+                    Resend available in {{ resendCooldown }}s
                   </p>
 
                   <!-- Compact Verification Code -->
@@ -1531,7 +1938,7 @@ useHead({
                       <div class="code-inputs-container">
                         <input
                           v-for="(digit, index) in codeInputs"
-                          :key="index"
+                          :key="`code-input-${index}`"
                           :ref="(el) => { if (el) codeInputRefs[index] = el as HTMLInputElement }"
                           v-model="codeInputs[index]"
                           type="text"
@@ -1544,9 +1951,12 @@ useHead({
                             'is-success': codeVerification.isValid,
                             'is-filled': codeInputs[index]
                           }"
+                          :data-index="index"
                           @input="handleCodeInput(index, $event)"
                           @keydown="handleCodeKeydown(index, $event)"
-                          @paste="handleCodePaste"
+                          @paste.prevent="handleCodePaste"
+                          @focus="console.log(`🎯 [DEBUG] Focus on input ${index}`)"
+                          @blur="console.log(`👋 [DEBUG] Blur on input ${index}`)"
                           autocomplete="off"
                         />
                       </div>

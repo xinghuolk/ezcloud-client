@@ -5,7 +5,7 @@ import { useUserSession } from '/@src/stores/user-session'
 import { useDeviceStore } from '/@src/stores/devices'
 import { statsApi } from '/@src/api'
 import type { Device } from '/@src/api/types'
-import { notyf } from '/@src/api/request'
+import { useFormErrorHandler } from '/@src/composables/use-error-handler'
 
 definePage({
   meta: {
@@ -28,6 +28,9 @@ const stats = ref({
 })
 
 const recentDevices = ref<Device[]>([])
+
+// Error handling
+const { handleError } = useFormErrorHandler()
 
 // System info (for admin users)
 const systemInfo = ref({
@@ -78,6 +81,9 @@ const loadDashboardData = async () => {
     }
   } catch (error) {
     console.warn('Dashboard API not available, using fallback data:', error)
+    handleError(error, { 
+      fallbackMessage: 'Dashboard data temporarily unavailable, showing offline data'
+    })
     // Use fallback data when API is not available
     if (isAdmin.value) {
       stats.value = {
@@ -136,6 +142,9 @@ const loadDashboardData = async () => {
       }
     } catch (error) {
       console.error('Failed to load system info:', error)
+      handleError(error, { 
+        fallbackMessage: 'System status temporarily unavailable',
+        })
       // Use fallback data when API is not available
       const now = new Date()
       const fallbackStartTime = new Date(now.getTime() - 15 * 24 * 60 * 60 * 1000) // 15天前
@@ -207,11 +216,15 @@ const startUptimeTimer = () => {
 const checkErrorMessage = () => {
   const route = useRoute()
   if (route.query.error === 'admin_required') {
-    notyf.error('Admin permission required to access that page')
+    handleError(new Error('Admin permission required to access that page'), {
+      fallbackMessage: 'Admin permission required to access that page'
+    })
     // Clear the error query parameter
     router.replace({ path: route.path })
   } else if (route.query.error === 'super_admin_required') {
-    notyf.error('Super admin permission required to access that page')
+    handleError(new Error('Super admin permission required to access that page'), {
+      fallbackMessage: 'Super admin permission required to access that page'
+    })
     // Clear the error query parameter
     router.replace({ path: route.path })
   }

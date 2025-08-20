@@ -67,11 +67,6 @@ export default defineConfig({
         '**/temp/**',
         '**/uploads/**',
         '**/types/**'
-      ],
-      include: [
-        'src/**/*',
-        'vite.config.ts',
-        'index.html'
       ]
     }
   },

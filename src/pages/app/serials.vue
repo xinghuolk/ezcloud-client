@@ -5,6 +5,7 @@ import { serialApi, modelApi } from '/@src/api'
 import type { SerialNumber, GenerateSerialParams, DeviceModel } from '/@src/api/types'
 import { notyf } from '/@src/api/request'
 import { formatDateTime } from '/@src/utils/date-formatter'
+import { useFormErrorHandler } from '/@src/composables/use-error-handler'
 
 definePage({
   meta: {
@@ -14,6 +15,11 @@ definePage({
 })
 
 const router = useRouter()
+
+// Error handling
+const { createFormErrors, clearFormErrors, setFieldError, handleError, showSuccess } = useFormErrorHandler()
+const generateErrors = createFormErrors()
+
 // State
 const loading = ref(false)
 const generating = ref(false)
@@ -67,16 +73,7 @@ const stats = reactive({
   activatedCount: 0
 })
 
-// Validation errors
-const generateErrors = ref({
-  model_id: '',
-  count: '',
-  mac_start: '',
-  mac_count: '',
-  mac_interval: '',
-  mode: '',
-  custom_start_serial: ''
-})
+// Validation errors (now handled by new architecture)
 
 // 动态列配置
 const tableColumns = computed(() => {
@@ -225,61 +222,53 @@ const displayBatches = computed(() => {
 
 // Methods
 const validateGenerateForm = () => {
-  generateErrors.value = {
-    model_id: '',
-    count: '',
-    mac_start: '',
-    mac_count: '',
-    mac_interval: '',
-    mode: '',
-    custom_start_serial: ''
-  }
+  clearFormErrors(generateErrors)
   
   let isValid = true
 
   if (!generateForm.model_id || generateForm.model_id === 0) {
-    generateErrors.value.model_id = 'Please select a device model'
+    setFieldError(generateErrors, 'model_id', 'Please select a device model')
     isValid = false
   }
 
   if (!generateForm.mode) {
-    generateErrors.value.mode = 'Please select generation mode'
+    setFieldError(generateErrors, 'mode', 'Please select generation mode')
     isValid = false
   }
 
   if (generateForm.mode === 'custom') {
     if (!generateForm.custom_start_serial) {
-      generateErrors.value.custom_start_serial = 'Please enter custom start serial'
+      setFieldError(generateErrors, 'custom_start_serial', 'Please enter custom start serial')
       isValid = false
     } else {
       const last6Digits = generateForm.custom_start_serial.slice(-6)
       if (!/^\d{6}$/.test(last6Digits)) {
-        generateErrors.value.custom_start_serial = 'Custom serial number must end with 6 digits'
+        setFieldError(generateErrors, 'custom_start_serial', 'Custom serial number must end with 6 digits')
         isValid = false
       }
     }
   }
 
   if (!generateForm.count || generateForm.count < 1 || generateForm.count > 10000) {
-    generateErrors.value.count = 'Count must be between 1 and 10000'
+    setFieldError(generateErrors, 'count', 'Count must be between 1 and 10000')
     isValid = false
   }
 
   if (!generateForm.mac_start.trim()) {
-    generateErrors.value.mac_start = 'Please enter starting MAC address'
+    setFieldError(generateErrors, 'mac_start', 'Please enter starting MAC address')
     isValid = false
   } else if (!/^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/.test(generateForm.mac_start)) {
-    generateErrors.value.mac_start = 'Invalid MAC address format'
+    setFieldError(generateErrors, 'mac_start', 'Invalid MAC address format')
     isValid = false
   }
 
   if (!generateForm.mac_count || generateForm.mac_count < 1) {
-    generateErrors.value.mac_count = 'MAC count must be at least 1'
+    setFieldError(generateErrors, 'mac_count', 'MAC count must be at least 1')
     isValid = false
   }
 
   if (!generateForm.mac_interval || generateForm.mac_interval < 1) {
-    generateErrors.value.mac_interval = 'MAC interval must be at least 1'
+    setFieldError(generateErrors, 'mac_interval', 'MAC interval must be at least 1')
     isValid = false
   }
 
@@ -308,11 +297,11 @@ const fetchSerials = async () => {
         updateStats()
       }
     } else {
-      notyf.error(response.message || 'Failed to fetch serials')
+      handleError(new Error(response.message || 'Failed to fetch serials'))
     }
   } catch (error) {
     console.error('Error fetching serials:', error)
-    notyf.error('Failed to fetch serials')
+    handleError(error, { fallbackMessage: 'Failed to fetch serials' })
   } finally {
     loading.value = false
   }
@@ -334,11 +323,11 @@ const fetchBatches = async () => {
       }
       updateStats()
     } else {
-      notyf.error(response.message || 'Failed to fetch batches')
+      handleError(new Error(response.message || 'Failed to fetch batches'))
     }
   } catch (error) {
     console.error('Error fetching batches:', error)
-    notyf.error('Failed to fetch batches')
+    handleError(error, { fallbackMessage: 'Failed to fetch batches' })
   }
 }
 
@@ -439,17 +428,17 @@ const handleSubmitGenerate = async () => {
   try {
     const response = await serialApi.generateSerials(generateForm)
     if (response.success) {
-      notyf.success(`Successfully generated ${generateForm.count} serial numbers`)
+      showSuccess(`Successfully generated ${generateForm.count} serial numbers`)
       generateDialogVisible.value = false
       resetGenerateForm()
       fetchSerials()
       fetchBatches()
     } else {
-      notyf.error(response.message || 'Failed to generate serials')
+      handleError(new Error(response.message || 'Failed to generate serials'))
     }
   } catch (error) {
     console.error('Error generating serials:', error)
-    notyf.error('Failed to generate serials')
+    handleError(error, { fallbackMessage: 'Failed to generate serials' })
   } finally {
     generating.value = false
   }
@@ -525,10 +514,10 @@ const handleExportBatch = async (batchId: string) => {
     link.click()
     link.remove()
     window.URL.revokeObjectURL(url)
-    notyf.success('Serial numbers exported successfully')
+    showSuccess('Serial numbers exported successfully')
   } catch (error) {
     console.error('Error exporting serials:', error)
-    notyf.error('Failed to export serials')
+    handleError(error, { fallbackMessage: 'Failed to export serials' })
   }
 }
 
@@ -543,18 +532,18 @@ const confirmDeleteBatch = async () => {
   try {
     const response = await serialApi.deleteBatch(selectedBatchForDelete.value)
     if (response.success) {
-      notyf.success('Batch deleted successfully')
+      showSuccess('Batch deleted successfully')
       if (currentBatch.value === selectedBatchForDelete.value) {
         currentBatch.value = ''
       }
       fetchSerials()
       fetchBatches()
     } else {
-      notyf.error(response.message || 'Failed to delete batch')
+      handleError(new Error(response.message || 'Failed to delete batch'))
     }
   } catch (error) {
     console.error('Error deleting batch:', error)
-    notyf.error('Failed to delete batch')
+    handleError(error, { fallbackMessage: 'Failed to delete batch' })
   } finally {
     deleteBatchConfirmOpen.value = false
     selectedBatchForDelete.value = ''
@@ -571,15 +560,7 @@ const resetGenerateForm = () => {
     mode: 'auto',
     custom_start_serial: ''
   })
-  generateErrors.value = {
-    model_id: '',
-    count: '',
-    mac_start: '',
-    mac_count: '',
-    mac_interval: '',
-    mode: '',
-    custom_start_serial: ''
-  }
+  clearFormErrors(generateErrors)
 }
 
 // 使用统一的日期格式化工具
@@ -593,7 +574,7 @@ const onPageChange = (page: number) => {
 const onModeChange = (mode: string) => {
   if (mode === 'auto') {
     generateForm.custom_start_serial = ''
-    generateErrors.value.custom_start_serial = ''
+    setFieldError(generateErrors, 'custom_start_serial', '')
   }
 }
 
@@ -601,9 +582,9 @@ const validateCustomSerial = () => {
   if (generateForm.mode === 'custom' && generateForm.custom_start_serial) {
     const last6Digits = generateForm.custom_start_serial.slice(-6)
     if (!/^\d{6}$/.test(last6Digits)) {
-      generateErrors.value.custom_start_serial = 'Custom serial number must end with 6 digits'
+      setFieldError(generateErrors, 'custom_start_serial', 'Custom serial number must end with 6 digits')
     } else {
-      generateErrors.value.custom_start_serial = ''
+      setFieldError(generateErrors, 'custom_start_serial', '')
     }
   }
 }

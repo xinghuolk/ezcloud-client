@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { useUserSession } from '/@src/stores/user-session'
-import { notyf } from '/@src/api/request'
 import { formatDateTime } from '/@src/utils/date-formatter'
+import { useFormErrorHandler } from '/@src/composables/use-error-handler'
 
 definePage({
   meta: {
@@ -11,6 +11,10 @@ definePage({
 })
 
 const userSession = useUserSession()
+
+// Error handling
+const { createFormErrors, clearFormErrors, setFieldError, handleError, showSuccess } = useFormErrorHandler()
+
 // State
 const activeTab = ref('profile')
 const profileLoading = ref(false)
@@ -130,7 +134,7 @@ const handleUpdateProfile = async () => {
     })
 
     if (success) {
-      notyf.success('Profile updated successfully')
+      showSuccess('Profile updated successfully')
       loadProfile() // Reload the updated profile
     }
   } catch (error) {
@@ -153,7 +157,7 @@ const handleChangePassword = async () => {
     })
 
     if (success) {
-      notyf.success('Password changed successfully')
+      showSuccess('Password changed successfully')
       resetPasswordForm()
     }
   } catch (error) {

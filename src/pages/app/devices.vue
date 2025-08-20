@@ -8,6 +8,7 @@ import RemoteAccessButton from '/@src/components/RemoteAccessButton.vue'
 import DeviceTrustManager from '/@src/components/DeviceTrustManager.vue'
 import { notyf } from '/@src/api/request'
 import { formatDateTime } from '/@src/utils/date-formatter'
+import { useFormErrorHandler } from '/@src/composables/use-error-handler'
 
 definePage({
   meta: {
@@ -17,6 +18,10 @@ definePage({
 
 const deviceStore = useDeviceStore()
 const userSession = useUserSession()
+
+// Error handling
+const { createFormErrors, clearFormErrors, setFieldError, handleError } = useFormErrorHandler()
+const bindErrors = createFormErrors()
 
 // State
 const loading = ref(false)
@@ -75,9 +80,12 @@ const fetchDevices = async () => {
   loading.value = true
   try {
     // Sync pagination state
-    filterForm.page = pagination.page
+    filterForm.page = pagination.value.page
     // Fetch device list including trusted devices
     await deviceStore.fetchDevicesWithTrusted(filterForm)
+  } catch (error) {
+    console.error('Failed to fetch devices:', error)
+    handleError(error, { fallbackMessage: 'Failed to load devices' })
   } finally {
     loading.value = false
   }
@@ -88,7 +96,7 @@ const handleRefresh = () => {
 }
 
 const handlePageChange = (newPage: number) => {
-  pagination.page = newPage
+  filterForm.page = newPage
   fetchDevices()
 }
 
@@ -131,28 +139,38 @@ const handleSelectionChange = (selection: Device[]) => {
 }
 
 const handleViewDetails = async (device: Device) => {
-  const details = await deviceStore.fetchDeviceDetails(device.id)
-  if (details) {
-    selectedDevice.value = details
-    detailsDialogOpen.value = true
-    // Reset tab-specific data
-    wifiData.value = null
-    modemData.value = null
+  try {
+    const details = await deviceStore.fetchDeviceDetails(device.id)
+    if (details) {
+      selectedDevice.value = details
+      detailsDialogOpen.value = true
+      // Reset tab-specific data
+      wifiData.value = null
+      modemData.value = null
+    }
+  } catch (error) {
+    console.error('Failed to fetch device details:', error)
+    handleError(error, { fallbackMessage: 'Failed to load device details' })
   }
 }
 
 const handleBindDevice = async () => {
+  clearFormErrors(bindErrors)
+  
   if (!bindForm.serial.trim()) {
-    notyf.error('Please enter serial number')
+    setFieldError(bindErrors, 'serial', 'Please enter serial number')
     return
   }
   
-  const success = await deviceStore.bindDevice(bindForm.serial)
-  if (success) {
+  try {
+    await deviceStore.bindDevice(bindForm.serial)
     bindDialogOpen.value = false
     bindForm.serial = ''
     bindForm.name = ''
     fetchDevices()
+  } catch (error) {
+    console.error('Failed to bind device:', error)
+    handleError(error, { fallbackMessage: 'Failed to bind device' })
   }
 }
 
@@ -164,12 +182,16 @@ const handleUnbind = (device: Device) => {
 const confirmUnbind = async () => {
   if (!selectedDeviceForUnbind.value) return
   
-  const success = await deviceStore.unbindDevice(selectedDeviceForUnbind.value.id)
-  if (success) {
+  try {
+    await deviceStore.unbindDevice(selectedDeviceForUnbind.value.id)
     fetchDevices()
+  } catch (error) {
+    console.error('Failed to unbind device:', error)
+    handleError(error, { fallbackMessage: 'Failed to unbind device' })
+  } finally {
+    unbindConfirmOpen.value = false
+    selectedDeviceForUnbind.value = null
   }
-  unbindConfirmOpen.value = false
-  selectedDeviceForUnbind.value = null
 }
 
 const handleBatchOperation = async () => {
@@ -187,11 +209,14 @@ const handleBatchOperation = async () => {
     params = { slot: 2 }
   }
 
-  const success = await deviceStore.batchOperation(deviceIds, operationType, params)
-  if (success) {
+  try {
+    await deviceStore.batchOperation(deviceIds, operationType, params)
     batchDialogOpen.value = false
     batchForm.operation = ''
     selectedDevices.value = []
+  } catch (error) {
+    console.error('Failed to perform batch operation:', error)
+    handleError(error, { fallbackMessage: 'Failed to perform batch operation' })
   }
 }
 
@@ -203,18 +228,28 @@ const handleReboot = (device: Device) => {
 const confirmReboot = async () => {
   if (!selectedDeviceForReboot.value) return
   
-  await deviceStore.rebootDevice(selectedDeviceForReboot.value.id)
-  rebootConfirmOpen.value = false
-  selectedDeviceForReboot.value = null
+  try {
+    await deviceStore.rebootDevice(selectedDeviceForReboot.value.id)
+  } catch (error) {
+    console.error('Failed to reboot device:', error)
+    handleError(error, { fallbackMessage: 'Failed to reboot device' })
+  } finally {
+    rebootConfirmOpen.value = false
+    selectedDeviceForReboot.value = null
+  }
 }
 
 const handleSIMSwitch = async (device: Device, slot: number) => {
-  await deviceStore.switchSIM(device.id, slot)
+  try {
+    await deviceStore.switchSIM(device.id, slot)
+  } catch (error) {
+    console.error('Failed to switch SIM slot:', error)
+    handleError(error, { fallbackMessage: 'Failed to switch SIM slot' })
+  }
 }
 
 const handleRemoteAccessStatusChange = (device: Device, status: any) => {
   // Handle remote access status changes
-  console.log(`Device ${device.serial} remote access status updated:`, status)
   // Additional status handling logic can be added here, such as notifications, logging, etc.
 }
 
@@ -233,62 +268,38 @@ const loadWiFiData = async () => {
   if (!selectedDevice.value) return
   
   loadingWifi.value = true
-  console.log('=== WiFi Data Debug ===')
-  console.log('Loading WiFi data for device:', selectedDevice.value.id, selectedDevice.value.serial)
   
   try {
-    const response = await deviceApi.getDeviceWiFi(selectedDevice.value.id)
-    console.log('Raw WiFi API response:', response)
-    console.log('Response success:', response.success)
-    console.log('Response data:', response.data)
-    console.log('Data type:', typeof response.data)
-    console.log('Data keys:', response.data ? Object.keys(response.data) : 'no data')
+    const response = await deviceApi.getDeviceWiFiStatus(selectedDevice.value.id)
     
     if (response.success && response.data) {
-      console.log('Raw WiFi API response data:', response.data)
-      
-      // 直接使用实际的radios数组结构
+      // 使用WiFi状态端点返回的纯状态数据
       const rawData = response.data as any
       
-      if (rawData.wifi && rawData.wifi.radios) {
-        console.log('使用实际WiFi radios数据...', rawData.wifi.radios)
-        
-        // 使用真实数据结构，添加统计信息
+      // 新的状态端点直接返回WiFi状态数据
+      if (rawData && rawData.radios) {
+        // 使用状态数据结构，添加统计信息
         const transformedData = {
-          ...rawData.wifi,
+          ...rawData,
           // 统计信息
-          total_radios: rawData.wifi.radios.length,
-          enabled_radios: rawData.wifi.radios.filter((r: any) => r.enabled).length,
-          total_clients: rawData.wifi.radios.reduce((sum: number, r: any) => sum + (r.connected_clients || 0), 0),
-          bands_summary: [...new Set(rawData.wifi.radios.map((r: any) => r.band))].join(', ')
+          total_radios: rawData.radios.length,
+          enabled_radios: rawData.radios.filter((r: any) => r.enabled).length,
+          total_clients: rawData.radios.reduce((sum: number, r: any) => sum + (r.connected_clients || 0), 0),
+          bands_summary: [...new Set(rawData.radios.map((r: any) => r.band))].join(', ')
         }
         
         wifiData.value = transformedData
       } else {
         wifiData.value = { radios: [], ap_enabled: false }
       }
-      
-      console.log('WiFi data set successfully:', wifiData.value)
-      
-      // Debug actual data fields
-      console.log('--- Real WiFi Data Fields ---')
-      console.log('ap_enabled:', wifiData.value.ap_enabled)
-      console.log('radios count:', wifiData.value.radios?.length)
-      console.log('total_clients:', wifiData.value.total_clients)
-      console.log('bands_summary:', wifiData.value.bands_summary)
     } else {
-      console.warn('Failed to load WiFi data - API returned error:', response.message)
-      console.warn('Or response.data is empty/null')
       wifiData.value = null
     }
   } catch (error) {
-    console.error('Exception when loading WiFi data:', error)
-    console.error('Error details:', (error as Error).message)
-    console.error('Error stack:', (error as Error).stack)
+    console.error('Failed to load WiFi data:', error)
     wifiData.value = null
   } finally {
     loadingWifi.value = false
-    console.log('=== End WiFi Data Debug ===')
   }
 }
 
@@ -297,19 +308,12 @@ const loadModemData = async () => {
   if (!selectedDevice.value) return
   
   loadingModem.value = true
-  console.log('=== Modem Data Debug ===')
-  console.log('Loading modem data for device:', selectedDevice.value.id, selectedDevice.value.serial)
   
   try {
-    const response = await deviceApi.getDeviceModem(selectedDevice.value.id)
-    console.log('Raw modem API response:', response)
-    console.log('Response success:', response.success)
-    console.log('Response data:', response.data)
-    console.log('Data type:', typeof response.data)
-    console.log('Data keys:', response.data ? Object.keys(response.data) : 'no data')
+    const response = await deviceApi.getDeviceModemStatus(selectedDevice.value.id)
     
     if (response.success && response.data) {
-      // Map API response fields to our expected structure
+      // 使用调制解调器状态端点返回的状态数据，映射到预期结构
       const rawData = response.data as any
       const mappedData = {
         sim_status: rawData.sim_status || (rawData.active_slot !== null ? 'ready' : 'no_sim'),
@@ -338,39 +342,14 @@ const loadModemData = async () => {
       
       // Always use mapped API data, even if empty
       modemData.value = mappedData
-      
-      console.log('Modem data set successfully:', modemData.value)
-      
-      // Debug both raw and mapped data
-      console.log('--- Raw API Data ---')
-      console.log('active_slot:', rawData.active_slot)
-      console.log('operator:', rawData.operator)
-      console.log('network_type:', rawData.network_type)
-      console.log('rssi:', rawData.rssi)
-      console.log('last_update:', rawData.last_update)
-      
-      console.log('--- Mapped Modem Data ---')
-      console.log('sim_status:', mappedData.sim_status)
-      console.log('active_sim:', mappedData.active_sim)
-      console.log('operator:', mappedData.operator)
-      console.log('signal_strength:', mappedData.signal_strength)
-      console.log('network_type:', mappedData.network_type)
-      console.log('ip_address:', mappedData.ip_address)
-      console.log('data_uploaded:', mappedData.data_uploaded)
-      console.log('data_downloaded:', mappedData.data_downloaded)
     } else {
-      console.warn('Failed to load Modem data - API returned error:', response.message)
-      console.warn('Or response.data is empty/null')
       modemData.value = null
     }
   } catch (error) {
-    console.error('Exception when loading Modem data:', error)
-    console.error('Error details:', (error as Error).message)
-    console.error('Error stack:', (error as Error).stack)
+    console.error('Failed to load Modem data:', error)
     modemData.value = null
   } finally {
     loadingModem.value = false
-    console.log('=== End Modem Data Debug ===')
   }
 }
 
@@ -456,7 +435,7 @@ const getOwnershipType = (device: Device) => {
     return { type: 'owned', text: 'Owned', color: 'primary' }
   } else if (device.ownership?.isTrusted) {
     return { type: 'trusted', text: 'Trusted', color: 'info' }
-  } else if (device.ownership?.accessType === 'unbound') {
+  } else if (!device.ownership?.isOwner && !device.ownership?.isTrusted) {
     return { type: 'unbound', text: 'Unbound', color: 'warning' }
   }
   return { type: 'unknown', text: 'Unknown', color: 'light' }
@@ -810,7 +789,7 @@ useHead({
                   color="info"
                   outlined
                   rounded
-                  size="small"
+                  size="tiny"
                   class="version-tag"
                 >
                   {{ device.version }}
@@ -884,7 +863,7 @@ useHead({
               <template v-if="column.key === 'lastSeen'">
                 <div class="last-seen-info">
                   <div v-if="device.last_seen" class="last-seen-content">
-                    <VDateTimeSplit :date-string="device.last_seen" size="small" />
+                    <VDateTimeSplit :date-string="device.last_seen" />
                   </div>
                   <div v-else class="last-seen-content">
                     <div class="last-seen-date common-text-light">Never</div>
@@ -994,7 +973,7 @@ useHead({
                     </template>
                     <hr class="dropdown-divider">
                     <a 
-                      v-if="isAdmin" 
+                      v-if="device.ownership?.isOwner" 
                       class="dropdown-item is-media has-text-danger" 
                       @click="handleUnbind(device)"
                     >
@@ -1034,8 +1013,12 @@ useHead({
             <VInput
               v-model="bindForm.serial"
               placeholder="Enter device serial number"
+              :class="{ 'is-danger': bindErrors.serial }"
             />
           </VControl>
+          <p v-if="bindErrors.serial" class="help is-danger">
+            {{ bindErrors.serial }}
+          </p>
         </VField>
         
         <VField>
@@ -1176,7 +1159,7 @@ useHead({
                         <template #header>
                           <VFlex align-items="center" justify-content="space-between">
                             <h4 class="title is-6">WiFi Access Point Status</h4>
-                            <VTag :color="wifiData.ap_enabled ? 'success' : 'danger'" size="small">
+                            <VTag :color="wifiData.ap_enabled ? 'success' : 'danger'" size="tiny">
                               {{ wifiData.ap_enabled ? 'AP Enabled' : 'AP Disabled' }}
                             </VTag>
                           </VFlex>
@@ -1504,7 +1487,7 @@ useHead({
                         <div class="wifi-info">
                           <div class="info-item">
                             <label>Connection Status:</label>
-                            <VTag :color="modemData.status === 'Connected' ? 'success' : 'warning'" size="small">
+                            <VTag :color="modemData.status === 'Connected' ? 'success' : 'warning'" size="tiny">
                               {{ modemData.status || 'Unknown' }}
                             </VTag>
                           </div>

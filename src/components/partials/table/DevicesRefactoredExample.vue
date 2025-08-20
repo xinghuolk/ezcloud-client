@@ -71,9 +71,9 @@ const fetchDevices = async (filters: Record<string, any> = {}) => {
 
 const fetchVendors = async () => {
   try {
-    const response = await vendorApi.getAllVendors()
+    const response = await vendorApi.getVendors()
     if (response.success) {
-      vendors.value = response.data
+      vendors.value = response.data.vendors
       
       // 动态更新过滤器选项
       const vendorFilter = deviceFilters.find(f => f.key === 'vendor_id')

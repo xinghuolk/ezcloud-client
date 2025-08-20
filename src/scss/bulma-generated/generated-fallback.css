@@ -3767,3 +3767,19 @@ code {
 .common-stats-card .stats-icon.is-info {
   color: rgb(255, 255, 255);
 }
+
+.help.is-danger {
+  color: rgb(255, 255, 255);
+}
+
+.help.is-success {
+  color: rgb(255, 255, 255);
+}
+
+.help.is-warning {
+  color: rgb(255, 255, 255);
+}
+
+.help.is-info {
+  color: rgb(255, 255, 255);
+}

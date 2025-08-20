@@ -4,8 +4,8 @@ import { useVendorStore } from '/@src/stores/vendors'
 import { modelApi } from '/@src/api'
 import type { DeviceModel, CreateDeviceModelParams } from '/@src/api/types'
 import type { VTagColor } from '/@src/components/base/VTag.vue'
-import { notyf } from '/@src/api/request'
 import { formatDateTime } from '/@src/utils/date-formatter'
+import { useFormErrorHandler } from '/@src/composables/use-error-handler'
 
 definePage({
   meta: {
@@ -15,6 +15,11 @@ definePage({
 })
 
 const vendorStore = useVendorStore()
+
+// Error handling
+const { createFormErrors, clearFormErrors, setFieldError, handleError, showSuccess } = useFormErrorHandler()
+const modelFormErrors = createFormErrors()
+
 // Device types
 const DEVICE_TYPES = [
   { value: 'router', label: 'Router' },
@@ -157,11 +162,11 @@ const fetchModels = async () => {
         pagination.pages = response.data.pagination.totalPages
       }
     } else {
-      notyf.error(response.message || 'Failed to fetch models')
+      handleError(new Error(response.message || 'Failed to fetch models'))
     }
   } catch (error) {
     console.error('Error fetching models:', error)
-    notyf.error('Failed to fetch models')
+    handleError(error, { fallbackMessage: 'Failed to fetch models' })
   } finally {
     loading.value = false
   }
@@ -169,7 +174,13 @@ const fetchModels = async () => {
 
 const handleAdd = async () => {
   if (vendorStore.vendors.length === 0) {
-    await vendorStore.fetchVendors()
+    try {
+      await vendorStore.fetchVendors()
+    } catch (error) {
+      console.error('Failed to fetch vendors:', error)
+      handleError(error, { fallbackMessage: 'Failed to load vendors' })
+      return
+    }
   }
   editingId.value = null
   resetForm()
@@ -178,7 +189,13 @@ const handleAdd = async () => {
 
 const handleEdit = async (model: DeviceModel) => {
   if (vendorStore.vendors.length === 0) {
-    await vendorStore.fetchVendors()
+    try {
+      await vendorStore.fetchVendors()
+    } catch (error) {
+      console.error('Failed to fetch vendors:', error)
+      handleError(error, { fallbackMessage: 'Failed to load vendors' })
+      return
+    }
   }
   
   editingId.value = model.id
@@ -208,14 +225,14 @@ const confirmDelete = async () => {
   try {
     const response = await modelApi.deleteModel(selectedModelForDelete.value.id)
     if (response.success) {
-      notyf.success('Model deleted successfully')
+      showSuccess('Model deleted successfully')
       fetchModels()
     } else {
-      notyf.error(response.message || 'Failed to delete model')
+      handleError(new Error(response.message || 'Failed to delete model'))
     }
   } catch (error) {
     console.error('Error deleting model:', error)
-    notyf.error('Failed to delete model')
+    handleError(error, { fallbackMessage: 'Failed to delete model' })
   } finally {
     deleteConfirmOpen.value = false
     selectedModelForDelete.value = null
@@ -234,16 +251,16 @@ const handleSubmit = async () => {
       : await modelApi.createModel(form)
     
     if (response.success) {
-      notyf.success(editingId.value ? 'Model updated successfully' : 'Model created successfully')
+      showSuccess(editingId.value ? 'Model updated successfully' : 'Model created successfully')
       dialogVisible.value = false
       resetForm()
       fetchModels()
     } else {
-      notyf.error(response.message || 'Operation failed')
+      handleError(new Error(response.message || 'Operation failed'))
     }
   } catch (error) {
     console.error('Error submitting form:', error)
-    notyf.error('Operation failed')
+    handleError(error, { fallbackMessage: 'Operation failed' })
   } finally {
     submitting.value = false
   }
@@ -339,10 +356,15 @@ watch(() => pagination.limit, () => {
 
 // Lifecycle
 onMounted(async () => {
-  await Promise.all([
-    fetchModels(),
-    vendorStore.fetchVendors()
-  ])
+  try {
+    await Promise.all([
+      fetchModels(),
+      vendorStore.fetchVendors()
+    ])
+  } catch (error) {
+    console.error('Failed to initialize page:', error)
+    handleError(error, { fallbackMessage: 'Failed to load page data' })
+  }
 })
 
 useHead({

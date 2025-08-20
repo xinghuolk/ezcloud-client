@@ -3,7 +3,7 @@ import { ref, reactive, onMounted, computed, watch } from 'vue'
 import { useVendorStore } from '/@src/stores/vendors'
 import { useUserSession } from '/@src/stores/user-session'
 import type { Vendor, CreateVendorParams } from '/@src/api/types'
-import { notyf } from '/@src/api/request'
+import { useFormErrorHandler } from '/@src/composables/use-error-handler'
 
 definePage({
   meta: {
@@ -13,6 +13,10 @@ definePage({
 })
 const vendorStore = useVendorStore()
 const userSession = useUserSession()
+
+// Error handling
+const { createFormErrors, clearFormErrors, setFieldError, handleError, showSuccess } = useFormErrorHandler()
+const vendorFormErrors = createFormErrors()
 
 // State
 const loading = ref(false)
@@ -51,6 +55,9 @@ const fetchVendors = async () => {
   loading.value = true
   try {
     await vendorStore.fetchVendors(searchForm)
+  } catch (error) {
+    console.error('Failed to fetch vendors:', error)
+    handleError(error, { fallbackMessage: 'Failed to load vendors' })
   } finally {
     loading.value = false
   }
@@ -91,28 +98,42 @@ const openEditDialog = (vendor: Vendor) => {
 }
 
 const handleCreate = async () => {
+  clearFormErrors(vendorFormErrors)
   if (!vendorForm.name.trim()) {
-    notyf.error('Please enter vendor name')
+    setFieldError(vendorFormErrors, 'name', 'Please enter vendor name')
     return
   }
 
-  const vendor = await vendorStore.createVendor(vendorForm)
-  if (vendor) {
-    createDialogOpen.value = false
-    fetchVendors()
+  try {
+    const vendor = await vendorStore.createVendor(vendorForm)
+    if (vendor) {
+      createDialogOpen.value = false
+      showSuccess('Vendor created successfully')
+      fetchVendors()
+    }
+  } catch (error) {
+    console.error('Failed to create vendor:', error)
+    handleError(error, { fallbackMessage: 'Failed to create vendor' })
   }
 }
 
 const handleUpdate = async () => {
+  clearFormErrors(vendorFormErrors)
   if (!selectedVendor.value || !vendorForm.name.trim()) {
-    notyf.error('Please enter vendor name')
+    setFieldError(vendorFormErrors, 'name', 'Please enter vendor name')
     return
   }
 
-  const vendor = await vendorStore.updateVendor(selectedVendor.value.id, vendorForm)
-  if (vendor) {
-    editDialogOpen.value = false
-    selectedVendor.value = null
+  try {
+    const vendor = await vendorStore.updateVendor(selectedVendor.value.id, vendorForm)
+    if (vendor) {
+      editDialogOpen.value = false
+      selectedVendor.value = null
+      showSuccess('Vendor updated successfully')
+    }
+  } catch (error) {
+    console.error('Failed to update vendor:', error)
+    handleError(error, { fallbackMessage: 'Failed to update vendor' })
   }
 }
 
@@ -129,6 +150,11 @@ const confirmDelete = async () => {
     if (success) {
       fetchVendors()
     }
+  } catch (error: any) {
+    // 使用统一错误处理架构
+    handleError(error, {
+      fallbackMessage: 'Failed to delete vendor'
+    })
   } finally {
     deleteConfirmOpen.value = false
     selectedVendorForDelete.value = null

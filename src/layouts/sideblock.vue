@@ -164,9 +164,9 @@ watch(() => darkmode.isDark.value, (newValue, oldValue) => {
   
   .logo-image {
     width: 100%;
-    max-width: 200px;
+    max-width: 190px;
     height: auto;
-    max-height: 40px;
+    max-height: 50px;
     object-fit: contain;
     transition: all 0.3s ease;
     

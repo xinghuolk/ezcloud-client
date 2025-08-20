@@ -23,11 +23,19 @@ COPY client/ ./client/
 # 设置工作目录到client
 WORKDIR /app/client
 
-# 接收构建参数
+# 定义构建时参数（VITE环境变量）
 ARG VITE_API_BASE_URL
 ARG VITE_WS_BASE_URL
-ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
-ENV VITE_WS_BASE_URL=$VITE_WS_BASE_URL
+ARG VITE_RECAPTCHA_SITE_KEY
+ARG VITE_RECAPTCHA_V2_SITE_KEY
+ARG VITE_RECAPTCHA_ENABLED
+
+# 将ARG转换为ENV供构建使用
+ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
+ENV VITE_WS_BASE_URL=${VITE_WS_BASE_URL}
+ENV VITE_RECAPTCHA_SITE_KEY=${VITE_RECAPTCHA_SITE_KEY}
+ENV VITE_RECAPTCHA_V2_SITE_KEY=${VITE_RECAPTCHA_V2_SITE_KEY}
+ENV VITE_RECAPTCHA_ENABLED=${VITE_RECAPTCHA_ENABLED}
 
 # 构建应用
 RUN npm run build
@@ -75,5 +83,6 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
 # 使用非root用户运行
 USER nginx
 
-# 启动nginx
+# 设置入口点和默认命令
+ENTRYPOINT ["/docker-entrypoint.sh"]
 CMD ["nginx", "-g", "daemon off;"] 

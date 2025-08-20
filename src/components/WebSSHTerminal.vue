@@ -11,14 +11,12 @@
           :color="isConnected ? 'success' : 'primary'"
           :loading="isConnecting"
           @click="toggleConnection"
-          size="small"
         >
           {{ connectionButtonText }}
         </VButton>
         <VButton 
           @click="clearTerminal" 
           :disabled="!isConnected"
-          size="small"
           outlined
         >
           <iconify-icon icon="lucide:trash-2" class="mr-1" />
@@ -26,7 +24,6 @@
         </VButton>
         <VButton 
           @click="closeTerminal"
-          size="small"
           outlined
         >
           <iconify-icon icon="lucide:x" class="mr-1" />
@@ -59,10 +56,9 @@
           Reconnect
         </VButton>
         <VButton 
-          color="secondary" 
+          color="light" 
           @click="emit('close')"
           outlined
-          size="medium"
         >
           <iconify-icon icon="lucide:x" class="mr-2" />
           Close Window
@@ -263,7 +259,7 @@ const connectSSH = async () => {
       wsBaseUrl = `${protocol}//${host}`
     }
     
-    const wsUrl = `${wsBaseUrl}/ws/ssh-terminal/device/${props.device.id}?token=${encodeURIComponent(token)}`
+    const wsUrl = `${wsBaseUrl}/api/v1/websocket/ssh-terminal/device/${props.device.id}?token=${encodeURIComponent(token)}`
 
     // Create WebSocket connection
     websocket = new WebSocket(wsUrl)

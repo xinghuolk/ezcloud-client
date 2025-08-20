@@ -3,7 +3,7 @@ import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { devicesApi } from '/@src/api'
 import type { Device } from '/@src/api/types'
-import { notyf } from '/@src/api/request'
+import { useFormErrorHandler } from '/@src/composables/use-error-handler'
 import WebSSHTerminal from '/@src/components/WebSSHTerminal.vue'
 
 definePage({
@@ -14,6 +14,9 @@ definePage({
 
 const route = useRoute()
 const router = useRouter()
+
+// Error handling
+const { handleError } = useFormErrorHandler()
 // State
 const device = ref<Device | null>(null)
 const loading = ref(true)
@@ -44,7 +47,7 @@ const initializeDevice = async () => {
   } catch (err: any) {
     console.error('Device initialization failed:', err)
     error.value = err.message || 'Initialization failed'
-    notyf.error(error.value)
+    handleError(err, { fallbackMessage: 'Device initialization failed' })
   } finally {
     loading.value = false
   }

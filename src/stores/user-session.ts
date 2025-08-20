@@ -4,7 +4,7 @@ import { authApi } from '/@src/api'
 import type { User, LoginParams, RegisterParams, SendVerificationCodeParams, VerifyCodeParams, EnhancedRegisterParams } from '/@src/api/types'
 import { useUserToken } from '/@src/composables/user-token'
 import { notyf } from '/@src/api/request'
-import { extractErrorMessage } from '/@src/utils/error-utils'
+import { extractErrorMessage } from '/@src/utils/error-handler'
 
 export interface UserData extends User {
   // 继承API中的User类型，可以添加额外字段
@@ -67,16 +67,14 @@ export const useUserSession = defineStore('userSession', () => {
       
       // 对于 423 reCAPTCHA 挑战响应，需要保留完整错误结构供上层组件处理
       if (error.response?.status === 423) {
-        console.log('🔍 处理 423 reCAPTCHA 挑战响应:', error.response.data)
         // 构造包含挑战信息的错误对象，传递整个响应数据
         const challengeError = new Error(error.response.data?.message || 'Security challenge required') as any
         challengeError.status = 423
         challengeError.data = error.response.data // 传递整个响应数据，challenge_type 现在在顶层
-        console.log('🚀 抛出挑战错误对象:', challengeError)
         throw challengeError
       }
       
-      // 为其他HTTP错误提供友好的错误消息
+      // 保留原始错误对象结构，但设置友好的错误消息
       let friendlyMessage = 'Login failed'
       if (error.response?.status === 429) {
         friendlyMessage = 'Too many login attempts. Please try again later.'
@@ -92,7 +90,13 @@ export const useUserSession = defineStore('userSession', () => {
         friendlyMessage = error.message
       }
       
-      throw new Error(friendlyMessage)
+      // 保留原始错误结构，只替换消息
+      const enhancedError = error.response ? error : new Error(friendlyMessage)
+      if (error.response) {
+        enhancedError.message = friendlyMessage
+      }
+      
+      throw enhancedError
     } finally {
       loading.value = false
     }
@@ -110,8 +114,7 @@ export const useUserSession = defineStore('userSession', () => {
       return false
     } catch (error: any) {
       console.error('Register error:', error)
-      // axios拦截器已处理错误提示)
-      return false
+      throw error
     } finally {
       loading.value = false
     }
@@ -155,8 +158,9 @@ export const useUserSession = defineStore('userSession', () => {
     }
   }
 
+
   // 增强注册方法 (包含验证码)
-  async function enhancedRegisterUser(params: EnhancedRegisterParams): Promise<{ success: boolean; error?: string }> {
+  async function enhancedRegisterUser(params: EnhancedRegisterParams): Promise<{ success: boolean; error?: string; validationErrors?: any[] }> {
     loading.value = true
     try {
       const response = await authApi.enhancedRegister(params)
@@ -171,6 +175,15 @@ export const useUserSession = defineStore('userSession', () => {
       if (error.response?.status === 423) {
         // 重新抛出423错误，保持原始结构
         throw error
+      }
+      
+      // 处理验证错误 (400状态码，包含详细的字段验证错误)
+      if (error.response?.status === 400 && error.response?.data?.details) {
+        return { 
+          success: false, 
+          error: extractErrorMessage(error, 'Validation failed'),
+          validationErrors: error.response.data.details
+        }
       }
       
       return { success: false, error: extractErrorMessage(error, 'Registration failed') }
@@ -217,8 +230,7 @@ export const useUserSession = defineStore('userSession', () => {
       return false
     } catch (error: any) {
       console.error('Update profile error:', error)
-      // axios拦截器已处理错误提示)
-      return false
+      throw error
     } finally {
       loading.value = false
     }
@@ -236,8 +248,7 @@ export const useUserSession = defineStore('userSession', () => {
       return false
     } catch (error: any) {
       console.error('Change password error:', error)
-      // axios拦截器已处理错误提示)
-      return false
+      throw error
     } finally {
       loading.value = false
     }
@@ -327,14 +338,10 @@ export const useUserSession = defineStore('userSession', () => {
   // 开发环境下添加全局调试函数
   if (import.meta.env.DEV) {
     (window as any).logout = () => {
-      console.log('Executing logout...')
       logoutUser().then(() => {
-        console.log('Logout completed')
         window.location.href = '/auth'
       })
     }
-    
-    console.log('Dev mode: Use window.logout() to logout quickly')
   }
 
   return {

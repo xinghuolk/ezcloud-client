@@ -4,6 +4,7 @@ import { useUserSession } from '/@src/stores/user-session'
 import { userManagementApi } from '/@src/api'
 import type { User, UserListParams } from '/@src/api/types'
 import { notyf } from '/@src/api/request'
+import { useFormErrorHandler } from '/@src/composables/use-error-handler'
 
 definePage({
   meta: {
@@ -13,6 +14,10 @@ definePage({
 })
 
 const userSession = useUserSession()
+
+// Error handling
+const { createFormErrors, clearFormErrors, setFieldError, handleError, showSuccess } = useFormErrorHandler()
+const userFormErrors = createFormErrors()
 
 // State
 const loading = ref(false)
@@ -82,7 +87,7 @@ const fetchUsers = async () => {
     }
   } catch (error: any) {
     console.error('Failed to fetch users:', error)
-    notyf.error('Failed to load users')
+    handleError(error, { fallbackMessage: 'Failed to load users' })
   } finally {
     loading.value = false
   }
@@ -109,6 +114,16 @@ const handleReset = () => {
 
 const handleRefresh = () => {
   fetchUsers()
+}
+
+const resetUserForm = () => {
+  userForm.username = ''
+  userForm.email = ''
+  userForm.phone = ''
+  userForm.password = ''
+  userForm.role = 'user'
+  userForm.is_active = true
+  clearFormErrors(userFormErrors)
 }
 
 const handlePageChange = (newPage: number) => {
@@ -140,14 +155,26 @@ const openEditDialog = (user: User) => {
 
 
 const handleCreate = async () => {
-  if (!userForm.username.trim() || !userForm.email.trim() || !userForm.password.trim()) {
-    notyf.error('Please fill in all required fields')
+  clearFormErrors(userFormErrors)
+  
+  if (!userForm.username.trim()) {
+    setFieldError(userFormErrors, 'username', 'Please enter username')
+    return
+  }
+  
+  if (!userForm.email.trim()) {
+    setFieldError(userFormErrors, 'email', 'Please enter email address')  
+    return
+  }
+  
+  if (!userForm.password.trim()) {
+    setFieldError(userFormErrors, 'password', 'Please enter password')
     return
   }
 
   // 防止创建多个Super Admin（虽然UI不允许选择，但安全检查）
-  if (userForm.role === 'super_admin' && existingSuperAdminCount.value > 0) {
-    notyf.error('Only one Super Admin user is allowed')
+  if (userForm.role === 'admin' && existingSuperAdminCount.value > 0) {
+    setFieldError(userFormErrors, 'role', 'Only one Super Admin user is allowed')
     return
   }
 
@@ -163,18 +190,31 @@ const handleCreate = async () => {
     
     if (response.success) {
       createDialogOpen.value = false
-      notyf.success('User created successfully')
+      showSuccess('User created successfully')
+      resetUserForm()
       fetchUsers()
     }
   } catch (error: any) {
     console.error('Failed to create user:', error)
-    notyf.error(error.message || 'Failed to create user')
+    handleError(error)
   }
 }
 
 const handleUpdate = async () => {
-  if (!selectedUser.value || !userForm.username.trim() || !userForm.email.trim()) {
-    notyf.error('Please fill in all required fields')
+  clearFormErrors(userFormErrors)
+  
+  if (!selectedUser.value) {
+    handleError(new Error('No user selected for editing'))
+    return
+  }
+  
+  if (!userForm.username.trim()) {
+    setFieldError(userFormErrors, 'username', 'Please enter username')
+    return
+  }
+  
+  if (!userForm.email.trim()) {
+    setFieldError(userFormErrors, 'email', 'Please enter email address')
     return
   }
 
@@ -198,13 +238,13 @@ const handleUpdate = async () => {
           await userManagementApi.resetUserPassword(selectedUser.value.id, {
             new_password: userForm.password.trim()
           })
-          notyf.success('User updated and password reset successfully')
+          showSuccess('User updated and password reset successfully')
         } catch (passwordError: any) {
           console.error('Failed to reset password:', passwordError)
-          notyf.error('User updated but password reset failed')
+          handleError(passwordError, { fallbackMessage: 'User updated but password reset failed' })
         }
       } else {
-        notyf.success('User updated successfully')
+        showSuccess('User updated successfully')
       }
       
       editDialogOpen.value = false
@@ -212,7 +252,7 @@ const handleUpdate = async () => {
     }
   } catch (error: any) {
     console.error('Failed to update user:', error)
-    notyf.error(error.message || 'Failed to update user')
+    handleError(error)
   }
 }
 
@@ -466,8 +506,12 @@ onMounted(() => {
             <VInput
               v-model="userForm.username"
               placeholder="Enter username"
+              :class="{ 'is-danger': userFormErrors.username }"
             />
           </VControl>
+          <p v-if="userFormErrors.username" class="help is-danger">
+            {{ userFormErrors.username }}
+          </p>
         </VField>
 
         <VField>
@@ -477,8 +521,12 @@ onMounted(() => {
               v-model="userForm.email"
               type="email"
               placeholder="Enter email"
+              :class="{ 'is-danger': userFormErrors.email }"
             />
           </VControl>
+          <p v-if="userFormErrors.email" class="help is-danger">
+            {{ userFormErrors.email }}
+          </p>
         </VField>
 
         <VField>
@@ -498,18 +546,25 @@ onMounted(() => {
               v-model="userForm.password"
               type="password"
               placeholder="Enter password"
+              :class="{ 'is-danger': userFormErrors.password }"
             />
           </VControl>
+          <p v-if="userFormErrors.password" class="help is-danger">
+            {{ userFormErrors.password }}
+          </p>
         </VField>
 
         <VField>
           <VLabel>Role</VLabel>
           <VControl>
-            <VSelect v-model="userForm.role">
+            <VSelect v-model="userForm.role" :class="{ 'is-danger': userFormErrors.role }">
               <VOption value="user">User</VOption>
               <VOption value="admin">Admin</VOption>
             </VSelect>
           </VControl>
+          <p v-if="userFormErrors.role" class="help is-danger">
+            {{ userFormErrors.role }}
+          </p>
         </VField>
 
         <VField>
@@ -544,8 +599,12 @@ onMounted(() => {
             <VInput
               v-model="userForm.username"
               placeholder="Enter username"
+              :class="{ 'is-danger': userFormErrors.username }"
             />
           </VControl>
+          <p v-if="userFormErrors.username" class="help is-danger">
+            {{ userFormErrors.username }}
+          </p>
         </VField>
 
         <VField>
@@ -555,8 +614,12 @@ onMounted(() => {
               v-model="userForm.email"
               type="email"
               placeholder="Enter email"
+              :class="{ 'is-danger': userFormErrors.email }"
             />
           </VControl>
+          <p v-if="userFormErrors.email" class="help is-danger">
+            {{ userFormErrors.email }}
+          </p>
         </VField>
 
         <VField>

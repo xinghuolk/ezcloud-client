@@ -3,7 +3,7 @@ import { ref, computed } from 'vue'
 import type { Device, DeviceQuery, DeviceTrustParams, DeviceTrustUpdateParams, DeviceTrusted } from '/@src/api/types'
 import { deviceApi } from '/@src/api'
 import { notyf } from '/@src/api/request'
-import { extractErrorMessage } from '/@src/utils/error-utils'
+import { extractErrorMessage } from '/@src/utils/error-handler'
 
 export const useDeviceStore = defineStore('devices', () => {
   // State
@@ -45,7 +45,7 @@ export const useDeviceStore = defineStore('devices', () => {
       }
     } catch (error) {
       console.error('Failed to fetch devices:', error)
-      // axios拦截器已处理错误提示)
+      throw error
     } finally {
       loading.value = false
     }
@@ -68,8 +68,7 @@ export const useDeviceStore = defineStore('devices', () => {
       }
     } catch (error) {
       console.error('Store: Exception when fetching device details:', error)
-      // axios拦截器已处理错误提示)
-      return null
+      throw error
     }
   }
 
@@ -87,8 +86,7 @@ export const useDeviceStore = defineStore('devices', () => {
       }
     } catch (error) {
       console.error('Failed to bind device:', error)
-      // axios拦截器已处理错误提示)
-      return false
+      throw error
     }
   }
 
@@ -106,8 +104,7 @@ export const useDeviceStore = defineStore('devices', () => {
       }
     } catch (error) {
       console.error('Failed to unbind device:', error)
-      // axios拦截器已处理错误提示)
-      return false
+      throw error
     }
   }
 
@@ -131,8 +128,7 @@ export const useDeviceStore = defineStore('devices', () => {
       }
     } catch (error) {
       console.error('Failed to update device name:', error)
-      // axios拦截器已处理错误提示)
-      return false
+      throw error
     }
   }
 
@@ -148,8 +144,7 @@ export const useDeviceStore = defineStore('devices', () => {
       }
     } catch (error) {
       console.error('Failed to reboot device:', error)
-      // axios拦截器已处理错误提示)
-      return false
+      throw error
     }
   }
 
@@ -165,8 +160,7 @@ export const useDeviceStore = defineStore('devices', () => {
       }
     } catch (error) {
       console.error('Failed to switch SIM:', error)
-      // axios拦截器已处理错误提示)
-      return false
+      throw error
     }
   }
 
@@ -182,8 +176,7 @@ export const useDeviceStore = defineStore('devices', () => {
       }
     } catch (error) {
       console.error('Failed to collect logs:', error)
-      // axios拦截器已处理错误提示)
-      return false
+      throw error
     }
   }
 
@@ -202,8 +195,7 @@ export const useDeviceStore = defineStore('devices', () => {
       }
     } catch (error) {
       console.error(`Failed to perform batch ${operation}:`, error)
-      // axios拦截器已处理错误提示)
-      return false
+      throw error
     }
   }
 
@@ -247,8 +239,7 @@ export const useDeviceStore = defineStore('devices', () => {
       }
     } catch (error) {
       console.error('Failed to trust device:', error)
-      // axios拦截器已处理错误提示)
-      return false
+      throw error
     }
   }
 
@@ -266,8 +257,7 @@ export const useDeviceStore = defineStore('devices', () => {
       }
     } catch (error) {
       console.error('Failed to untrust device:', error)
-      // axios拦截器已处理错误提示)
-      return false
+      throw error
     }
   }
 
@@ -282,8 +272,7 @@ export const useDeviceStore = defineStore('devices', () => {
       }
     } catch (error) {
       console.error('Failed to get device trustees:', error)
-      // axios拦截器已处理错误提示)
-      return []
+      throw error
     }
   }
 
@@ -301,8 +290,7 @@ export const useDeviceStore = defineStore('devices', () => {
       }
     } catch (error) {
       console.error('Failed to update device trust:', error)
-      // axios拦截器已处理错误提示)
-      return null
+      throw error
     }
   }
 

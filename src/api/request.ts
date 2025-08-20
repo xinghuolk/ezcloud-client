@@ -71,16 +71,9 @@ request.interceptors.response.use(
     
     // 新的统一响应格式：{success, message, data}
     if (typeof data === 'object' && data !== null) {
-      // 如果响应不成功，对于登录API不在这里显示错误消息
+      // 如果响应不成功，只reject错误，不显示消息（由组件层处理）
       if (data.success === false) {
-        if (response.config.url?.includes('/auth/login')) {
-          // 登录API的错误由上层处理，这里只reject错误，不显示消息
-          return Promise.reject(new Error(data.message || 'Request failed'))
-        } else {
-          // 其他API的错误在这里显示消息
-          notyf.error(data.message || 'Request failed')
-          return Promise.reject(new Error(data.message || 'Request failed'))
-        }
+        return Promise.reject(new Error(data.message || 'Request failed'))
       }
       
       // 响应成功，返回完整响应数据
@@ -91,90 +84,59 @@ request.interceptors.response.use(
     return data
   },
   (error: AxiosError) => {
-    // 处理HTTP错误状态码
+    // HTTP拦截器只处理关键的系统级错误，其他错误由组件层的错误处理架构统一处理
     if (error.response) {
       const { status, data } = error.response
-      let errorMessage = 'Request failed'
       
-      // 尝试从响应数据中获取错误消息
-      if (data && typeof data === 'object') {
-        errorMessage = (data as any).message || errorMessage
-      }
-      
+      // 只处理需要立即响应的认证和授权错误
       switch (status) {
-        case 400:
-          // 使用后端返回的具体错误信息
-          errorMessage = errorMessage || 'Bad request'
-          notyf.error(errorMessage)
-          break
         case 401:
-          // 对于登录API的401错误，不在这里显示错误消息（由上层处理）
-          if (error.config?.url?.includes('/auth/login')) {
-            // 登录失败的错误消息由登录逻辑处理，这里不显示重复消息
-            // 但需要传递具体的错误消息给上层
-            return Promise.reject(new Error(errorMessage))
+          // 401表示token无效或过期，需要自动重新登录
+          if (!error.config?.url?.includes('/auth/login')) {
+            console.warn('🔒 Token expired or invalid, redirecting to login')
+            // 清除本地存储的认证信息
+            localStorage.removeItem('token')
+            localStorage.removeItem('user_info')
+            // 跳转到登录页面
+            if (typeof window !== 'undefined') {
+              window.location.href = '/auth'
+            }
           }
+          break
           
-          // 401表示token无效或过期，需要重新登录
-          errorMessage = 'Unauthorized, please login again'
-          notyf.error(errorMessage)
-          // 清除本地存储的认证信息
-          localStorage.removeItem('token')
-          localStorage.removeItem('user_info')
-          // 跳转到登录页面（使用window.location避免router问题）
-          window.location.href = '/auth'
-          break
         case 403:
-          // 403表示权限不足，但用户身份有效，不应该退出登录
-          errorMessage = errorMessage || 'Access denied - insufficient permissions'
-          notyf.error(errorMessage)
-          break
-        case 404:
-          // 对于某些预期的404（如开发中的API），不显示通知
-          errorMessage = 'Resource not found'
-          // 只在控制台记录，不显示用户通知（允许应用优雅降级）
-          console.warn(`API endpoint not found: ${error.config?.url}`)
-          break
-        case 429:
-          errorMessage = 'Too many requests, please try again later'
-          notyf.error(errorMessage)
-          break
-        case 409:
-          // 冲突错误（如设备重复绑定、厂商重复等），显示后端返回的具体错误信息
-          errorMessage = errorMessage || 'Resource conflict'
-          notyf.error(errorMessage)
-          break
-        case 422:
-          // 不可处理的实体（如删除有关联的资源）
-          errorMessage = errorMessage || 'Cannot process request'
-          notyf.error(errorMessage)
-          break
-        case 423:
-          // 423 Locked - 用于 reCAPTCHA 挑战响应
-          // 对于登录API的423错误，不显示通知消息，让上层组件处理
-          if (error.config?.url?.includes('/auth/login')) {
-            // 保持错误消息但不显示通知，让前端组件处理 reCAPTCHA 挑战
-            break
-          } else {
-            // 非登录API的423错误显示通知
-            errorMessage = errorMessage || 'Resource locked, please try again later'
-            notyf.error(errorMessage)
+          // 检查是否是token过期的情况
+          const errorMessage = (data as any)?.message || ''
+          if (errorMessage.includes('Token has expired') || 
+              errorMessage.includes('expired') || 
+              errorMessage.includes('invalid token')) {
+            console.warn('🔒 Session expired, redirecting to login')
+            // Token过期，需要重新登录
+            localStorage.removeItem('token')
+            localStorage.removeItem('user_info')
+            // 跳转到登录页面
+            if (typeof window !== 'undefined') {
+              window.location.href = '/auth'
+            }
           }
           break
-        case 500:
-          // 使用后端返回的具体错误信息
-          errorMessage = errorMessage || 'Internal server error'
-          notyf.error(errorMessage)
+          
+        case 404:
+          // 404错误只在控制台记录，不显示用户通知（允许应用优雅降级）
+          if (import.meta.env.DEV) {
+            console.warn(`🔍 API endpoint not found: ${error.config?.url}`)
+          }
           break
-        default:
-          notyf.error(errorMessage)
       }
     } else if (error.request) {
-      notyf.error('Network error, please check your connection')
-    } else {
-      notyf.error('Request configuration error')
+      // Network errors are handled at component level
+      if (import.meta.env.DEV) {
+        console.error('🌐 Network error:', error.message)
+      }
     }
     
+    // Always reject the error for component-level handling
+    // Components will use the new error handler architecture to display appropriate messages
     return Promise.reject(error)
   }
 )

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
-import { notyf } from '/@src/api/request'
+import { useFormErrorHandler } from '/@src/composables/use-error-handler'
 import { formatDateTime } from '/@src/utils/date-formatter'
 import { useUserSession } from '/@src/stores/user-session'
 import request from '/@src/api/request'
@@ -12,6 +12,9 @@ definePage({
 })
 
 const userSession = useUserSession()
+
+// Error handling
+const { handleError, showSuccess } = useFormErrorHandler()
 
 // 检查是否有系统查看权限
 const hasSystemAccess = computed(() => userSession.hasPermission('system:view'))
@@ -59,8 +62,8 @@ const fetchSystemConfig = async () => {
     const response = await request.get('/system/config')
     systemConfig.value = response.data
   } catch (error) {
-    console.error('获取系统配置失败:', error)
-    notyf.error('获取系统配置失败')
+    console.error('Failed to get system config:', error)
+    handleError(error, { fallbackMessage: 'Failed to get system config' })
   } finally {
     isLoadingConfig.value = false
   }
@@ -74,7 +77,7 @@ const fetchFrpStatus = async () => {
     frpStatus.value = response.data
   } catch (error) {
     console.error('获取FRP状态失败:', error)
-    notyf.error('获取FRP状态失败')
+    handleError(error, { fallbackMessage: '获取FRP状态失败' })
   } finally {
     isLoadingStatus.value = false
   }
@@ -84,12 +87,12 @@ const fetchFrpStatus = async () => {
 const reloadFrpConfig = async () => {
   try {
     await request.post('/system/frp/reload')
-    notyf.success('FRP配置重新加载成功')
+    showSuccess('FRP配置重新加载成功')
     await fetchSystemConfig()
     await fetchFrpStatus()
   } catch (error) {
     console.error('重新加载FRP配置失败:', error)
-    notyf.error('重新加载FRP配置失败')
+    handleError(error, { fallbackMessage: '重新加载FRP配置失败' })
   }
 }
 
@@ -114,7 +117,7 @@ const startOAuthAuthentication = async () => {
     isAuthenticating.value = true
     const response = await request.get('/auth/google/oauth-url?popup=true')
     
-    if (response.success && response.data.authUrl) {
+    if (response.data && response.data.authUrl) {
       // 在新窗口中打开Google OAuth认证页面
       const authWindow = window.open(
         response.data.authUrl,
@@ -127,7 +130,7 @@ const startOAuthAuthentication = async () => {
         const handleMessage = (event: MessageEvent) => {
           if (event.data.type === 'oauth-success') {
             console.log('OAuth认证成功:', event.data)
-            notyf.success('Google OAuth认证成功！')
+            showSuccess('Google OAuth认证成功！')
             // 清理监听器
             window.removeEventListener('message', handleMessage)
             clearInterval(checkClosed)
@@ -137,7 +140,7 @@ const startOAuthAuthentication = async () => {
             }, 500)
           } else if (event.data.type === 'oauth-error') {
             console.error('OAuth认证失败:', event.data.error)
-            notyf.error(`OAuth认证失败: ${event.data.error}`)
+            handleError(new Error(`OAuth认证失败: ${event.data.error}`), { fallbackMessage: `OAuth认证失败: ${event.data.error}` })
             // 清理监听器
             window.removeEventListener('message', handleMessage)
             clearInterval(checkClosed)
@@ -170,16 +173,16 @@ const startOAuthAuthentication = async () => {
           window.removeEventListener('message', handleMessage)
         }, 600000)
         
-        notyf.success('请在新窗口中完成Google OAuth认证')
+        showSuccess('请在新窗口中完成Google OAuth认证')
       } else {
-        notyf.error('无法打开认证窗口，请检查浏览器弹窗阻止设置')
+        handleError(new Error('无法打开认证窗口，请检查浏览器弹窗阻止设置'), { fallbackMessage: '无法打开认证窗口，请检查浏览器弹窗阻止设置' })
       }
     } else {
-      notyf.error('获取认证URL失败')
+      handleError(new Error('获取认证URL失败'), { fallbackMessage: '获取认证URL失败' })
     }
   } catch (error) {
     console.error('开始OAuth认证失败:', error)
-    notyf.error('开始OAuth认证失败')
+    handleError(error, { fallbackMessage: '开始OAuth认证失败' })
   } finally {
     isAuthenticating.value = false
   }
@@ -193,7 +196,7 @@ const checkOAuthResult = () => {
   const error = urlParams.get('error')
 
   if (status === 'oauth_success') {
-    notyf.success('邮件认证配置成功！')
+    showSuccess('邮件认证配置成功！')
     if (configuredAt) {
       console.log('认证配置时间:', decodeURIComponent(configuredAt))
     }
@@ -219,7 +222,7 @@ const checkOAuthResult = () => {
       default:
         errorMessage = `认证错误: ${error}`
     }
-    notyf.error(errorMessage)
+    handleError(new Error(errorMessage), { fallbackMessage: errorMessage })
     // 清除URL参数
     window.history.replaceState({}, document.title, window.location.pathname)
   }

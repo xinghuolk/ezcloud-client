@@ -2,15 +2,19 @@
 import { ref, onMounted, watch } from 'vue'
 import { wifiTemplatesApi } from '/@src/api'
 import type { WiFiTemplate } from '/@src/api/types'
-import { notyf } from '/@src/api/request'
 import type { VTagColor } from '/@src/components/base/VTag.vue'
 import VDateTimeSplit from '/@src/components/base/VDateTimeSplit.vue'
+import { useFormErrorHandler } from '/@src/composables/use-error-handler'
 
 definePage({
   meta: {
     requiresAuth: true
   }
 })
+
+// Error handling
+const { createFormErrors, clearFormErrors, setFieldError, handleError, showSuccess } = useFormErrorHandler()
+const wifiFormErrors = createFormErrors()
 
 // State
 const loading = ref(false)
@@ -106,7 +110,7 @@ const loadTemplates = async () => {
     }
   } catch (error) {
     console.error('Load templates error:', error)
-    notyf.error('Failed to load WiFi templates')
+    handleError(error, { fallbackMessage: 'Failed to load WiFi templates' })
   } finally {
     loading.value = false
   }
@@ -139,11 +143,11 @@ const viewTemplate = async (template: WiFiTemplate) => {
       viewingTemplate.value = response.data
       showDetailDialog.value = true
     } else {
-      notyf.error('Failed to load template details')
+      handleError(new Error('Failed to load template details'))
     }
   } catch (error) {
     console.error('View template error:', error)
-    notyf.error('Failed to load template details')
+    handleError(error, { fallbackMessage: 'Failed to load template details' })
   } finally {
     loadingDetails.value = false
   }
@@ -159,11 +163,11 @@ const editTemplate = async (template: WiFiTemplate) => {
       editingTemplate.value = response.data
       showEditDialog.value = true
     } else {
-      notyf.error('Failed to load template for editing')
+      handleError(new Error('Failed to load template for editing'))
     }
   } catch (error) {
     console.error('Edit template error:', error)
-    notyf.error('Failed to load template for editing')
+    handleError(error, { fallbackMessage: 'Failed to load template for editing' })
   } finally {
     loadingDetails.value = false
   }
@@ -174,24 +178,26 @@ const saveTemplate = async () => {
   if (!editingTemplate.value) return
   
   // Validation
+  clearFormErrors(wifiFormErrors)
+  
   if (!editingTemplate.value.name.trim()) {
-    notyf.error('Please enter template name')
+    setFieldError(wifiFormErrors, 'name', 'Please enter template name')
     return
   }
   
   if (!editingTemplate.value.ssidConfigs || editingTemplate.value.ssidConfigs.length === 0) {
-    notyf.error('At least one SSID configuration is required')
+    setFieldError(wifiFormErrors, 'ssidConfigs', 'At least one SSID configuration is required')
     return
   }
   
   // Validate SSIDs
   for (const ssid of editingTemplate.value.ssidConfigs) {
     if (!ssid.ssid.trim()) {
-      notyf.error('Please enter SSID name')
+      setFieldError(wifiFormErrors, 'ssid', 'Please enter SSID name')
       return
     }
     if (ssid.encryption !== 'none' && !ssid.password?.trim()) {
-      notyf.error('Please enter password for secured SSID')
+      setFieldError(wifiFormErrors, 'password', 'Please enter password for secured SSID')
       return
     }
   }
@@ -225,15 +231,15 @@ const saveTemplate = async () => {
     const response = await wifiTemplatesApi.updateTemplate(editingTemplate.value.id!, updateData)
     
     if (response.success) {
-      notyf.success('Template updated successfully')
+      showSuccess('Template updated successfully')
       showEditDialog.value = false
       loadTemplates() // Refresh the list
     } else {
-      notyf.error(response.message || 'Failed to update template')
+      handleError(new Error(response.message || 'Failed to update template'))
     }
   } catch (error) {
     console.error('Save template error:', error)
-    notyf.error('Failed to update template')
+    handleError(error, { fallbackMessage: 'Failed to update template' })
   } finally {
     submittingEdit.value = false
   }
@@ -285,24 +291,26 @@ const resetCreateForm = () => {
 
 // Submit create template
 const submitCreateTemplate = async () => {
+  clearFormErrors(wifiFormErrors)
+  
   if (!createForm.value.name.trim()) {
-    notyf.error('Please enter template name')
+    setFieldError(wifiFormErrors, 'name', 'Please enter template name')
     return
   }
   
   if (createForm.value.ssidConfigs.length === 0) {
-    notyf.error('At least one SSID configuration is required')
+    setFieldError(wifiFormErrors, 'ssidConfigs', 'At least one SSID configuration is required')
     return
   }
   
   // Validate SSIDs
   for (const ssid of createForm.value.ssidConfigs) {
     if (!ssid.ssid.trim()) {
-      notyf.error('Please enter SSID name')
+      setFieldError(wifiFormErrors, 'ssid', 'Please enter SSID name')
       return
     }
     if (ssid.encryption !== 'none' && !ssid.password?.trim()) {
-      notyf.error('Please enter password for secured SSID')
+      setFieldError(wifiFormErrors, 'password', 'Please enter password for secured SSID')
       return
     }
   }
@@ -311,15 +319,15 @@ const submitCreateTemplate = async () => {
   try {
     const response = await wifiTemplatesApi.createTemplate(createForm.value)
     if (response.success) {
-      notyf.success('WiFi template created successfully')
+      showSuccess('WiFi template created successfully')
       showCreateDialog.value = false
       loadTemplates()
     } else {
-      notyf.error(response.message || 'Failed to create template')
+      handleError(new Error(response.message || 'Failed to create template'))
     }
   } catch (error) {
     console.error('Create template error:', error)
-    notyf.error('Failed to create template')
+    handleError(error, { fallbackMessage: 'Failed to create template' })
   } finally {
     submittingCreate.value = false
   }
@@ -439,12 +447,12 @@ const toggleTemplateStatus = async (template: WiFiTemplate) => {
   try {
     const response = await wifiTemplatesApi.toggleTemplate(template.id!)
     if (response.success) {
-      notyf.success(`Template ${template.is_active ? 'disabled' : 'enabled'} successfully`)
+      showSuccess(`Template ${template.is_active ? 'disabled' : 'enabled'} successfully`)
       loadTemplates()
     }
   } catch (error) {
     console.error('Toggle template error:', error)
-    notyf.error('Failed to update template status')
+    handleError(error, { fallbackMessage: 'Failed to update template status' })
   }
 }
 
@@ -460,12 +468,12 @@ const confirmDeleteTemplate = async () => {
   try {
     const response = await wifiTemplatesApi.deleteTemplate(selectedTemplateForDelete.value.id!)
     if (response.success) {
-      notyf.success('Template deleted successfully')
+      showSuccess('Template deleted successfully')
       loadTemplates()
     }
   } catch (error) {
     console.error('Delete template error:', error)
-    notyf.error('Failed to delete template')
+    handleError(error, { fallbackMessage: 'Failed to delete template' })
   } finally {
     deleteConfirmOpen.value = false
     selectedTemplateForDelete.value = null
