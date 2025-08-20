@@ -82,7 +82,8 @@ export function analyzeError(error: any): ErrorAnalysis {
         analysis.userMessage = 'Please check your input and try again'
         
         // Special handling for specific validation errors
-        if (analysis.technicalMessage.includes('recaptcha')) {
+        if (analysis.technicalMessage.includes('reCAPTCHA verification required') || 
+            analysis.technicalMessage.includes('recaptcha')) {
           analysis.type = ErrorType.RECAPTCHA
           analysis.requiresRecaptcha = true
           analysis.userMessage = 'Security verification required'

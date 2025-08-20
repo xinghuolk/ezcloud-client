@@ -1,6 +1,5 @@
 import axios, { type AxiosResponse, type AxiosError, type InternalAxiosRequestConfig } from 'axios'
 import { Notyf } from 'notyf'
-import { useRouter } from 'vue-router'
 
 // 创建通知实例
 const notyf = new Notyf({
@@ -71,9 +70,26 @@ request.interceptors.response.use(
     
     // 新的统一响应格式：{success, message, data}
     if (typeof data === 'object' && data !== null) {
-      // 如果响应不成功，只reject错误，不显示消息（由组件层处理）
+      // 如果响应不成功，需要先检查是否是Token过期错误
       if (data.success === false) {
-        return Promise.reject(new Error(data.message || 'Request failed'))
+        const message = data.message || 'Request failed'
+        
+        // 检查是否是Token过期错误，需要特殊处理
+        if (message.includes('Token has expired') || 
+            message.includes('expired') || 
+            message.includes('invalid token') ||
+            message.includes('token is invalid')) {
+          console.warn('🔒 Token expired detected in API response, redirecting to login')
+          // 清除本地存储的认证信息
+          localStorage.removeItem('token')
+          localStorage.removeItem('user_info')
+          // 跳转到登录页面
+          if (typeof window !== 'undefined') {
+            window.location.href = '/auth'
+          }
+        }
+        
+        return Promise.reject(new Error(message))
       }
       
       // 响应成功，返回完整响应数据

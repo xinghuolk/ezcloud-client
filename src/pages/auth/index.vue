@@ -309,22 +309,15 @@ const handleCodeInput = (index: number, event: Event) => {
   const target = event.target as HTMLInputElement
   const value = target.value.replace(/\D/g, '') // 只允许数字
   
-  console.log(`⌨️ [DEBUG] Input event - Index: ${index}, Value: "${value}", Length: ${value.length}`)
-  
   // 检查是否是多字符输入（类似粘贴）
   if (value.length > 1) {
-    console.log(`📥 [DEBUG] Multi-character input detected: "${value}"`)
     // 处理多字符输入，从第一个输入框开始填充
     const digits = value.slice(0, 6) // 只取前6个数字
-    console.log(`🔢 [DEBUG] Extracted digits from input: "${digits}"`)
     
     // 清空所有输入框并填充新数据
     for (let i = 0; i < 6; i++) {
       const newValue = digits[i] || ''
-      const oldValue = codeInputs.value[i]
       codeInputs.value[i] = newValue
-      
-      console.log(`📝 [DEBUG] Multi-input Index ${i}: ${oldValue} -> ${newValue}`)
       
       // 同时更新DOM元素的值
       const input = codeInputRefs.value[i]
@@ -335,7 +328,6 @@ const handleCodeInput = (index: number, event: Event) => {
     
     // 立即更新验证码
     updateVerificationCode()
-    console.log(`📧 [DEBUG] Multi-input verification code updated: ${registerForm.verificationCode}`)
     
     // 焦点移到合适的位置
     nextTick(() => {
@@ -355,7 +347,6 @@ const handleCodeInput = (index: number, event: Event) => {
   }
   
   // 正常单个字符输入
-  console.log(`✏️ [DEBUG] Single character input - Index: ${index}, Value: "${value}"`)
   codeInputs.value[index] = value
   target.value = value // 确保DOM同步
   
@@ -366,7 +357,6 @@ const handleCodeInput = (index: number, event: Event) => {
   if (value && index < 5) {
     const nextInput = codeInputRefs.value[index + 1]
     if (nextInput) {
-      console.log(`➡️ [DEBUG] Moving focus from ${index} to ${index + 1}`)
       nextInput.focus()
     }
   }
@@ -377,13 +367,10 @@ const handleCodeKeydown = (index: number, event: KeyboardEvent) => {
   
   // 处理Ctrl+V粘贴快捷键
   if (event.ctrlKey && event.key === 'v') {
-    console.log('⌨️ [DEBUG] Ctrl+V detected, preventing default and triggering paste logic')
     event.preventDefault()
     
     // 从剪贴板读取数据
     navigator.clipboard.readText().then(text => {
-      console.log('📋 [DEBUG] Clipboard text from Ctrl+V:', text)
-      console.log('📋 [DEBUG] Text length:', text?.length, 'Content preview:', text?.slice(0, 20))
       // 创建模拟的粘贴事件
       const mockPasteEvent = {
         preventDefault: () => {},
@@ -394,10 +381,8 @@ const handleCodeKeydown = (index: number, event: KeyboardEvent) => {
       
       handleCodePaste(mockPasteEvent)
     }).catch(error => {
-      console.error('❌ [DEBUG] Failed to read clipboard:', error)
       // 如果剪贴板API失败，尝试监听下一个paste事件
       const tempPasteHandler = (e: ClipboardEvent) => {
-        console.log('🔄 [DEBUG] Fallback paste event after Ctrl+V')
         handleCodePaste(e)
         document.removeEventListener('paste', tempPasteHandler)
       }
@@ -444,82 +429,46 @@ const handleCodeKeydown = (index: number, event: KeyboardEvent) => {
 }
 
 const handleCodePaste = (event: ClipboardEvent) => {
-  console.log('🎯 [DEBUG] Paste event triggered:', event)
-  
   event.preventDefault()
   const paste = (event.clipboardData || (window as any).clipboardData)?.getData('text')
   
-  console.log('📋 [DEBUG] Raw paste data:', paste)
-  
   if (paste) {
     const digits = paste.replace(/\D/g, '').slice(0, 6) // 只取前6个数字
-    console.log('🔢 [DEBUG] Extracted digits:', digits)
-    console.log('📏 [DEBUG] Digits length:', digits.length)
     
     if (digits.length > 0) {
-      console.log('🧹 [DEBUG] Before clearing - codeInputs:', [...codeInputs.value])
-      
       // 清空所有输入框并填充新数据（同步操作）
       for (let i = 0; i < 6; i++) {
         const newValue = digits[i] || ''
-        const oldValue = codeInputs.value[i]
         codeInputs.value[i] = newValue
-        
-        console.log(`📝 [DEBUG] Index ${i}: ${oldValue} -> ${newValue}`)
         
         // 同时更新DOM元素的值以确保同步
         const input = codeInputRefs.value[i]
         if (input) {
-          console.log(`🔄 [DEBUG] Updating DOM input ${i}: ${input.value} -> ${newValue}`)
           input.value = newValue
-        } else {
-          console.warn(`⚠️ [DEBUG] Input ref ${i} is null/undefined`)
         }
       }
       
-      console.log('✅ [DEBUG] After filling - codeInputs:', [...codeInputs.value])
-      console.log('🔍 [DEBUG] DOM values:', codeInputRefs.value.map((input, i) => input?.value || 'null'))
-      
       // 立即更新验证码（同步调用）
-      const oldVerificationCode = registerForm.verificationCode
       updateVerificationCode()
-      console.log(`📧 [DEBUG] Verification code: ${oldVerificationCode} -> ${registerForm.verificationCode}`)
       
       // 使用 nextTick 来处理焦点，确保DOM已更新
       nextTick(() => {
-        console.log('⏰ [DEBUG] nextTick - Setting focus')
         // 焦点移到最后一个有值的输入框，如果填满了就移到最后一个
         const lastFilledIndex = Math.min(digits.length - 1, 5)
         const focusIndex = digits.length >= 6 ? 5 : lastFilledIndex
-        console.log(`🎯 [DEBUG] Focus index: ${focusIndex}`)
         
         const targetInput = codeInputRefs.value[focusIndex]
         if (targetInput) {
-          console.log(`👆 [DEBUG] Focusing on input ${focusIndex}`)
           targetInput.focus()
           // 如果没填满就选中文本，填满了就光标放到末尾
           if (digits.length < 6) {
             targetInput.select()
-            console.log(`📄 [DEBUG] Selected text in input ${focusIndex}`)
           } else {
             targetInput.setSelectionRange(1, 1)
-            console.log(`💎 [DEBUG] Set cursor position in input ${focusIndex}`)
           }
-        } else {
-          console.error(`❌ [DEBUG] Target input ${focusIndex} is null`)
         }
-        
-        console.log('🏁 [DEBUG] Final DOM state:', codeInputRefs.value.map((input, i) => ({
-          index: i,
-          value: input?.value || 'null',
-          focused: document.activeElement === input
-        })))
       })
-    } else {
-      console.warn('⚠️ [DEBUG] No valid digits found in paste data')
     }
-  } else {
-    console.warn('⚠️ [DEBUG] No paste data available')
   }
 }
 
@@ -527,18 +476,13 @@ const updateVerificationCode = () => {
   const code = codeInputs.value.join('')
   registerForm.verificationCode = code
   
-  console.log(`📧 [DEBUG] updateVerificationCode - Code: "${code}", Length: ${code.length}`)
-  console.log(`📊 [DEBUG] Current codeInputs state:`, codeInputs.value)
-  
   // 如果输入完整6位，自动触发验证
   if (code.length === 6 && /^\d{6}$/.test(code)) {
-    console.log('✅ [DEBUG] Full 6-digit code detected, triggering verification')
     // 使用nextTick确保DOM更新完成后再验证
     nextTick(() => {
       verifyCodeRealtime()
     })
   } else if (code.length < 6) {
-    console.log('⏳ [DEBUG] Incomplete code, resetting verification status')
     // 重置验证状态
     codeVerification.status = 'idle'
     codeVerification.message = ''
@@ -739,27 +683,25 @@ const validateRegisterForm = () => {
 const executeRecaptcha = (action: string): Promise<string | null> => {
   return new Promise((resolve) => {
     if (typeof window.grecaptcha?.enterprise === 'undefined') {
-      console.warn('reCAPTCHA Enterprise not loaded, skipping verification')
       resolve(null)
       return
     }
 
-    // 从预加载的配置获取 Site Key（同步访问）
+    // 从appConfig获取Site Key
     const siteKey = appConfig.recaptchaSiteKey
+    
     if (!siteKey) {
-      console.error('RECAPTCHA_SITE_KEY 环境变量未配置')
       resolve(null)
       return
     }
 
     window.grecaptcha.enterprise.ready(() => {
+      
       window.grecaptcha.enterprise.execute(siteKey, { action })
         .then((token: string) => {
-          console.log('reCAPTCHA Enterprise token generated for action:', action)
           resolve(token)
         })
         .catch((error: any) => {
-          console.error('reCAPTCHA Enterprise execution failed:', error)
           resolve(null)
         })
     })
@@ -776,7 +718,7 @@ const initRecaptchaV2 = (): Promise<void> => {
     }
 
     window.grecaptcha.ready(() => {
-      // 获取 v2 site key（同步访问）
+      // 获取 v2 site key（直接访问Pinia store属性）
       const v2SiteKey = appConfig.recaptchaV2SiteKey
       if (!v2SiteKey) {
         console.error('RECAPTCHA_V2_SITE_KEY 环境变量未配置')
@@ -838,7 +780,7 @@ const initRegisterRecaptchaV2 = (): Promise<void> => {
     }
 
     window.grecaptcha.ready(() => {
-      // 获取 v2 site key（同步访问）
+      // 获取 v2 site key（直接访问Pinia store属性）
       const v2SiteKey = appConfig.recaptchaV2SiteKey
       if (!v2SiteKey) {
         console.error('RECAPTCHA_V2_SITE_KEY 环境变量未配置')
@@ -906,7 +848,6 @@ const cacheV3Token = (token: string, action: string, email: string = '') => {
   recaptchaTokenCache.v3Timestamp = Date.now()
   recaptchaTokenCache.lastAction = action
   if (email) recaptchaTokenCache.lastEmail = email
-  console.log(`✅ Cached v3 token for action: ${action}`)
 }
 
 const cacheV2Token = (token: string, action: string, email: string = '') => {
@@ -914,7 +855,6 @@ const cacheV2Token = (token: string, action: string, email: string = '') => {
   recaptchaTokenCache.v2Timestamp = Date.now()
   recaptchaTokenCache.lastAction = action
   if (email) recaptchaTokenCache.lastEmail = email
-  console.log(`✅ Cached v2 token for action: ${action}`)
 }
 
 const clearTokenCache = () => {
@@ -926,7 +866,6 @@ const clearTokenCache = () => {
     lastAction: null,
     lastEmail: ''
   })
-  console.log('🗑️ Cleared token cache')
 }
 
 // 检测并处理 reCAPTCHA DUPE 错误的辅助函数
@@ -970,7 +909,6 @@ const getOptimalRecaptchaToken = async (action: string, email: string = ''): Pro
   // 检查v2 token (优先级最高，因为用户已完成挑战)
   if (recaptchaTokenCache.v2Token && isTokenValid(recaptchaTokenCache.v2Timestamp)) {
     const age = getTokenAge(recaptchaTokenCache.v2Timestamp)
-    console.log(`♾️ Using cached v2 token (age: ${age}s) for action: ${action}`)
     
     return {
       useV2: true,
@@ -986,7 +924,6 @@ const getOptimalRecaptchaToken = async (action: string, email: string = ''): Pro
       isTokenValid(recaptchaTokenCache.v3Timestamp) &&
       recaptchaTokenCache.lastEmail === email) {
     const age = getTokenAge(recaptchaTokenCache.v3Timestamp)
-    console.log(`♾️ Using cached v3 token (age: ${age}s) for action: ${action}`)
     
     return {
       useV2: false,
@@ -998,7 +935,6 @@ const getOptimalRecaptchaToken = async (action: string, email: string = ''): Pro
   }
   
   // 需要新的v3验证
-  console.log(`🆕 Generating new v3 token for action: ${action}`)
   const newV3Token = await executeRecaptcha(action)
   if (newV3Token) {
     cacheV3Token(newV3Token, action, email)
@@ -1028,11 +964,13 @@ const handleLogin = async () => {
     // 执行 reCAPTCHA v3 验证
     const recaptchaToken = await executeRecaptcha('login')
     
-    const success = await userSession.loginUser({
+    const loginData = {
       email: loginForm.email,
       password: loginForm.password,
       recaptcha_token: recaptchaToken || undefined
-    })
+    }
+    
+    const success = await userSession.loginUser(loginData)
 
     if (success) {
       showSuccess('Login successful!')
@@ -1135,7 +1073,6 @@ const handleSendVerificationCode = async () => {
     const tokens = await getOptimalRecaptchaToken('send_verification_code', registerForm.email)
     
     if (tokens.fromCache && tokens.cacheInfo) {
-      console.log(`💾 Smart verification: ${tokens.cacheInfo}`)
       // 可选择显示给用户
       // notyf.info('使用之前的验证状态')
     }
@@ -1225,19 +1162,8 @@ const handleSendVerificationCode = async () => {
 // Real-time verification code validation
 const verifyCodeRealtime = async () => {
   if (!registerForm.verificationCode || registerForm.verificationCode.length !== 6) {
-    console.log('🚫 [DEBUG] verifyCodeRealtime - Invalid code length:', {
-      code: registerForm.verificationCode,
-      length: registerForm.verificationCode?.length
-    })
     return
   }
-
-  console.log('🔍 [DEBUG] Starting real-time verification:', {
-    email: registerForm.email,
-    code: registerForm.verificationCode,
-    codeLength: registerForm.verificationCode.length,
-    codeInputsState: [...codeInputs.value]
-  })
 
   codeVerification.status = 'verifying'
   codeVerification.message = 'Verifying...'
@@ -1248,11 +1174,8 @@ const verifyCodeRealtime = async () => {
     type: 'registration'
   }
 
-  console.log('📤 [DEBUG] Sending verification request:', params)
-
   try {
     const result = await userSession.verifyCode(params)
-    console.log('📥 [DEBUG] Verification response:', result)
     if (result.success) {
       codeVerification.status = 'success'
       codeVerification.message = 'Code verified!'
@@ -1336,7 +1259,6 @@ const handleEnhancedRegister = async () => {
           fromCache: true,
           cacheInfo: 'Using v2 token for email verification, skipping duplicate verification'
         }
-        console.log('✅ Smart verification: Using v2 token for email verification, skipping registration reCAPTCHA')
       } else if (recaptchaTokenCache.v3Token && isTokenValid(recaptchaTokenCache.v3Timestamp)) {
         // 有有效的v3 token，直接使用
         tokens = {
@@ -1345,10 +1267,8 @@ const handleEnhancedRegister = async () => {
           fromCache: true,
           cacheInfo: 'Using v3 token for email verification, skipping registration reCAPTCHA'
         }
-        console.log('✅ Smart verification: Using v3 token for email verification, skipping registration reCAPTCHA')
       } else {
         // 没有可用token，但邮箱已验证，使用轻量级验证
-        console.log('✅ Smart verification: Email verified, skipping registration reCAPTCHA verification')
         tokens = { v3Token: null, v2Token: null, fromCache: true, cacheInfo: 'Email verified, skipping registration reCAPTCHA' }
       }
           } else {
@@ -1363,7 +1283,7 @@ const handleEnhancedRegister = async () => {
       }
     
     if (tokens.fromCache && tokens.cacheInfo) {
-      console.log(`💾 Smart registration: ${tokens.cacheInfo}`)
+      // Smart registration caching active
     }
     
          const params: EnhancedRegisterParams = {
@@ -1409,14 +1329,11 @@ const handleEnhancedRegister = async () => {
     } else {
       // 处理详细的验证错误
       if (result.validationErrors && Array.isArray(result.validationErrors)) {
-        console.log('Processing validation errors:', result.validationErrors)
-        
         // 清除之前的错误
         clearFormErrors(registerErrors)
         
         // 逐个处理验证错误
         result.validationErrors.forEach((error: any) => {
-          console.log('Processing error:', error)
           if (error.path) {
             const fieldName = error.path
             const message = error.msg || error.message || 'Validation failed'
@@ -1500,7 +1417,6 @@ const handleEnhancedRegisterWithV2Token = async (v2Token: string) => {
     let v3Token = null
     if (useExistingV3) {
       v3Token = recaptchaTokenCache.v3Token
-      console.log('💾 Using existing v3 token with new v2 token for registration')
     } else if (registerRecaptchaV2Challenge.value?.recaptcha_result?.action) {
       // 只有在明确需要时才生成新v3 token
       v3Token = await executeRecaptcha('registration')
@@ -1550,14 +1466,11 @@ const handleEnhancedRegisterWithV2Token = async (v2Token: string) => {
     } else {
       // 处理详细的验证错误
       if (result.validationErrors && Array.isArray(result.validationErrors)) {
-        console.log('Processing validation errors (v2 flow):', result.validationErrors)
-        
         // 清除之前的错误
         clearFormErrors(registerErrors)
         
         // 逐个处理验证错误
         result.validationErrors.forEach((error: any) => {
-          console.log('Processing error (v2 flow):', error)
           if (error.path) {
             const fieldName = error.path
             const message = error.msg || error.message || 'Validation failed'
@@ -1698,26 +1611,37 @@ const handleRegister = async () => {
 
 // 动态加载reCAPTCHA脚本（使用同步配置访问）
 const loadRecaptchaScripts = () => {
+  
+  // 正确访问Pinia store中的computed属性
   const siteKey = appConfig.recaptchaSiteKey
+  const v2SiteKey = appConfig.recaptchaV2SiteKey
+  
   
   if (siteKey) {
     // 加载reCAPTCHA Enterprise脚本
     const enterpriseScript = document.createElement('script')
     enterpriseScript.src = `https://www.google.com/recaptcha/enterprise.js?render=${siteKey}`
     enterpriseScript.defer = true
+    enterpriseScript.onload = () => {
+      // reCAPTCHA Enterprise script loaded successfully
+    }
+    enterpriseScript.onerror = (error) => {
+      console.error('❌ [DEBUG] reCAPTCHA Enterprise script failed to load:', error)
+    }
     document.head.appendChild(enterpriseScript)
-    console.log('✅ reCAPTCHA Enterprise脚本已加载')
   } else {
-    console.warn('⚠️ reCAPTCHA Site Key未配置，跳过Enterprise脚本加载')
   }
   
-  // 加载reCAPTCHA v2脚本
-  const v2Script = document.createElement('script')
-  v2Script.src = 'https://www.google.com/recaptcha/api.js'
-  v2Script.async = true
-  v2Script.defer = true
-  document.head.appendChild(v2Script)
-  console.log('✅ reCAPTCHA v2脚本已加载')
+  if (v2SiteKey) {
+    // 加载reCAPTCHA v2脚本
+    const v2Script = document.createElement('script')
+    v2Script.src = 'https://www.google.com/recaptcha/api.js'
+    v2Script.async = true
+    v2Script.defer = true
+    document.head.appendChild(v2Script)
+    console.log('✅ reCAPTCHA v2脚本已加载')
+  } else {
+  }
 }
 
 // 全局粘贴监听器 - 备用方案
@@ -1733,21 +1657,12 @@ onMounted(() => {
     const target = event.target as HTMLElement
     const isInVerificationArea = target?.closest?.('.verification-compact') != null
     
-    console.log('🌐 [DEBUG] Global paste detected:', {
-      target: target?.tagName,
-      className: target?.className,
-      isInVerificationArea,
-      activeElement: document.activeElement?.tagName
-    })
-    
     if (isInVerificationArea && showVerificationField.value) {
-      console.log('🎯 [DEBUG] Global paste - redirecting to handleCodePaste')
       handleCodePaste(event)
     }
   }
   
   document.addEventListener('paste', globalPasteListener)
-  console.log('📋 [DEBUG] Global paste listener registered')
 })
 
 onBeforeUnmount(() => {
@@ -1756,7 +1671,6 @@ onBeforeUnmount(() => {
   // 清理全局粘贴监听器
   if (globalPasteListener) {
     document.removeEventListener('paste', globalPasteListener)
-    console.log('📋 [DEBUG] Global paste listener removed')
   }
 })
 
@@ -1955,8 +1869,6 @@ useHead({
                           @input="handleCodeInput(index, $event)"
                           @keydown="handleCodeKeydown(index, $event)"
                           @paste.prevent="handleCodePaste"
-                          @focus="console.log(`🎯 [DEBUG] Focus on input ${index}`)"
-                          @blur="console.log(`👋 [DEBUG] Blur on input ${index}`)"
                           autocomplete="off"
                         />
                       </div>
